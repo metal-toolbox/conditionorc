@@ -1,0 +1,30 @@
+log_level: debug
+app_kind: server
+listen_address: localhost:9001
+store_kind: serverservice
+condition_definitions:
+  - name: inventoryOutofband
+    exclusive: false
+  - name: firmwareUpdate
+    exclusive: true
+serverservice_options:
+  endpoint: hollow.sh
+  disable_oauth: true
+  #oidc_issuer_endpoint: foo.bar/oidc/issuer
+  #oidc_audience_endpoint: foo.bar/oidc/audience
+  #oidc_client_id: conditionorc
+  #oidc_client_scopes:
+  #  - read
+  #  - write
+events_broker_kind: nats
+nats_options:
+  stream_url: nats@nats
+  stream_user: foo
+  stream_pass: bar
+  #creds_file:
+  stream_name: hollow
+  stream_prefix: com.hollow.sh.events
+  stream_urn_ns: hollow
+  stream_subjects:
+    - com.hollow.sh.events.>
+  connect_timeout: 100ms
