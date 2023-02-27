@@ -18,6 +18,7 @@ require (
 	go.hollow.sh/toolbox v0.5.1
 	go.infratographer.com/x v0.0.1
 	golang.org/x/exp v0.0.0-20230116083435-1de6713980de
+	gopkg.in/square/go-jose.v2 v2.6.0
 )
 
 require (
@@ -85,7 +86,6 @@ require (
 	google.golang.org/grpc v1.52.0 // indirect
 	google.golang.org/protobuf v1.28.1 // indirect
 	gopkg.in/ini.v1 v1.67.0 // indirect
-	gopkg.in/square/go-jose.v2 v2.6.0 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )

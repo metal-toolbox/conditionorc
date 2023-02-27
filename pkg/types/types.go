@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"time"
 
-	"github.com/google/uuid"
 	"golang.org/x/exp/slices"
 )
 
@@ -13,12 +12,24 @@ import (
 // ConditionKind defines model for ConditionKind.
 type ConditionKind string
 
-// ConditionKinds is the list of ConditionKinds loaded from the condition definitions.
-type ConditionKinds []ConditionKind
+const (
+	FirmwareInstallOutofband ConditionKind = "firmwareInstallOutofband"
+	InventoryOutofband       ConditionKind = "inventoryOutofband"
+	GenerateFirmwareSet      ConditionKind = "generateFirmwareSet"
+)
 
-// Valid checks if the condition kind is known.
-func (v ConditionKinds) Valid(k ConditionKind) bool {
-	return slices.Contains(v, k)
+// ConditionKinds returns the list of ConditionKinds defined.
+func ConditionKinds() []ConditionKind {
+	return []ConditionKind{
+		FirmwareInstallOutofband,
+		InventoryOutofband,
+		GenerateFirmwareSet,
+	}
+}
+
+// ConditionKindValid validates the ConditionKind.
+func ConditionKindValid(k ConditionKind) bool {
+	return slices.Contains(ConditionKinds(), k)
 }
 
 // ConditionState defines model for ConditionState.
@@ -26,20 +37,58 @@ type ConditionState string
 
 // Defines values for ConditionState.
 const (
+	Pending   ConditionState = "pending"
 	Active    ConditionState = "active"
 	Failed    ConditionState = "failed"
-	Pending   ConditionState = "pending"
 	Succeeded ConditionState = "succeeded"
 )
+
+// ConditionStates returns available condition states.
+func ConditionStates() []ConditionState {
+	return []ConditionState{
+		Active,
+		Pending,
+		Failed,
+		Succeeded,
+	}
+}
+
+// Transition valid returns a bool value if the state transition is allowed.
+func (current ConditionState) TransitionValid(next ConditionState) bool {
+	switch {
+	// Pending state can stay in Pending or transition to Active or Failed or Succeeded
+	case current == Pending && slices.Contains([]ConditionState{Pending, Active, Failed, Succeeded}, next):
+		return true
+	// Active state can stay in Active or transition to Failed or Succeeded
+	case current == Active && slices.Contains([]ConditionState{Active, Failed, Succeeded}, next):
+		return true
+	default:
+		return false
+	}
+}
+
+// ConditionStateValid validates the ConditionState.
+func ConditionStateValid(s ConditionState) bool {
+	return slices.Contains(ConditionStates(), s)
+}
+
+// ConditionStateFinalized returns true when the state is finalized.
+func ConditionStateFinalized(s ConditionState) bool {
+	return slices.Contains([]ConditionState{Failed, Succeeded}, s)
+}
+
+// Parameters is an interface for Condition Parameter types
+type Parameters interface {
+	Validate() error
+}
 
 // Condition defines model for Condition.
 type Condition struct {
 	// Kind is one of ConditionKind.
 	Kind ConditionKind `json:"kind,omitempty"`
 
-	// Parameters is a JSON object that is agreed upon by the controller
-	// reconciling the condition and the client requesting the condition.
-	Parameters json.RawMessage `json:"parameters,omitempty"`
+	// Parameters is typed based on the ConditionKind
+	Parameters Parameters `json:"parameters,omitempty"`
 
 	// State is one of ConditionState
 	State ConditionState `json:"state,omitempty"`
@@ -63,20 +112,23 @@ type Condition struct {
 	ResourceVersion int64 `json:"resourceVersion,omitempty"`
 
 	// UpdatedAt is when this object was last updated.
-	UpdatedAt *time.Time `json:"updatedAt,omitempty"`
+	UpdatedAt time.Time `json:"updatedAt,omitempty"`
 
 	// CreatedAt is when this object was created.
-	CreatedAt *time.Time `json:"createdAt,omitempty"`
+	CreatedAt time.Time `json:"createdAt,omitempty"`
 }
 
-// Server defines model for Server.
-type Server struct {
-	ID         uuid.UUID    `json:"id"`
-	Conditions *[]Condition `json:"conditions,omitempty"`
+type InventoryOutofbandParameters struct{}
+
+// Validate fields
+func (i *InventoryOutofbandParameters) Validate() error {
+	return nil
 }
 
-// ConditionDefinition type holds attributes of a condition definition.
-type ConditionDefinition struct {
-	Name      ConditionKind `mapstructure:"name"`
-	Exclusive bool          `mapstructure:"exclusive"`
+type GenerateFirmwareSetParameters struct {
+}
+
+// Validate fields
+func (g *GenerateFirmwareSetParameters) Validate() error {
+	return nil
 }

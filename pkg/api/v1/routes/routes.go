@@ -1,4 +1,4 @@
-package apiv1
+package routes
 
 import (
 	"errors"
@@ -9,17 +9,14 @@ import (
 	"github.com/metal-toolbox/conditionorc/internal/store"
 	"github.com/sirupsen/logrus"
 	"go.hollow.sh/toolbox/ginjwt"
-
-	ptypes "github.com/metal-toolbox/conditionorc/pkg/types"
 )
 
 // Routes type sets up the conditionorc API  router routes.
 type Routes struct {
-	authMW        *ginjwt.Middleware
-	conditionDefs []ptypes.ConditionDefinition
-	repository    store.Repository
-	streamBroker  events.StreamBroker
-	logger        *logrus.Logger
+	authMW       *ginjwt.Middleware
+	repository   store.Repository
+	streamBroker events.StreamBroker
+	logger       *logrus.Logger
 }
 
 // Option type sets a parameter on the Routes type.
@@ -46,13 +43,6 @@ func WithLogger(logger *logrus.Logger) Option {
 	}
 }
 
-// WithConditionDefs sets the conditions this router supports.
-func WithConditionDefs(defs []ptypes.ConditionDefinition) Option {
-	return func(r *Routes) {
-		r.conditionDefs = defs
-	}
-}
-
 // WithAuthMiddleware sets the auth middleware on the routes type.
 func WithAuthMiddleware(authMW *ginjwt.Middleware) Option {
 	return func(r *Routes) {
@@ -74,15 +64,7 @@ func NewRoutes(options ...Option) (*Routes, error) {
 		return nil, errors.New("no store repository defined")
 	}
 
-	if len(routes.conditionDefs) == 0 {
-		return nil, errors.New("no condition definitions defined")
-	}
-
-	for _, c := range routes.conditionDefs {
-		supported = append(supported, string(c.Name))
-	}
-
-	routes.logger.Info(
+	routes.logger.Debug(
 		"routes initialized with support for conditions: ",
 		strings.Join(supported, ","),
 	)
@@ -98,26 +80,26 @@ func (r *Routes) Routes(g *gin.RouterGroup) {
 	// For now these don't have scopes, since @ozz suggests it'll be handled by the API gateway.
 	servers := g.Group("/servers/:uuid")
 	{
-		// /servers/:uuid/condition
-		serverCondition := servers.Group("/conditions")
+		// /servers/:uuid/state/:conditionState
+		serverCondition := servers.Group("/state")
 		{
-			serverCondition.GET("", r.serverConditionList)
+			serverCondition.GET("/:conditionState", r.serverConditionList)
 		}
 
-		// /servers/:uuid/conditions/:conditionslug
-		serverConditionBySlug := servers.Group("/conditions")
+		// /servers/:uuid/condition/:conditionKind
+		serverConditionBySlug := servers.Group("/condition")
 		{
 			// List condition on a server.
-			serverConditionBySlug.GET("/:conditionslug", r.serverConditionGet)
+			serverConditionBySlug.GET("/:conditionKind", r.serverConditionGet)
 
-			// Set a condition on a server.
-			serverConditionBySlug.POST("/:conditionslug", r.serverConditionSet)
+			// Create a condition on a server.
+			serverConditionBySlug.POST("/:conditionKind", r.serverConditionCreate)
 
 			// Update an existing condition attributes on a server.
-			serverConditionBySlug.PUT("/:conditionslug", r.serverConditionUpdate)
+			serverConditionBySlug.PUT("/:conditionKind", r.serverConditionUpdate)
 
 			// Remove a condition from a server.
-			serverConditionBySlug.DELETE("/:conditionslug", r.serverConditionDelete)
+			serverConditionBySlug.DELETE("/:conditionKind", r.serverConditionDelete)
 		}
 	}
 }

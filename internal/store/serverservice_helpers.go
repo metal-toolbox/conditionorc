@@ -25,7 +25,7 @@ func (s *Serverservice) conditionByKindFromAttributes(attributes []sservice.Attr
 		return nil, errors.Wrap(ErrServerserviceAttributes, "multiple conditions of the same kind found")
 	}
 
-	condition := &ptypes.Condition{}
+	condition := &ptypes.Condition{CreatedAt: found[0].CreatedAt, UpdatedAt: found[0].UpdatedAt}
 	if err := json.Unmarshal(found[0].Data, condition); err != nil {
 		return nil, errors.Wrap(ErrServerserviceAttributes, err.Error())
 	}
@@ -63,6 +63,9 @@ func (s *Serverservice) findConditionByKindInAttributes(conditionKind ptypes.Con
 		}
 
 		if condition.Kind == conditionKind {
+			condition.CreatedAt = attr.CreatedAt
+			condition.UpdatedAt = attr.UpdatedAt
+
 			return condition
 		}
 	}
@@ -72,13 +75,17 @@ func (s *Serverservice) findConditionByKindInAttributes(conditionKind ptypes.Con
 
 func (s *Serverservice) findConditionByStateInAttributes(conditionState ptypes.ConditionState, attributes []*sservice.Attributes) []*ptypes.Condition {
 	found := []*ptypes.Condition{}
+
 	for _, attr := range attributes {
 		condition := &ptypes.Condition{}
 		if err := json.Unmarshal(attr.Data, condition); err != nil {
 			continue
 		}
 
-		if condition.State == condition.State {
+		if condition.State == conditionState {
+			condition.CreatedAt = attr.CreatedAt
+			condition.UpdatedAt = attr.UpdatedAt
+
 			found = append(found, condition)
 		}
 	}

@@ -5,7 +5,7 @@ store_kind: serverservice
 condition_definitions:
   - name: inventoryOutofband
     exclusive: false
-  - name: firmwareUpdate
+  - name: firmwareInstall
     exclusive: true
 serverservice_options:
   endpoint: hollow.sh

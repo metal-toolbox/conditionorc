@@ -8,12 +8,10 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/metal-toolbox/conditionorc/internal/events"
 	"github.com/metal-toolbox/conditionorc/internal/store"
-	apiv1 "github.com/metal-toolbox/conditionorc/pkg/api/v1"
+	"github.com/metal-toolbox/conditionorc/pkg/api/v1/routes"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	ginlogrus "github.com/toorop/gin-logrus"
-
-	ptypes "github.com/metal-toolbox/conditionorc/pkg/types"
 )
 
 var (
@@ -31,7 +29,6 @@ type Server struct {
 	listenAddress string
 	repository    store.Repository
 	streamBroker  events.StreamBroker
-	conditionDefs []ptypes.ConditionDefinition
 	engine        *gin.Engine
 }
 
@@ -59,13 +56,6 @@ func WithLogger(logger *logrus.Logger) Option {
 	}
 }
 
-// WithConditionDefs sets the condition definitions on the Server type.
-func WithConditionDefs(defs []ptypes.ConditionDefinition) Option {
-	return func(s Server) {
-		s.conditionDefs = defs
-	}
-}
-
 // WithListenAddress sets the Server listen address.
 func WithListenAddress(addr string) Option {
 	return func(s Server) {
@@ -89,15 +79,14 @@ func New(opts ...Option) *http.Server {
 
 	g.GET("/healthz/readiness", s.ping)
 
-	options := []apiv1.Option{
+	options := []routes.Option{
 		//		apiv1.WithAuthMiddleware(authMW),
-		apiv1.WithLogger(s.logger),
-		apiv1.WithStore(s.repository),
-		apiv1.WithStreamBroker(s.streamBroker),
-		apiv1.WithConditionDefs(s.conditionDefs),
+		routes.WithLogger(s.logger),
+		routes.WithStore(s.repository),
+		routes.WithStreamBroker(s.streamBroker),
 	}
 
-	v1Router, err := apiv1.NewRoutes(options...)
+	v1Router, err := routes.NewRoutes(options...)
 	if err != nil {
 		s.logger.Fatal(errors.Wrap(err, ErrRoutes.Error()))
 	}

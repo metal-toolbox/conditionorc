@@ -8,7 +8,6 @@ import (
 
 	"github.com/metal-toolbox/conditionorc/internal/events"
 	"github.com/metal-toolbox/conditionorc/internal/model"
-	ptypes "github.com/metal-toolbox/conditionorc/pkg/types"
 	"github.com/pkg/errors"
 )
 
@@ -38,10 +37,6 @@ type Configuration struct {
 
 	// ListenAddress is the server listen address
 	ListenAddress string `mapstructure:"listen_address"`
-
-	// ConditionDefinitions defines conditions known to this application
-	// and the rules on which the conditions operate.
-	ConditionDefinitions []ptypes.ConditionDefinition `mapstructure:"condition_definitions"`
 
 	// StoreKind indicates the kind of store to store server conditions
 	// supported parameter value - serverservice
@@ -109,10 +104,6 @@ func (a *App) LoadConfiguration() error {
 
 	if err := a.envVarOverrides(); err != nil {
 		return errors.Wrap(err, ErrConfig.Error())
-	}
-
-	if len(a.Config.ConditionDefinitions) == 0 {
-		return errors.Wrap(errors.New("no condition definitions"), ErrConfig.Error())
 	}
 
 	return nil

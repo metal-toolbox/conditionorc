@@ -3,6 +3,7 @@ package store
 import (
 	"context"
 	"encoding/json"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/metal-toolbox/conditionorc/internal/app"
@@ -86,6 +87,7 @@ func (s *Serverservice) List(ctx context.Context, id uuid.UUID, conditionState p
 //
 // Note: its upto the caller to validate the condition payload.
 func (s *Serverservice) Create(ctx context.Context, id uuid.UUID, condition *ptypes.Condition) error {
+	condition.ResourceVersion = time.Now().UnixNano()
 	payload, err := json.Marshal(condition)
 	if err != nil {
 		return errors.Wrap(ErrServerserviceAttributes, err.Error())
