@@ -27,6 +27,8 @@ type Repository interface {
 	// @conditionState: optional
 	List(ctx context.Context, serverID uuid.UUID, conditionState ptypes.ConditionState) ([]*ptypes.Condition, error)
 
+	ListServersWithCondition(ctx context.Context, conditionKind ptypes.ConditionKind, conditionState ptypes.ConditionState) ([]*ptypes.ServerConditions, error)
+
 	// Create a condition on a server.
 	// @serverID: required
 	// @condition: required

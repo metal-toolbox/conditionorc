@@ -184,7 +184,7 @@ func (r *Routes) serverConditionCreate(c *gin.Context) {
 
 	// purge the existing condition
 	err = r.repository.Delete(c.Request.Context(), serverID, kind)
-	if err != nil {
+	if err != nil && !errors.Is(err, store.ErrConditionNotFound) {
 		c.JSON(
 			http.StatusInternalServerError,
 			&ServerResponse{Message: err.Error()},

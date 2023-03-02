@@ -63,6 +63,7 @@ type Configuration struct {
 // https://github.com/metal-toolbox/hollow-serverservice
 type ServerserviceOptions struct {
 	EndpointURL          *url.URL
+	FacilityCode         string   `mapstructure:"facility_code"`
 	Endpoint             string   `mapstructure:"endpoint"`
 	OidcIssuerEndpoint   string   `mapstructure:"oidc_issuer_endpoint"`
 	OidcAudienceEndpoint string   `mapstructure:"oidc_audience_endpoint"`
@@ -238,8 +239,12 @@ func (a *App) envVarServerserviceOverrides() error {
 		a.Config.ServerserviceOptions.Endpoint = a.v.GetString("serverservice.endpoint")
 	}
 
-	if a.Config.ServerserviceOptions.Endpoint == "" {
-		return errors.New("serverservice endpoint not defined")
+	if a.v.GetString("serverservice.facilitycode") != "" {
+		a.Config.ServerserviceOptions.Endpoint = a.v.GetString("serverservice.facilitycode")
+	}
+
+	if a.Config.ServerserviceOptions.FacilityCode == "" {
+		return errors.New("serverservice facility code not defined")
 	}
 
 	endpointURL, err := url.Parse(a.Config.ServerserviceOptions.Endpoint)

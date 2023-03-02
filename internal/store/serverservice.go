@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/davecgh/go-spew/spew"
 	"github.com/google/uuid"
 	"github.com/metal-toolbox/conditionorc/internal/app"
 	ptypes "github.com/metal-toolbox/conditionorc/pkg/types"
@@ -104,7 +105,7 @@ func (s *Serverservice) List(ctx context.Context, serverID uuid.UUID, conditionS
 // @id: required
 // @condition: required
 //
-// Note: its upto the caller to validate the condition payload.
+// Note: its upto the caller to validate the condition payload and to delete any existing condition before creating.
 func (s *Serverservice) Create(ctx context.Context, serverID uuid.UUID, condition *ptypes.Condition) error {
 	condition.ResourceVersion = time.Now().UnixNano()
 
@@ -137,6 +138,9 @@ func (s *Serverservice) Update(ctx context.Context, serverID uuid.UUID, conditio
 	}
 
 	_, err = s.client.UpdateAttributes(ctx, serverID, s.conditionNS(condition.Kind), payload)
+	if err != nil && strings.Contains(err.Error(), "404") {
+		return ErrConditionNotFound
+	}
 
 	return err
 }
@@ -146,6 +150,32 @@ func (s *Serverservice) Update(ctx context.Context, serverID uuid.UUID, conditio
 // @conditionKind: required
 func (s *Serverservice) Delete(ctx context.Context, serverID uuid.UUID, conditionKind ptypes.ConditionKind) error {
 	_, err := s.client.DeleteAttributes(ctx, serverID, s.conditionNS(conditionKind))
+	if err != nil && strings.Contains(err.Error(), "404") {
+		return ErrConditionNotFound
+	}
 
 	return err
+}
+
+func (s *Serverservice) ListServersWithCondition(ctx context.Context, conditionKind ptypes.ConditionKind, conditionState ptypes.ConditionState) ([]*ptypes.ServerConditions, error) {
+	params := &sservice.ServerListParams{
+		FacilityCode: s.config.FacilityCode,
+		AttributeListParams: []sservice.AttributeListParams{
+			{
+				Namespace: s.conditionNS(conditionKind),
+				Keys:      []string{"state"},
+				Operator:  sservice.OperatorEqual,
+				Value:     string(conditionState),
+			},
+		},
+	}
+
+	got, _, err := s.client.List(ctx, params)
+	if err != nil {
+		return nil, err
+	}
+
+	spew.Dump(got)
+
+	return nil, nil
 }

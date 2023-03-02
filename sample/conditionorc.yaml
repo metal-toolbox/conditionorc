@@ -8,6 +8,7 @@ condition_definitions:
   - name: firmwareInstall
     exclusive: true
 serverservice_options:
+  facility_code: dc13
   endpoint: hollow.sh
   disable_oauth: true
   #oidc_issuer_endpoint: foo.bar/oidc/issuer

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"time"
 
+	"github.com/google/uuid"
 	"golang.org/x/exp/slices"
 )
 
@@ -117,6 +118,12 @@ type Condition struct {
 
 	// CreatedAt is when this object was created.
 	CreatedAt time.Time `json:"createdAt,omitempty"`
+}
+
+// ServerConditions is a type to hold a server ID and the conditions associated with it.
+type ServerConditions struct {
+	ServerID   uuid.UUID
+	Conditions []*Condition
 }
 
 type InventoryOutofbandParameters struct{}
