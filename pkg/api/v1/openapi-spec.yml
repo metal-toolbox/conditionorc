@@ -1,0 +1,196 @@
+openapi: "3.0.0"
+info:
+  description: Conditions API expose CRUD actions to condition objects on servers
+  title: Condition orchestrator API
+  version: 1.0.0
+paths:
+  /api/v1/servers/{serverID}/state/{conditionState}:
+    get:
+      summary: Returns all conditions set on a server by the condition state.
+      operationId: serverConditionList
+      parameters:
+        - name: serverID
+          in: path
+          description: Server ID
+          required: true
+          schema:
+            $ref: "#/components/schemas/ServerID"
+        - name: conditionState
+          in: path
+          description: Condition state
+          required: true
+          schema:
+            $ref: "#/components/schemas/ConditionState"
+      responses:
+        "200":
+          description: response returns list of conditions set on a server
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ServerResponse"
+
+  /api/v1/servers/{serverID}/condition/{conditionKind}:
+    # shared parameters
+    parameters:
+      - name: serverID
+        in: path
+        description: Server ID
+        required: true
+        schema:
+          $ref: "#/components/schemas/ServerID"
+      - name: conditionKind
+        in: path
+        description: Condition kind
+        required: true
+        schema:
+          $ref: "#/components/schemas/ConditionKind"
+
+    get:
+      summary: Returns condition set on a server by its condition kind.
+      operationId: serverConditionGet
+      responses:
+        "200":
+          description: server conditions response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ServerResponse"
+        "400":
+          description: invalid request response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ServerResponse"
+    post:
+      summary: Creates a condition on a server
+      operationId: serverConditionCreate
+      requestBody:
+        description: Condition to add to server
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ConditionCreate"
+      responses:
+        "200":
+          description: Set condition on server response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ServerResponse"
+        "400":
+          description: invalid request response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ServerResponse"
+    put:
+      summary: Update an existing condition on a server
+      operationId: serverConditionUpdate
+      requestBody:
+        description: Condition update payload
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ConditionUpdate"
+      responses:
+        "200":
+          description: Update a condition for a server
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ServerResponse"
+        "400":
+          description: invalid request response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ServerResponse"
+components:
+  schemas:
+    ServerID:
+      type: string
+      format: uuid
+    ConditionState:
+      type: string
+      enum:
+        - pending
+        - active
+        - failed
+        - succeeded
+    ConditionKind:
+      type: string
+      enum:
+        - firmwareInstall
+        - inventoryOutofband
+    Condition:
+      type: object
+      properties:
+        Kind:
+          type: string
+          format: ConditionKind
+          oneOf:
+            - $ref: "#/components/schemas/ConditionKind"
+          readOnly: true
+        Parameters:
+          type: object
+          additionalProperties: {}
+        State:
+          type: string
+          oneOf:
+            - $ref: "#/components/schemas/ConditionState"
+        Status:
+          type: object
+          additionalProperties: {}
+        CreatedAt:
+          type: string
+          format: date-time
+        UpdatedAt:
+          type: string
+          format: date-time
+    # API response format
+    ServerResponse:
+      properties:
+        Message:
+          type: string
+        Record:
+          type: object
+          additionalProperties: {}
+        Records:
+          type: array
+          oneOf:
+            - $ref: "#/components/schemas/ConditionsResponse"
+    # API conditions response
+    ConditionsResponse:
+      properties:
+        ServerID:
+          type: string
+        Conditions:
+          type: array
+          oneOf:
+            - $ref: "#/components/schemas/Condition"
+    # API conditions create request
+    ConditionCreate:
+      required:
+        - parameters
+      properties:
+        parameters:
+          type: object
+          additionalProperties: {}
+    # API conditions update request
+    ConditionUpdate:
+      required:
+        - state
+        - status
+        - resourceVersion
+      properties:
+        state:
+          type: string
+          oneOf:
+            - $ref: "#/components/schemas/ConditionState"
+        status:
+          type: object
+          additionalProperties: {}
+        resourceVersion:
+          type: integer
