@@ -9,8 +9,8 @@ import (
 	"net/http"
 	"net/url"
 
+	"github.com/metal-toolbox/conditionorc/internal/version"
 	"github.com/metal-toolbox/conditionorc/pkg/api/v1/routes"
-	"go.hollow.sh/toolbox/version"
 )
 
 func (c *Client) get(ctx context.Context, path string) (*routes.ServerResponse, error) {
@@ -79,14 +79,10 @@ func (c *Client) delete(ctx context.Context, path string) (*routes.ServerRespons
 	return c.do(req)
 }
 
-func (c *Client) userAgentString() string {
-	return fmt.Sprintf("conditionorc-client (%s)", version.String())
-}
-
 func (c *Client) do(req *http.Request) (*routes.ServerResponse, error) {
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", fmt.Sprintf("bearer %s", c.authToken))
-	req.Header.Set("User-Agent", c.userAgentString())
+	req.Header.Set("User-Agent", fmt.Sprintf("conditionorc-client (%s)", version.Current().String()))
 
 	response, err := c.client.Do(req)
 	if err != nil {

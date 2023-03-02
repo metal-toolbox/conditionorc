@@ -3,6 +3,7 @@ package store
 import (
 	"context"
 	"encoding/json"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -27,7 +28,7 @@ var (
 
 	ErrServerserviceQuery = errors.New("Serverservice query error")
 
-	ErrServerserviceAttributes = errors.New("error in serverservice attribute")
+	ErrServerserviceAttribute = errors.New("error in serverservice attribute")
 
 	// ServerserviceConditionsNSFmtStr attribute namespace format string value for server condition attributes.
 	ServerserviceConditionsNSFmtStr = "sh.hollow.condition.%s"
@@ -57,28 +58,46 @@ func (s *Serverservice) Ping(ctx context.Context) error {
 // Get a condition set on a server.
 // @id: required
 // @conditionKind: required
-func (s *Serverservice) Get(ctx context.Context, id uuid.UUID, conditionKind ptypes.ConditionKind) (*ptypes.Condition, error) {
+func (s *Serverservice) Get(ctx context.Context, serverID uuid.UUID, conditionKind ptypes.ConditionKind) (*ptypes.Condition, error) {
 	// list attributes on a server
-	attributes, _, err := s.client.ListAttributes(ctx, id, nil)
+	attributes, _, err := s.client.GetAttributes(ctx, serverID, s.conditionNS(conditionKind))
 	if err != nil {
+		if strings.Contains(err.Error(), "404") {
+			return nil, ErrConditionNotFound
+		}
+
 		return nil, errors.Wrap(ErrServerserviceQuery, err.Error())
 	}
 
+	if attributes == nil {
+		return nil, ErrConditionNotFound
+	}
+
 	// return condition object from attribute
-	return s.conditionByKindFromAttributes(attributes, conditionKind)
+	return s.conditionFromAttribute(attributes)
 }
 
 // List all conditions set on a server.
 // @id: required
 // @conditionState: optional
-func (s *Serverservice) List(ctx context.Context, id uuid.UUID, conditionState ptypes.ConditionState) ([]*ptypes.Condition, error) {
-	// list attributes on a server
-	attributes, _, err := s.client.ListAttributes(ctx, id, nil)
-	if err != nil {
-		return nil, errors.Wrap(ErrServerserviceQuery, err.Error())
+func (s *Serverservice) List(ctx context.Context, serverID uuid.UUID, conditionState ptypes.ConditionState) ([]*ptypes.Condition, error) {
+	found := []*sservice.Attributes{}
+
+	for _, kind := range ptypes.ConditionKinds() {
+		attr, _, err := s.client.GetAttributes(ctx, serverID, s.conditionNS(kind))
+		if err != nil {
+			if strings.Contains(err.Error(), "404") {
+				continue
+			}
+
+			return nil, errors.Wrap(ErrServerserviceQuery, err.Error())
+		}
+
+		found = append(found, attr)
 	}
 
-	return s.conditionByStateFromAttributes(attributes, conditionState)
+	// list attributes on a server
+	return s.findConditionByStateInAttributes(conditionState, found), nil
 }
 
 // Create a condition on a server.
@@ -86,12 +105,12 @@ func (s *Serverservice) List(ctx context.Context, id uuid.UUID, conditionState p
 // @condition: required
 //
 // Note: its upto the caller to validate the condition payload.
-func (s *Serverservice) Create(ctx context.Context, id uuid.UUID, condition *ptypes.Condition) error {
+func (s *Serverservice) Create(ctx context.Context, serverID uuid.UUID, condition *ptypes.Condition) error {
 	condition.ResourceVersion = time.Now().UnixNano()
 
 	payload, err := json.Marshal(condition)
 	if err != nil {
-		return errors.Wrap(ErrServerserviceAttributes, err.Error())
+		return errors.Wrap(ErrServerserviceAttribute, err.Error())
 	}
 
 	data := sservice.Attributes{
@@ -99,7 +118,7 @@ func (s *Serverservice) Create(ctx context.Context, id uuid.UUID, condition *pty
 		Data:      payload,
 	}
 
-	_, err = s.client.CreateAttributes(ctx, id, data)
+	_, err = s.client.CreateAttributes(ctx, serverID, data)
 
 	return err
 }
@@ -109,13 +128,15 @@ func (s *Serverservice) Create(ctx context.Context, id uuid.UUID, condition *pty
 // @condition: required
 //
 // Note: its upto the caller to validate the condition update payload.
-func (s *Serverservice) Update(ctx context.Context, id uuid.UUID, condition *ptypes.Condition) error {
+func (s *Serverservice) Update(ctx context.Context, serverID uuid.UUID, condition *ptypes.Condition) error {
+	condition.ResourceVersion = time.Now().UnixNano()
+
 	payload, err := json.Marshal(condition)
 	if err != nil {
-		return errors.Wrap(ErrServerserviceAttributes, err.Error())
+		return errors.Wrap(ErrServerserviceAttribute, err.Error())
 	}
 
-	_, err = s.client.UpdateAttributes(ctx, id, s.conditionNS(condition.Kind), payload)
+	_, err = s.client.UpdateAttributes(ctx, serverID, s.conditionNS(condition.Kind), payload)
 
 	return err
 }
@@ -123,8 +144,8 @@ func (s *Serverservice) Update(ctx context.Context, id uuid.UUID, condition *pty
 // Delete a condition from a server.
 // @id: required
 // @conditionKind: required
-func (s *Serverservice) Delete(ctx context.Context, id uuid.UUID, conditionKind ptypes.ConditionKind) error {
-	_, err := s.client.DeleteAttributes(ctx, id, s.conditionNS(conditionKind))
+func (s *Serverservice) Delete(ctx context.Context, serverID uuid.UUID, conditionKind ptypes.ConditionKind) error {
+	_, err := s.client.DeleteAttributes(ctx, serverID, s.conditionNS(conditionKind))
 
 	return err
 }

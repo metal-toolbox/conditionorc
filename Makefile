@@ -35,7 +35,7 @@ build-osx:
 ifeq ($(GO_VERSION), 0)
 	$(error build requies go version 1.17.n or higher)
 endif
-	  GOOS=darwin GOARCH=amd64 go build -o alloy \
+	  GOOS=darwin GOARCH=amd64 go build -o conditionorc \
 	   -ldflags \
 		"-X $(LDFLAG_LOCATION).GitCommit=$(GIT_COMMIT) \
          -X $(LDFLAG_LOCATION).GitBranch=$(GIT_BRANCH) \
@@ -50,7 +50,7 @@ build-linux:
 ifeq ($(GO_VERSION), 0)
 	$(error build requies go version 1.16.n or higher)
 endif
-	GOOS=linux GOARCH=amd64 go build -o alloy \
+	GOOS=linux GOARCH=amd64 go build -o conditionorc \
 	   -ldflags \
 		"-X $(LDFLAG_LOCATION).GitCommit=$(GIT_COMMIT) \
          -X $(LDFLAG_LOCATION).GitBranch=$(GIT_BRANCH) \

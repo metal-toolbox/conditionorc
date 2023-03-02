@@ -110,7 +110,7 @@ type Condition struct {
 	// ResourceVersion has to be set to the value received by the
 	// client updating it, this it to make sure condition updates
 	// occur in the expected order.
-	ResourceVersion int64 `json:"resourceVersion,omitempty"`
+	ResourceVersion int64 `json:"resourceVersion"`
 
 	// UpdatedAt is when this object was last updated.
 	UpdatedAt time.Time `json:"updatedAt,omitempty"`

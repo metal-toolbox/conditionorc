@@ -129,7 +129,7 @@ func TestIntegration_ConditionsGet(t *testing.T) {
 
 				return &routes.ServerResponse{
 					StatusCode: 200,
-					Record: routes.ConditionResponse{
+					Record: &routes.ConditionResponse{
 						ServerID: serverID,
 						Condition: &ptypes.Condition{
 							Kind:       ptypes.FirmwareInstallOutofband,
@@ -274,7 +274,7 @@ func TestIntegration_ConditionsList(t *testing.T) {
 
 				return &routes.ServerResponse{
 					StatusCode: 200,
-					Records: routes.ConditionsResponse{
+					Records: &routes.ConditionsResponse{
 						ServerID: serverID,
 						Conditions: []*ptypes.Condition{
 							{

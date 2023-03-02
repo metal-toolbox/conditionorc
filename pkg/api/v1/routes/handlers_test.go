@@ -510,7 +510,7 @@ func TestServerConditionList(t *testing.T) {
 				want := asJSONBytes(
 					t,
 					&ServerResponse{
-						Records: ConditionsResponse{
+						Records: &ConditionsResponse{
 							ServerID:   serverID,
 							Conditions: conditions,
 						},
@@ -619,7 +619,7 @@ func TestServerConditionGet(t *testing.T) {
 				want := asJSONBytes(
 					t,
 					&ServerResponse{
-						Record: ConditionResponse{
+						Record: &ConditionResponse{
 							ServerID:  serverID,
 							Condition: condition,
 						},

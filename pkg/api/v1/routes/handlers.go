@@ -1,17 +1,22 @@
 package routes
 
 import (
+	"bytes"
+	"context"
+	"fmt"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
 
+	"github.com/metal-toolbox/conditionorc/internal/store"
 	ptypes "github.com/metal-toolbox/conditionorc/pkg/types"
 )
 
 var (
 	ErrConditionParameter = errors.New("error in condition parameter")
+	ErrConditionExclusive = errors.New("exclusive condition present")
 )
 
 func (r *Routes) serverConditionUpdate(c *gin.Context) {
@@ -57,7 +62,7 @@ func (r *Routes) serverConditionUpdate(c *gin.Context) {
 	if conditionUpdate.State == "" && conditionUpdate.Status == nil {
 		c.JSON(
 			http.StatusBadRequest,
-			&ServerResponse{Message: "invalid ConditionUpdate payload, either a State or a Status value"},
+			&ServerResponse{Message: "invalid ConditionUpdate payload, either a state or a status attribute is expected"},
 		)
 
 		return
@@ -70,6 +75,13 @@ func (r *Routes) serverConditionUpdate(c *gin.Context) {
 			http.StatusBadRequest,
 			&ServerResponse{Message: err.Error()},
 		)
+
+		return
+	}
+
+	// nothing to update
+	if existing.State == conditionUpdate.State && bytes.Equal(existing.Status, conditionUpdate.Status) {
+		c.JSON(http.StatusOK, &ServerResponse{Message: "no changes to be applied"})
 
 		return
 	}
@@ -131,9 +143,9 @@ func (r *Routes) serverConditionCreate(c *gin.Context) {
 
 	condition := conditionCreate.newCondition(kind)
 
-	// TODO: check if condition already exists and is in a finalized state
+	// check the condition doesn't already exist in a non-finalized state
 	existing, err := r.repository.Get(c.Request.Context(), serverID, kind)
-	if err != nil {
+	if err != nil && !errors.Is(err, store.ErrConditionNotFound) {
 		c.JSON(
 			http.StatusBadRequest,
 			&ServerResponse{Message: err.Error()},
@@ -151,7 +163,37 @@ func (r *Routes) serverConditionCreate(c *gin.Context) {
 		return
 	}
 
-	// Create updates the resource version
+	// check if any condition with exclusive set is in non-finalized states
+	if errEx := r.exclusiveNonFinalConditionExists(c.Request.Context(), serverID); errEx != nil {
+		if errors.Is(errEx, ErrConditionExclusive) {
+			c.JSON(
+				http.StatusBadRequest,
+				&ServerResponse{Message: errEx.Error()},
+			)
+
+			return
+		}
+
+		c.JSON(
+			http.StatusInternalServerError,
+			&ServerResponse{Message: errEx.Error()},
+		)
+
+		return
+	}
+
+	// purge the existing condition
+	err = r.repository.Delete(c.Request.Context(), serverID, kind)
+	if err != nil {
+		c.JSON(
+			http.StatusInternalServerError,
+			&ServerResponse{Message: err.Error()},
+		)
+
+		return
+	}
+
+	// Create the new condition
 	err = r.repository.Create(c.Request.Context(), serverID, condition)
 	if err != nil {
 		c.JSON(
@@ -163,6 +205,30 @@ func (r *Routes) serverConditionCreate(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, &ServerResponse{Message: "condition set"})
+}
+
+func (r *Routes) exclusiveNonFinalConditionExists(ctx context.Context, serverID uuid.UUID) error {
+	for _, state := range ptypes.ConditionStates() {
+		if ptypes.ConditionStateFinalized(state) {
+			continue
+		}
+
+		existing, err := r.repository.List(ctx, serverID, state)
+		if err != nil && !errors.Is(err, store.ErrConditionNotFound) {
+			return err
+		}
+
+		for _, condition := range existing {
+			if condition.Exclusive && condition.State == state {
+				return errors.Wrap(
+					ErrConditionExclusive,
+					fmt.Sprintf("%s condition exists in non-finalized state - %s", condition.Kind, string(condition.State)),
+				)
+			}
+		}
+	}
+
+	return nil
 }
 
 func (r *Routes) serverConditionDelete(c *gin.Context) {
@@ -256,7 +322,7 @@ func (r *Routes) serverConditionList(c *gin.Context) {
 
 	data := ConditionsResponse{ServerID: serverID, Conditions: found}
 
-	c.JSON(http.StatusOK, &ServerResponse{Records: data})
+	c.JSON(http.StatusOK, &ServerResponse{Records: &data})
 }
 
 func (r *Routes) serverConditionGet(c *gin.Context) {
@@ -282,6 +348,12 @@ func (r *Routes) serverConditionGet(c *gin.Context) {
 
 	found, err := r.repository.Get(c.Request.Context(), serverID, kind)
 	if err != nil {
+		if errors.Is(err, store.ErrConditionNotFound) {
+			c.JSON(http.StatusNotFound, &ServerResponse{Message: "conditionKind not found on server"})
+
+			return
+		}
+
 		c.JSON(
 			http.StatusInternalServerError,
 			&ServerResponse{Message: err.Error()},
@@ -298,5 +370,5 @@ func (r *Routes) serverConditionGet(c *gin.Context) {
 
 	data := ConditionResponse{ServerID: serverID, Condition: found}
 
-	c.JSON(http.StatusOK, &ServerResponse{Record: data})
+	c.JSON(http.StatusOK, &ServerResponse{Record: &data})
 }
