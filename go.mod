@@ -4,11 +4,13 @@ go 1.19
 
 require (
 	github.com/banzaicloud/logrus-runtime-formatter v0.0.0-20190729070250-5ae5475bae5e
+	github.com/deepmap/oapi-codegen v1.12.5-0.20230221180206-2b52cd58cf5b
 	github.com/gin-gonic/gin v1.8.2
 	github.com/golang/mock v1.6.0
 	github.com/google/uuid v1.3.0
 	github.com/nats-io/nats.go v1.23.0
 	github.com/pkg/errors v0.9.1
+	github.com/sanity-io/litter v1.5.5
 	github.com/sirupsen/logrus v1.9.0
 	github.com/spf13/cobra v1.6.1
 	github.com/spf13/viper v1.15.0
@@ -18,7 +20,6 @@ require (
 	go.hollow.sh/toolbox v0.5.1
 	go.infratographer.com/x v0.0.1
 	golang.org/x/exp v0.0.0-20230116083435-1de6713980de
-	gopkg.in/square/go-jose.v2 v2.6.0
 )
 
 require (
@@ -86,6 +87,7 @@ require (
 	google.golang.org/grpc v1.52.0 // indirect
 	google.golang.org/protobuf v1.28.1 // indirect
 	gopkg.in/ini.v1 v1.67.0 // indirect
+	gopkg.in/square/go-jose.v2 v2.6.0 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )

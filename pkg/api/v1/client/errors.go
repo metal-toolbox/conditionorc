@@ -1,31 +1,22 @@
 package client
 
-import "fmt"
-
-// ClientError is returned when invalid arguments are provided to the client
-type ClientError struct {
-	Message string
+// Error holds the cause of a client error and implements the Error interface.
+type Error struct {
+	Cause string
 }
 
-// Error returns the ClientError in string format
-func (e *ClientError) Error() string {
-	return fmt.Sprintf("hollow client error: %s", e.Message)
+// Error returned for a client side problem.
+func (c Error) Error() string {
+	return "conditionorc client error - " + c.Cause
 }
 
-// ServerError is returned when the client receives an error back from the server
-type ServerError struct {
-	Message      string `json:"message"`
-	ErrorMessage string `json:"error"`
-	StatusCode   int
+// RequestError is returned when the client gets an error while performing a request.
+type RequestError struct {
+	Message    string `json:"message"`
+	StatusCode int    `json:"stateusCode"`
 }
 
-// Error returns the ServerError in string format
-func (e ServerError) Error() string {
-	return fmt.Sprintf("hollow client received a server error - response code: %d, message: %s, details: %s", e.StatusCode, e.Message, e.ErrorMessage)
-}
-
-func newClientError(msg string) *ClientError {
-	return &ClientError{
-		Message: msg,
-	}
+// Error returns the RequestError in string format
+func (e RequestError) Error() string {
+	return "conditionorc client request error: " + e.Message
 }

@@ -88,6 +88,7 @@ func (s *Serverservice) List(ctx context.Context, id uuid.UUID, conditionState p
 // Note: its upto the caller to validate the condition payload.
 func (s *Serverservice) Create(ctx context.Context, id uuid.UUID, condition *ptypes.Condition) error {
 	condition.ResourceVersion = time.Now().UnixNano()
+
 	payload, err := json.Marshal(condition)
 	if err != nil {
 		return errors.Wrap(ErrServerserviceAttributes, err.Error())
@@ -100,7 +101,7 @@ func (s *Serverservice) Create(ctx context.Context, id uuid.UUID, condition *pty
 
 	_, err = s.client.CreateAttributes(ctx, id, data)
 
-	return nil
+	return err
 }
 
 // Update a condition on a server.
@@ -116,7 +117,7 @@ func (s *Serverservice) Update(ctx context.Context, id uuid.UUID, condition *pty
 
 	_, err = s.client.UpdateAttributes(ctx, id, s.conditionNS(condition.Kind), payload)
 
-	return nil
+	return err
 }
 
 // Delete a condition from a server.

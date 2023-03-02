@@ -46,7 +46,8 @@ func (s *Serverservice) conditionByStateFromAttributes(attributes []sservice.Att
 
 func (s *Serverservice) findAttributesByNamespace(ns string, attributes []sservice.Attributes) []*sservice.Attributes {
 	found := []*sservice.Attributes{}
-	for idx, _ := range attributes {
+
+	for idx := range attributes {
 		if attributes[idx].Namespace == ns {
 			found = append(found, &attributes[idx])
 		}
@@ -55,23 +56,23 @@ func (s *Serverservice) findAttributesByNamespace(ns string, attributes []sservi
 	return found
 }
 
-func (s *Serverservice) findConditionByKindInAttributes(conditionKind ptypes.ConditionKind, attributes []*sservice.Attributes) *ptypes.Condition {
-	for _, attr := range attributes {
-		condition := &ptypes.Condition{}
-		if err := json.Unmarshal(attr.Data, condition); err != nil {
-			continue
-		}
-
-		if condition.Kind == conditionKind {
-			condition.CreatedAt = attr.CreatedAt
-			condition.UpdatedAt = attr.UpdatedAt
-
-			return condition
-		}
-	}
-
-	return nil
-}
+// func (s *Serverservice) findConditionByKindInAttributes(conditionKind ptypes.ConditionKind, attributes []*sservice.Attributes) *ptypes.Condition {
+//	for _, attr := range attributes {
+//		condition := &ptypes.Condition{}
+//		if err := json.Unmarshal(attr.Data, condition); err != nil {
+//			continue
+//		}
+//
+//		if condition.Kind == conditionKind {
+//			condition.CreatedAt = attr.CreatedAt
+//			condition.UpdatedAt = attr.UpdatedAt
+//
+//			return condition
+//		}
+//	}
+//
+//	return nil
+// }
 
 func (s *Serverservice) findConditionByStateInAttributes(conditionState ptypes.ConditionState, attributes []*sservice.Attributes) []*ptypes.Condition {
 	found := []*ptypes.Condition{}

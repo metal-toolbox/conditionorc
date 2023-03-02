@@ -2,6 +2,7 @@ package routes
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -108,7 +109,7 @@ func TestServerConditionUpdate(t *testing.T) {
 			nil,
 			func(t *testing.T) *http.Request {
 				url := fmt.Sprintf("/api/v1/servers/%s/condition/%s", "123", "invalid")
-				request, err := http.NewRequest(http.MethodPut, url, http.NoBody)
+				request, err := http.NewRequestWithContext(context.TODO(), http.MethodPut, url, http.NoBody)
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -125,7 +126,7 @@ func TestServerConditionUpdate(t *testing.T) {
 			nil,
 			func(t *testing.T) *http.Request {
 				url := fmt.Sprintf("/api/v1/servers/%s/condition/%s", uuid.New().String(), "asdasd")
-				request, err := http.NewRequest(http.MethodPut, url, http.NoBody)
+				request, err := http.NewRequestWithContext(context.TODO(), http.MethodPut, url, http.NoBody)
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -142,7 +143,7 @@ func TestServerConditionUpdate(t *testing.T) {
 			nil,
 			func(t *testing.T) *http.Request {
 				url := fmt.Sprintf("/api/v1/servers/%s/condition/%s", serverID.String(), ptypes.FirmwareInstallOutofband)
-				request, err := http.NewRequest(http.MethodPut, url, bytes.NewReader(payloadInvalid))
+				request, err := http.NewRequestWithContext(context.TODO(), http.MethodPut, url, bytes.NewReader(payloadInvalid))
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -170,7 +171,7 @@ func TestServerConditionUpdate(t *testing.T) {
 			},
 			func(t *testing.T) *http.Request {
 				url := fmt.Sprintf("/api/v1/servers/%s/condition/%s", serverID.String(), ptypes.FirmwareInstallOutofband)
-				request, err := http.NewRequest(http.MethodPut, url, bytes.NewReader(payloadValid))
+				request, err := http.NewRequestWithContext(context.TODO(), http.MethodPut, url, bytes.NewReader(payloadValid))
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -212,7 +213,7 @@ func TestServerConditionUpdate(t *testing.T) {
 			},
 			func(t *testing.T) *http.Request {
 				url := fmt.Sprintf("/api/v1/servers/%s/condition/%s", serverID.String(), ptypes.FirmwareInstallOutofband)
-				request, err := http.NewRequest(http.MethodPut, url, bytes.NewReader(payloadValid))
+				request, err := http.NewRequestWithContext(context.TODO(), http.MethodPut, url, bytes.NewReader(payloadValid))
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -243,31 +244,6 @@ func TestServerConditionUpdate(t *testing.T) {
 func TestServerConditionCreate(t *testing.T) {
 	serverID := uuid.New()
 
-	// valid parameters for test
-	parametersValid := &ptypes.FirmwareInstallOutofbandParameters{
-		FirmwareSetID: uuid.NewString(),
-	}
-
-	paramsJSONValid, _ := json.Marshal(parametersValid)
-
-	createValid := ConditionCreate{
-		Parameters: paramsJSONValid,
-	}
-
-	payloadValid, err := json.Marshal(createValid)
-	if err != nil {
-		t.Error()
-	}
-
-	createInvalid := ConditionCreate{
-		Parameters: []byte(`{"foo": "bar"}`),
-	}
-
-	payloadInvalid, err := json.Marshal(createInvalid)
-	if err != nil {
-		t.Error()
-	}
-
 	// mock repository
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
@@ -290,7 +266,7 @@ func TestServerConditionCreate(t *testing.T) {
 			nil,
 			func(t *testing.T) *http.Request {
 				url := fmt.Sprintf("/api/v1/servers/%s/condition/%s", "123", "invalid")
-				request, err := http.NewRequest(http.MethodPost, url, http.NoBody)
+				request, err := http.NewRequestWithContext(context.TODO(), http.MethodPost, url, http.NoBody)
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -307,7 +283,7 @@ func TestServerConditionCreate(t *testing.T) {
 			nil,
 			func(t *testing.T) *http.Request {
 				url := fmt.Sprintf("/api/v1/servers/%s/condition/%s", uuid.New().String(), "asdasd")
-				request, err := http.NewRequest(http.MethodPost, url, http.NoBody)
+				request, err := http.NewRequestWithContext(context.TODO(), http.MethodPost, url, http.NoBody)
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -320,11 +296,11 @@ func TestServerConditionCreate(t *testing.T) {
 			},
 		},
 		{
-			"invalid server condition returns error",
+			"invalid server condition payload returns error",
 			nil,
 			func(t *testing.T) *http.Request {
 				url := fmt.Sprintf("/api/v1/servers/%s/condition/%s", serverID.String(), ptypes.FirmwareInstallOutofband)
-				request, err := http.NewRequest(http.MethodPost, url, bytes.NewReader(payloadInvalid))
+				request, err := http.NewRequestWithContext(context.TODO(), http.MethodPost, url, bytes.NewReader([]byte(``)))
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -333,13 +309,18 @@ func TestServerConditionCreate(t *testing.T) {
 			},
 			func(t *testing.T, r *httptest.ResponseRecorder) {
 				assert.Equal(t, http.StatusBadRequest, r.Code)
-				assert.Contains(t, string(asBytes(t, r.Body)), "error in condition parameter")
+				assert.Contains(t, string(asBytes(t, r.Body)), "invalid ConditionCreate payload")
 			},
 		},
 		{
 			"valid server condition created",
 			// mock repository
 			func(r *store.MockRepository) {
+				parametersJSON, err := json.Marshal(json.RawMessage(`{"some param": "1"}`))
+				if err != nil {
+					t.Error()
+				}
+
 				// lookup for an existing condition
 				r.EXPECT().
 					Get(
@@ -358,16 +339,22 @@ func TestServerConditionCreate(t *testing.T) {
 						gomock.Eq(
 							&ptypes.Condition{
 								Kind:       ptypes.FirmwareInstallOutofband,
-								Parameters: parametersValid,
+								Parameters: parametersJSON,
 								State:      ptypes.Pending,
 							},
 						),
 					).
+					Return(nil).
 					Times(1)
 			},
 			func(t *testing.T) *http.Request {
+				payload, err := json.Marshal(&ConditionCreate{Parameters: []byte(`{"some param": "1"}`)})
+				if err != nil {
+					t.Error()
+				}
+
 				url := fmt.Sprintf("/api/v1/servers/%s/condition/%s", serverID.String(), ptypes.FirmwareInstallOutofband)
-				request, err := http.NewRequest(http.MethodPost, url, bytes.NewReader(payloadValid))
+				request, err := http.NewRequestWithContext(context.TODO(), http.MethodPost, url, bytes.NewReader(payload))
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -376,7 +363,7 @@ func TestServerConditionCreate(t *testing.T) {
 			},
 			func(t *testing.T, r *httptest.ResponseRecorder) {
 				assert.Equal(t, http.StatusOK, r.Code)
-				assert.Equal(t, asBytes(t, r.Body), asJSONBytes(t, &ServerResponse{Message: "condition set"}))
+				assert.Equal(t, asJSONBytes(t, &ServerResponse{Message: "condition set"}), asBytes(t, r.Body))
 			},
 		},
 		{
@@ -392,14 +379,14 @@ func TestServerConditionCreate(t *testing.T) {
 					).
 					Return(&ptypes.Condition{ // condition present
 						Kind:       ptypes.FirmwareInstallOutofband,
-						Parameters: parametersValid,
 						State:      ptypes.Pending,
+						Parameters: []byte(`{"hello":"world"}`),
 					}, nil).
 					Times(1)
 			},
 			func(t *testing.T) *http.Request {
 				url := fmt.Sprintf("/api/v1/servers/%s/condition/%s", serverID.String(), ptypes.FirmwareInstallOutofband)
-				request, err := http.NewRequest(http.MethodPost, url, bytes.NewReader(payloadValid))
+				request, err := http.NewRequestWithContext(context.TODO(), http.MethodPost, url, bytes.NewReader([]byte(`{"hello":"world"}`)))
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -429,20 +416,20 @@ func TestServerConditionCreate(t *testing.T) {
 
 func TestServerConditionList(t *testing.T) {
 	var firmwareInstall ptypes.ConditionKind = "firmwareInstall"
+
 	var inventoryOutofband ptypes.ConditionKind = "inventoryOutofband"
 
 	serverID := uuid.New()
+
 	conditions := []*ptypes.Condition{
 		{
-			Kind: firmwareInstall,
-			Parameters: &ptypes.FirmwareInstallOutofbandParameters{
-				FirmwareSetID: uuid.NewString(),
-			},
-			State: ptypes.Pending,
+			Kind:       firmwareInstall,
+			Parameters: []byte(`{"FirmwareSetID": "123"}`),
+			State:      ptypes.Pending,
 		},
 		{
 			Kind:       inventoryOutofband,
-			Parameters: &ptypes.InventoryOutofbandParameters{},
+			Parameters: []byte(`{}`),
 			State:      ptypes.Pending,
 		},
 	}
@@ -469,7 +456,7 @@ func TestServerConditionList(t *testing.T) {
 			nil,
 			func(t *testing.T) *http.Request {
 				url := fmt.Sprintf("/api/v1/servers/%s/state/%s", "123", "invalid")
-				request, err := http.NewRequest(http.MethodGet, url, http.NoBody)
+				request, err := http.NewRequestWithContext(context.TODO(), http.MethodGet, url, http.NoBody)
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -486,7 +473,7 @@ func TestServerConditionList(t *testing.T) {
 			nil,
 			func(t *testing.T) *http.Request {
 				url := fmt.Sprintf("/api/v1/servers/%s/state/%s", uuid.New().String(), "asdasd")
-				request, err := http.NewRequest(http.MethodGet, url, http.NoBody)
+				request, err := http.NewRequestWithContext(context.TODO(), http.MethodGet, url, http.NoBody)
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -510,7 +497,7 @@ func TestServerConditionList(t *testing.T) {
 			func(t *testing.T) *http.Request {
 				url := fmt.Sprintf("/api/v1/servers/%s/state/%s", serverID.String(), ptypes.Pending)
 
-				request, err := http.NewRequest(http.MethodGet, url, http.NoBody)
+				request, err := http.NewRequestWithContext(context.TODO(), http.MethodGet, url, http.NoBody)
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -553,7 +540,7 @@ func TestServerConditionGet(t *testing.T) {
 	serverID := uuid.New()
 	condition := &ptypes.Condition{
 		Kind:       ptypes.FirmwareInstallOutofband,
-		Parameters: &ptypes.FirmwareInstallOutofbandParameters{},
+		Parameters: json.RawMessage{},
 	}
 
 	// mock repository
@@ -578,7 +565,7 @@ func TestServerConditionGet(t *testing.T) {
 			nil,
 			func(t *testing.T) *http.Request {
 				url := fmt.Sprintf("/api/v1/servers/%s/condition/%s", "123", "asdasd")
-				request, err := http.NewRequest(http.MethodGet, url, http.NoBody)
+				request, err := http.NewRequestWithContext(context.TODO(), http.MethodGet, url, http.NoBody)
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -595,7 +582,7 @@ func TestServerConditionGet(t *testing.T) {
 			nil,
 			func(t *testing.T) *http.Request {
 				url := fmt.Sprintf("/api/v1/servers/%s/condition/%s", uuid.New().String(), "asdasd")
-				request, err := http.NewRequest(http.MethodGet, url, http.NoBody)
+				request, err := http.NewRequestWithContext(context.TODO(), http.MethodGet, url, http.NoBody)
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -619,7 +606,7 @@ func TestServerConditionGet(t *testing.T) {
 			func(t *testing.T) *http.Request {
 				url := fmt.Sprintf("/api/v1/servers/%s/condition/%s", serverID.String(), ptypes.FirmwareInstallOutofband)
 
-				request, err := http.NewRequest(http.MethodGet, url, http.NoBody)
+				request, err := http.NewRequestWithContext(context.TODO(), http.MethodGet, url, http.NoBody)
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -683,7 +670,7 @@ func TestServerConditionDelete(t *testing.T) {
 			nil,
 			func(t *testing.T) *http.Request {
 				url := fmt.Sprintf("/api/v1/servers/%s/condition/%s", "123", "asdasd")
-				request, err := http.NewRequest(http.MethodDelete, url, http.NoBody)
+				request, err := http.NewRequestWithContext(context.TODO(), http.MethodDelete, url, http.NoBody)
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -700,7 +687,7 @@ func TestServerConditionDelete(t *testing.T) {
 			nil,
 			func(t *testing.T) *http.Request {
 				url := fmt.Sprintf("/api/v1/servers/%s/condition/%s", uuid.New().String(), "asdasd")
-				request, err := http.NewRequest(http.MethodDelete, url, http.NoBody)
+				request, err := http.NewRequestWithContext(context.TODO(), http.MethodDelete, url, http.NoBody)
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -724,7 +711,7 @@ func TestServerConditionDelete(t *testing.T) {
 			func(t *testing.T) *http.Request {
 				url := fmt.Sprintf("/api/v1/servers/%s/condition/%s", serverID.String(), ptypes.FirmwareInstallOutofband)
 
-				request, err := http.NewRequest(http.MethodDelete, url, http.NoBody)
+				request, err := http.NewRequestWithContext(context.TODO(), http.MethodDelete, url, http.NoBody)
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -760,7 +747,7 @@ func TestServerConditionDelete(t *testing.T) {
 			func(t *testing.T) *http.Request {
 				url := fmt.Sprintf("/api/v1/servers/%s/condition/%s", serverID.String(), ptypes.FirmwareInstallOutofband)
 
-				request, err := http.NewRequest(http.MethodDelete, url, http.NoBody)
+				request, err := http.NewRequestWithContext(context.TODO(), http.MethodDelete, url, http.NoBody)
 				if err != nil {
 					t.Fatal(err)
 				}

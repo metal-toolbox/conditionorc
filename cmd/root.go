@@ -19,19 +19,12 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/metal-toolbox/conditionorc/internal/app"
 	"github.com/spf13/cobra"
 )
 
-type ()
-
 var (
 	logLevel string
-	trace    bool
-	debug    bool
 	cfgFile  string
-	appName  string
-	natsOpts = &app.NatsOptions{}
 )
 
 // rootCmd represents the base command when called without any subcommands
@@ -53,5 +46,4 @@ func init() {
 	// Read in env vars with appName as prefix
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "conditionorc.yaml", "default is ./conditionorc.yaml")
 	rootCmd.PersistentFlags().StringVar(&logLevel, "log-level", "info", "set logging level - debug, trace")
-
 }

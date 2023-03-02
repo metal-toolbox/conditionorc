@@ -45,10 +45,19 @@ func (r *Routes) serverConditionUpdate(c *gin.Context) {
 		return
 	}
 
-	if conditionUpdate.ResourceVersion == 0 || (conditionUpdate.State == "" && conditionUpdate.Status == nil) {
+	if conditionUpdate.ResourceVersion == 0 {
 		c.JSON(
 			http.StatusBadRequest,
-			&ServerResponse{Message: "invalid ConditionUpdate payload"},
+			&ServerResponse{Message: "invalid ConditionUpdate payload, expected a valid resourceVersion"},
+		)
+
+		return
+	}
+
+	if conditionUpdate.State == "" && conditionUpdate.Status == nil {
+		c.JSON(
+			http.StatusBadRequest,
+			&ServerResponse{Message: "invalid ConditionUpdate payload, either a State or a Status value"},
 		)
 
 		return
@@ -120,15 +129,7 @@ func (r *Routes) serverConditionCreate(c *gin.Context) {
 		return
 	}
 
-	condition, err := conditionCreate.newCondition(kind)
-	if err != nil {
-		c.JSON(
-			http.StatusBadRequest,
-			&ServerResponse{Message: err.Error()},
-		)
-
-		return
-	}
+	condition := conditionCreate.newCondition(kind)
 
 	// TODO: check if condition already exists and is in a finalized state
 	existing, err := r.repository.Get(c.Request.Context(), serverID, kind)
@@ -247,6 +248,12 @@ func (r *Routes) serverConditionList(c *gin.Context) {
 		return
 	}
 
+	if len(found) == 0 {
+		c.JSON(http.StatusNotFound, &ServerResponse{Message: "no conditions in given state found on server"})
+
+		return
+	}
+
 	data := ConditionsResponse{ServerID: serverID, Conditions: found}
 
 	c.JSON(http.StatusOK, &ServerResponse{Records: data})
@@ -279,6 +286,12 @@ func (r *Routes) serverConditionGet(c *gin.Context) {
 			http.StatusInternalServerError,
 			&ServerResponse{Message: err.Error()},
 		)
+
+		return
+	}
+
+	if found == nil {
+		c.JSON(http.StatusNotFound, &ServerResponse{Message: "conditionKind not found on server"})
 
 		return
 	}

@@ -11,7 +11,6 @@ type LogLevel string
 
 type EventBrokerKind string
 
-
 const (
 	AppName string = "conditionorc"
 

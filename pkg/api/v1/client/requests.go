@@ -1,11 +1,5 @@
 package client
 
-// License
-//
-// Major portions of this code was adapted from the hollow-serverservice project
-//
-// https://github.com/metal-toolbox/hollow-serverservice/blob/main/LICENSE
-
 import (
 	"bytes"
 	"context"
@@ -15,113 +9,122 @@ import (
 	"net/http"
 	"net/url"
 
+	"github.com/metal-toolbox/conditionorc/pkg/api/v1/routes"
 	"go.hollow.sh/toolbox/version"
 )
 
-func newGetRequest(ctx context.Context, uri, path string) (*http.Request, error) {
-	requestURL, err := url.Parse(fmt.Sprintf("%s/api/%s/%s", uri, apiVersion, path))
+func (c *Client) get(ctx context.Context, path string) (*routes.ServerResponse, error) {
+	requestURL, err := url.Parse(fmt.Sprintf("%s%s/%s", c.serverAddress, routes.PathPrefix, path))
 	if err != nil {
-		return nil, err
+		return nil, Error{Cause: err.Error()}
 	}
 
-	return http.NewRequestWithContext(ctx, http.MethodGet, requestURL.String(), nil)
-}
-
-func newPostRequest(ctx context.Context, uri, path string, body interface{}) (*http.Request, error) {
-	requestURL, err := url.Parse(fmt.Sprintf("%s/api/%s/%s", uri, apiVersion, path))
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, requestURL.String(), http.NoBody)
 	if err != nil {
-		return nil, err
+		return nil, Error{Cause: "error in GET request" + err.Error()}
 	}
 
-	var buf io.ReadWriter
-	if body != nil {
-		buf = &bytes.Buffer{}
-		enc := json.NewEncoder(buf)
-		enc.SetEscapeHTML(false)
-
-		if err := enc.Encode(body); err != nil {
-			return nil, err
-		}
-	}
-
-	return http.NewRequestWithContext(ctx, http.MethodPost, requestURL.String(), buf)
+	return c.do(req)
 }
 
-func newPutRequest(ctx context.Context, uri, path string, body interface{}) (*http.Request, error) {
-	requestURL, err := url.Parse(fmt.Sprintf("%s/api/%s/%s", uri, apiVersion, path))
+func (c *Client) put(ctx context.Context, path string, body interface{}) (*routes.ServerResponse, error) {
+	requestURL, err := url.Parse(fmt.Sprintf("%s%s/%s", c.serverAddress, routes.PathPrefix, path))
 	if err != nil {
-		return nil, err
+		return nil, Error{Cause: err.Error()}
 	}
 
-	var buf io.ReadWriter
-	if body != nil {
-		buf = &bytes.Buffer{}
-		enc := json.NewEncoder(buf)
-		enc.SetEscapeHTML(false)
-
-		if err := enc.Encode(body); err != nil {
-			return nil, err
-		}
-	}
-
-	return http.NewRequestWithContext(ctx, http.MethodPut, requestURL.String(), buf)
-}
-
-func newDeleteRequest(ctx context.Context, uri, path string) (*http.Request, error) {
-	requestURL, err := url.Parse(fmt.Sprintf("%s/api/%s/%s", uri, apiVersion, path))
+	payload, err := json.Marshal(body)
 	if err != nil {
-		return nil, err
+		return nil, Error{Cause: "error in PUT JSON payload: " + err.Error()}
 	}
 
-	return http.NewRequestWithContext(ctx, http.MethodDelete, requestURL.String(), nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPut, requestURL.String(), bytes.NewReader(payload))
+	if err != nil {
+		return nil, Error{Cause: "error in PUT request" + err.Error()}
+	}
+
+	return c.do(req)
 }
 
-func userAgentString() string {
-	return fmt.Sprintf("go-conditionorc-client (%s)", version.String())
+func (c *Client) post(ctx context.Context, path string, body interface{}) (*routes.ServerResponse, error) {
+	requestURL, err := url.Parse(fmt.Sprintf("%s%s/%s", c.serverAddress, routes.PathPrefix, path))
+	if err != nil {
+		return nil, Error{Cause: err.Error()}
+	}
+
+	payload, err := json.Marshal(body)
+	if err != nil {
+		return nil, Error{Cause: "error in POST JSON payload: " + err.Error()}
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, requestURL.String(), bytes.NewReader(payload))
+	if err != nil {
+		return nil, Error{Cause: "error in POST request" + err.Error()}
+	}
+
+	return c.do(req)
 }
 
-func (c *Client) do(req *http.Request, result interface{}) error {
+func (c *Client) delete(ctx context.Context, path string) (*routes.ServerResponse, error) {
+	requestURL, err := url.Parse(fmt.Sprintf("%s%s/%s", c.serverAddress, routes.PathPrefix, path))
+	if err != nil {
+		return nil, Error{Cause: err.Error()}
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodDelete, requestURL.String(), http.NoBody)
+	if err != nil {
+		return nil, Error{Cause: "error in DELETE request" + err.Error()}
+	}
+
+	return c.do(req)
+}
+
+func (c *Client) userAgentString() string {
+	return fmt.Sprintf("conditionorc-client (%s)", version.String())
+}
+
+func (c *Client) do(req *http.Request) (*routes.ServerResponse, error) {
+	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", fmt.Sprintf("bearer %s", c.authToken))
-	req.Header.Set("User-Agent", userAgentString())
+	req.Header.Set("User-Agent", c.userAgentString())
 
-	resp, err := c.httpClient.Do(req)
+	response, err := c.client.Do(req)
 	if err != nil {
-		return err
+		return nil, RequestError{err.Error(), c.statusCode(response)}
 	}
 
-	if err := ensureValidServerResponse(resp); err != nil {
-		return err
+	if response == nil {
+		return nil, RequestError{"got empty response body", 0}
 	}
 
-	defer resp.Body.Close()
+	defer response.Body.Close()
 
-	data, err := io.ReadAll(resp.Body)
+	data, err := io.ReadAll(response.Body)
 	if err != nil {
-		return err
+		return nil, RequestError{
+			"failed to read response body: " + err.Error(),
+			c.statusCode(response),
+		}
 	}
 
-	return json.Unmarshal(data, result)
+	serverResponse := &routes.ServerResponse{}
+
+	if err := json.Unmarshal(data, &serverResponse); err != nil {
+		return nil, RequestError{
+			"failed to unmarshal response from server: " + err.Error(),
+			c.statusCode(response),
+		}
+	}
+
+	serverResponse.StatusCode = response.StatusCode
+
+	return serverResponse, nil
 }
 
-func ensureValidServerResponse(resp *http.Response) error {
-	if resp.StatusCode >= http.StatusMultiStatus {
-		defer resp.Body.Close()
-
-		var se ServerError
-
-		se.StatusCode = resp.StatusCode
-
-		data, err := io.ReadAll(resp.Body)
-		if err != nil {
-			return err
-		}
-
-		if err := json.Unmarshal(data, &se); err != nil {
-			se.ErrorMessage = "failed to decode response from server"
-		}
-
-		return se
+func (c *Client) statusCode(response *http.Response) int {
+	if response != nil {
+		return response.StatusCode
 	}
 
-	return nil
+	return 0
 }

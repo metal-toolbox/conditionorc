@@ -1,7 +1,6 @@
 package server
 
 import (
-	"context"
 	"net/http"
 	"time"
 
@@ -23,56 +22,52 @@ var (
 	ErrRoutes = errors.New("error in routes")
 )
 
+// Server type holds attributes of the condition orc server
 type Server struct {
 	// Logger is the app logger
 	logger        *logrus.Logger
 	listenAddress string
 	repository    store.Repository
 	streamBroker  events.StreamBroker
-	engine        *gin.Engine
 }
 
 // Option type sets a parameter on the Server type.
-type Option func(Server)
+type Option func(*Server)
 
 // WithStore sets the storage repository on the Server type.
 func WithStore(repository store.Repository) Option {
-	return func(s Server) {
+	return func(s *Server) {
 		s.repository = repository
 	}
 }
 
 // WithStreamBroker sets the event stream broker on the Server type.
 func WithStreamBroker(broker events.StreamBroker) Option {
-	return func(s Server) {
+	return func(s *Server) {
 		s.streamBroker = broker
 	}
 }
 
 // WithLogger sets the logger on the Server type.
 func WithLogger(logger *logrus.Logger) Option {
-	return func(s Server) {
+	return func(s *Server) {
 		s.logger = logger
 	}
 }
 
 // WithListenAddress sets the Server listen address.
 func WithListenAddress(addr string) Option {
-	return func(s Server) {
+	return func(s *Server) {
 		s.listenAddress = addr
 	}
 }
 
 func New(opts ...Option) *http.Server {
-	s := Server{}
+	s := &Server{}
 
 	for _, opt := range opts {
 		opt(s)
 	}
-	//	authMW, err := ginjwt.NewAuthMiddleware(authConfig)
-	//	if err != nil {
-	//		s.logger.Fatal("failed to initialize auth middleware", "error", err)
-	//	}
 
 	g := gin.New()
 	g.Use(ginlogrus.Logger(s.logger), gin.Recovery())
@@ -80,7 +75,6 @@ func New(opts ...Option) *http.Server {
 	g.GET("/healthz/readiness", s.ping)
 
 	options := []routes.Option{
-		//		apiv1.WithAuthMiddleware(authMW),
 		routes.WithLogger(s.logger),
 		routes.WithStore(s.repository),
 		routes.WithStreamBroker(s.streamBroker),
@@ -91,7 +85,7 @@ func New(opts ...Option) *http.Server {
 		s.logger.Fatal(errors.Wrap(err, ErrRoutes.Error()))
 	}
 
-	v1Router.Routes(g.Group("/api/v1"))
+	v1Router.Routes(g.Group(routes.PathPrefix))
 
 	g.NoRoute(func(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"message": "invalid request - route not found"})
@@ -103,11 +97,6 @@ func New(opts ...Option) *http.Server {
 		ReadTimeout:  readTimeout,
 		WriteTimeout: writeTimeout,
 	}
-}
-
-// Run method here runs the http server, its mainly here for tests.
-func (s *Server) Run(ctx context.Context, listenAddress string) {
-	s.engine.Run(listenAddress)
 }
 
 // ping checks the server can reach its store repository

@@ -87,8 +87,9 @@ type Condition struct {
 	// Kind is one of ConditionKind.
 	Kind ConditionKind `json:"kind,omitempty"`
 
-	// Parameters is typed based on the ConditionKind
-	Parameters Parameters `json:"parameters,omitempty"`
+	// Parameters is a JSON object that is agreed upon by the controller
+	// reconciling the condition and the client requesting the condition.
+	Parameters json.RawMessage `json:"parameters,omitempty"`
 
 	// State is one of ConditionState
 	State ConditionState `json:"state,omitempty"`

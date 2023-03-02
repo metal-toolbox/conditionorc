@@ -19,6 +19,7 @@ var (
 	defaultNatsStreamURNNamespace = "hollow"
 	defaultNatsStreamPrefix       = "com.hollow.sh.events"
 	defaultNatsStreamSubjects     = []string{"com.hollow.sh.events.>"}
+	defaultNatsConnectTimeout     = 100 * time.Millisecond
 )
 
 // Configuration holds application configuration read from a YAML or set by env variables.
@@ -166,7 +167,7 @@ func (a *App) setNATSDefaults() {
 	}
 
 	if a.Config.NatsOptions.ConnectTimeout == 0 {
-		a.Config.NatsOptions.ConnectTimeout = 100 * time.Millisecond
+		a.Config.NatsOptions.ConnectTimeout = defaultNatsConnectTimeout
 	}
 }
 
@@ -231,6 +232,7 @@ func (a *App) NewEventStreamBrokerFromConfig() events.StreamBroker {
 
 // Server service configuration options
 
+// nolint:gocyclo // parameter validation is cyclomatic
 func (a *App) envVarServerserviceOverrides() error {
 	if a.v.GetString("serverservice.endpoint") != "" {
 		a.Config.ServerserviceOptions.Endpoint = a.v.GetString("serverservice.endpoint")

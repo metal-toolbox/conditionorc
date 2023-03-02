@@ -22,10 +22,10 @@ type Firmware struct {
 
 // firmwareInstallParameters define firmwareInstall condition parameters.
 type FirmwareInstallOutofbandParameters struct {
-	InventoryAfterUpdate bool        `json:"inventory_after_update,omitempty"`
-	ForceInstall         bool        `json:"force_install,omitempty"`
+	InventoryAfterUpdate bool        `json:"inventoryAfterUpdate,omitempty"`
+	ForceInstall         bool        `json:"forceInstall,omitempty"`
 	FirmwareSetID        string      `json:"firmwareSetID,omitempty"`
-	FirmwareList         []*Firmware `json:"firmware_list,omitempty"`
+	FirmwareList         []*Firmware `json:"firmwareList,omitempty"`
 }
 
 // Validate fields implements the Parameters interface to validate FirmwareInstallOutofbandParameters.

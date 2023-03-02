@@ -20,9 +20,15 @@ lint:
 test: lint
 	CGO_ENABLED=0 go test -timeout 1m -v -covermode=atomic ./...
 
+
+## install openapi codegen
+install-oapi-codegen:
+	# pinned to version that is known to work
+	go get github.com/deepmap/oapi-codegen@2b52cd5
+
 gen-store-mock:
 	go install github.com/golang/mock/mockgen@v1.6.0
-	mockgen -package=store -source=internal/store/store.go > internal/store/mock.go
+	mockgen -package=store -source=internal/store/interface.go > internal/store/mock.go
 
 ## build osx bin
 build-osx:

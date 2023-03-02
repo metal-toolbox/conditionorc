@@ -1,14 +1,18 @@
 package routes
 
 import (
-	"errors"
 	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/metal-toolbox/conditionorc/internal/events"
 	"github.com/metal-toolbox/conditionorc/internal/store"
+	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"go.hollow.sh/toolbox/ginjwt"
+)
+
+const (
+	PathPrefix = "/api/v1"
 )
 
 // Routes type sets up the conditionorc API  router routes.
@@ -61,7 +65,7 @@ func NewRoutes(options ...Option) (*Routes, error) {
 	supported := []string{}
 
 	if routes.repository == nil {
-		return nil, errors.New("no store repository defined")
+		return nil, errors.Wrap(ErrStore, "no store repository defined")
 	}
 
 	routes.logger.Debug(
@@ -73,33 +77,27 @@ func NewRoutes(options ...Option) (*Routes, error) {
 }
 
 func (r *Routes) Routes(g *gin.RouterGroup) {
-	//authMiddleWare := r.authMW
-
-	//g.Use(authMiddleWare)
-
 	// For now these don't have scopes, since @ozz suggests it'll be handled by the API gateway.
 	servers := g.Group("/servers/:uuid")
 	{
 		// /servers/:uuid/state/:conditionState
 		serverCondition := servers.Group("/state")
-		{
-			serverCondition.GET("/:conditionState", r.serverConditionList)
-		}
+
+		serverCondition.GET("/:conditionState", r.serverConditionList)
 
 		// /servers/:uuid/condition/:conditionKind
 		serverConditionBySlug := servers.Group("/condition")
-		{
-			// List condition on a server.
-			serverConditionBySlug.GET("/:conditionKind", r.serverConditionGet)
 
-			// Create a condition on a server.
-			serverConditionBySlug.POST("/:conditionKind", r.serverConditionCreate)
+		// List condition on a server.
+		serverConditionBySlug.GET("/:conditionKind", r.serverConditionGet)
 
-			// Update an existing condition attributes on a server.
-			serverConditionBySlug.PUT("/:conditionKind", r.serverConditionUpdate)
+		// Create a condition on a server.
+		serverConditionBySlug.POST("/:conditionKind", r.serverConditionCreate)
 
-			// Remove a condition from a server.
-			serverConditionBySlug.DELETE("/:conditionKind", r.serverConditionDelete)
-		}
+		// Update an existing condition attributes on a server.
+		serverConditionBySlug.PUT("/:conditionKind", r.serverConditionUpdate)
+
+		// Remove a condition from a server.
+		serverConditionBySlug.DELETE("/:conditionKind", r.serverConditionDelete)
 	}
 }

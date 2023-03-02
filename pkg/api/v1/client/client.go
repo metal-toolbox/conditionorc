@@ -1,160 +1,102 @@
 package client
 
-// License
-//
-// Major portions of this code were adapted from the hollow-serverservice project.
-//
-// https://github.com/metal-toolbox/hollow-serverservice/blob/main/LICENSE
-
 import (
 	"context"
+	"fmt"
 	"net/http"
-	"net/url"
-	"strings"
+
+	"github.com/google/uuid"
+	"github.com/metal-toolbox/conditionorc/pkg/api/v1/routes"
+	ptypes "github.com/metal-toolbox/conditionorc/pkg/types"
 )
 
-var apiVersion = "v1"
+// Doer performs HTTP requests.
+//
+// The standard http.Client implements this interface.
+type HTTPRequestDoer interface {
+	Do(req *http.Request) (*http.Response, error)
+}
 
-// Client has the ability to talk to a hollow server service api server running at the given URI
+// Client can perform queries against the conditionorc API service.
 type Client struct {
-	url        string
-	authToken  string
-	httpClient Doer
+	// The server address with the schema - https://foo.com
+	serverAddress string
+
+	// Authentication token
+	authToken string
+
+	// Doer for performing requests, typically a *http.Client with any
+	// customized settings, such as certificate chains.
+	client HTTPRequestDoer
 }
 
-// Doer is an interface for an HTTP client that can make requests
-type Doer interface {
-	Do(*http.Request) (*http.Response, error)
-}
+// Option allows setting custom parameters during construction
+type Option func(*Client) error
 
-// NewClientWithToken will initialize a new hollow client with the given auth token and URL
-func NewClientWithToken(authToken, url string, doerClient Doer) (*Client, error) {
-	if authToken == "" {
-		return nil, newClientError("failed to initialize: no auth token provided")
+// Creates a new Client, with reasonable defaults
+func NewClient(serverAddress string, opts ...Option) (*Client, error) {
+	// create a client with sane default values
+	client := Client{
+		serverAddress: serverAddress,
+	}
+	// mutate client and add all optional params
+	for _, o := range opts {
+		if err := o(&client); err != nil {
+			return nil, err
+		}
 	}
 
-	c, err := NewClient(url, doerClient)
-	if err != nil {
-		return nil, err
+	// create httpClient, if not already present
+	if client.client == nil {
+		client.client = &http.Client{}
 	}
 
-	c.authToken = authToken
-
-	return c, nil
+	return &client, nil
 }
 
-// NewClient will return a server service client configured to talk to the given URL.
-// This client will not set the authorization header for you automatically and is left to be handled by the Doer that is provided.
-//
-// Example:
-//
-//	ctx := context.TODO()
-//	provider, _ := oidc.NewProvider(ctx, "https://OIDC_ISSUER.COM")
-//
-//	oauthConfig := clientcredentials.Config{
-//		ClientID:       "CLIENT_ID",
-//		ClientSecret:   "CLIENT_SECRET",
-//		TokenURL:       provider.Endpoint().TokenURL,
-//		Scopes:         []string{"SCOPE", "SCOPE2"},
-//		EndpointParams: url.Values{"audience": []string{"HOLLOW_AUDIENCE_VALUE"}},
-//	}
-//
-//	c, _ := serverservice.NewClient("HOLLOW_URI", oauthConfig.Client(ctx))
-func NewClient(url string, doerClient Doer) (*Client, error) {
-	if url == "" {
-		return nil, newClientError("failed to initialize: no hollow api url provided")
+// WithHTTPClient allows overriding the default Doer, which is
+// automatically created using http.Client. This is useful for tests.
+func WithHTTPClient(doer HTTPRequestDoer) Option {
+	return func(c *Client) error {
+		c.client = doer
+		return nil
 	}
+}
 
-	url = strings.TrimSuffix(url, "/")
-
-	c := &Client{
-		url: url,
+// WithAuthToken sets the client auth token.
+func WithAuthToken(authToken string) Option {
+	return func(c *Client) error {
+		c.authToken = authToken
+		return nil
 	}
-
-	c.httpClient = doerClient
-	if c.httpClient == nil {
-		// Use the default client as a fallback if one isn't passed
-		c.httpClient = http.DefaultClient
-	}
-
-	return c, nil
 }
 
-// SetToken allows you to change the token of a client
-func (c *Client) SetToken(token string) {
-	c.authToken = token
+func (c *Client) ServerConditionGet(ctx context.Context, serverID uuid.UUID, conditionKind ptypes.ConditionKind) (*routes.ServerResponse, error) {
+	path := fmt.Sprintf("servers/%s/condition/%s", serverID.String(), conditionKind)
+
+	return c.get(ctx, path)
 }
 
-// post provides a reusable method for a standard POST to a hollow server
-//func (c *Client) post(ctx context.Context, path string, body interface{}) (*ServerResponse, error) {
-//	request, err := newPostRequest(ctx, c.url, path, body)
-//	if err != nil {
-//		return nil, err
-//	}
-//
-//	r := ServerResponse{}
-//
-//	if err := c.do(request, &r); err != nil {
-//		return nil, err
-//	}
-//
-//	return &r, nil
-//}
-//
-//// put provides a reusable method for a standard PUT to a hollow server
-//func (c *Client) put(ctx context.Context, path string, body interface{}) (*ServerResponse, error) {
-//	request, err := newPutRequest(ctx, c.url, path, body)
-//	if err != nil {
-//		return nil, err
-//	}
-//
-//	r := ServerResponse{}
-//
-//	if err := c.do(request, &r); err != nil {
-//		return nil, err
-//	}
-//
-//	return &r, nil
-//}
+func (c *Client) ServerConditionList(ctx context.Context, serverID uuid.UUID, conditionState ptypes.ConditionState) (*routes.ServerResponse, error) {
+	path := fmt.Sprintf("servers/%s/state/%s", serverID.String(), conditionState)
 
-type queryParams interface {
-	setQuery(url.Values)
+	return c.get(ctx, path)
 }
 
-// list provides a reusable method for a standard list to a hollow server
-//func (c *Client) list(ctx context.Context, path string, params queryParams, resp interface{}) error {
-//	request, err := newGetRequest(ctx, c.url, path)
-//	if err != nil {
-//		return err
-//	}
-//
-//	if params != nil {
-//		q := request.URL.Query()
-//		params.setQuery(q)
-//		request.URL.RawQuery = q.Encode()
-//	}
-//
-//	return c.do(request, &resp)
-//}
+func (c *Client) ServerConditionCreate(ctx context.Context, serverID uuid.UUID, conditionKind ptypes.ConditionKind, conditionCreate routes.ConditionCreate) (*routes.ServerResponse, error) {
+	path := fmt.Sprintf("servers/%s/condition/%s", serverID.String(), conditionKind)
 
-// get provides a reusable method for a standard GET of a single item
-func (c *Client) get(ctx context.Context, path string, resp interface{}) error {
-	request, err := newGetRequest(ctx, c.url, path)
-	if err != nil {
-		return err
-	}
-
-	return c.do(request, &resp)
+	return c.post(ctx, path, conditionCreate)
 }
 
-// post provides a reusable method for a standard post to a hollow server
-//func (c *Client) delete(ctx context.Context, path string) (*ServerResponse, error) {
-//	request, err := newDeleteRequest(ctx, c.url, path)
-//	if err != nil {
-//		return nil, err
-//	}
-//
-//	var r ServerResponse
-//
-//	return &r, c.do(request, &r)
-//}
+func (c *Client) ServerConditionUpdate(ctx context.Context, serverID uuid.UUID, conditionKind ptypes.ConditionKind, conditionUpdate routes.ConditionUpdate) (*routes.ServerResponse, error) {
+	path := fmt.Sprintf("servers/%s/condition/%s", serverID.String(), conditionKind)
+
+	return c.put(ctx, path, conditionUpdate)
+}
+
+func (c *Client) ServerConditionDelete(ctx context.Context, serverID uuid.UUID, conditionKind ptypes.ConditionKind) (*routes.ServerResponse, error) {
+	path := fmt.Sprintf("servers/%s/condition/%s", serverID.String(), conditionKind)
+
+	return c.delete(ctx, path)
+}

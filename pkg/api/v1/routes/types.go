@@ -10,20 +10,21 @@ import (
 )
 
 type ServerResponse struct {
-	Message string      `json:"message,omitempty"`
-	Record  interface{} `json:"record,omitempty"`
-	Records interface{} `json:"records,omitempty"`
+	StatusCode int                `json:"statusCode"`
+	Message    string             `json:"message,omitempty"`
+	Record     ConditionResponse  `json:"record,omitempty"`
+	Records    ConditionsResponse `json:"records,omitempty"`
 }
 
 // ConditionResponse is the response returned for a single condition request.
 type ConditionResponse struct {
-	ServerID  uuid.UUID         `json:"server_id"`
+	ServerID  uuid.UUID         `json:"serverID"`
 	Condition *ptypes.Condition `json:"condition,omitempty"`
 }
 
 // ConditionsResponse is the response returned for listing multiple conditions on a server.
 type ConditionsResponse struct {
-	ServerID   uuid.UUID           `json:"server_id"`
+	ServerID   uuid.UUID           `json:"serverID"`
 	Conditions []*ptypes.Condition `json:"conditions,omitempty"`
 }
 
@@ -33,64 +34,19 @@ type ConditionCreate struct {
 }
 
 // newCondition validates its field values and returns a Condition type.
-func (c *ConditionCreate) newCondition(kind ptypes.ConditionKind) (*ptypes.Condition, error) {
-	condition := &ptypes.Condition{
-		Kind:  kind,
-		State: ptypes.Pending,
+func (c *ConditionCreate) newCondition(kind ptypes.ConditionKind) *ptypes.Condition {
+	return &ptypes.Condition{
+		Kind:       kind,
+		State:      ptypes.Pending,
+		Parameters: c.Parameters,
 	}
-
-	switch kind {
-	case ptypes.FirmwareInstallOutofband:
-		parameters := &ptypes.FirmwareInstallOutofbandParameters{}
-
-		if err := json.Unmarshal(c.Parameters, parameters); err != nil {
-			return nil, errors.Wrap(ErrConditionParameter, err.Error())
-		}
-
-		if err := parameters.Validate(); err != nil {
-			return nil, errors.Wrap(ErrConditionParameter, err.Error())
-		}
-
-		condition.Parameters = parameters
-
-	case ptypes.InventoryOutofband:
-		parameters := &ptypes.InventoryOutofbandParameters{}
-
-		if err := json.Unmarshal(c.Parameters, parameters); err != nil {
-			return nil, errors.Wrap(ErrConditionParameter, err.Error())
-		}
-
-		if err := parameters.Validate(); err != nil {
-			return nil, errors.Wrap(ErrConditionParameter, err.Error())
-		}
-
-		condition.Parameters = parameters
-
-	case ptypes.GenerateFirmwareSet:
-		parameters := &ptypes.GenerateFirmwareSetParameters{}
-
-		if err := json.Unmarshal(c.Parameters, parameters); err != nil {
-			return nil, errors.Wrap(ErrConditionParameter, err.Error())
-		}
-
-		if err := parameters.Validate(); err != nil {
-			return nil, errors.Wrap(ErrConditionParameter, err.Error())
-		}
-
-		condition.Parameters = parameters
-
-	default:
-		return nil, errors.Wrap(ErrConditionParameter, "unsupported conditionKind: "+string(kind))
-	}
-
-	return condition, nil
 }
 
 // ConditionUpdate is the request payload to update an existing condition.
 type ConditionUpdate struct {
 	State           ptypes.ConditionState `json:"state,omitempty"`
 	Status          json.RawMessage       `json:"status,omitempty"`
-	ResourceVersion int64                 `json:"resource_version"`
+	ResourceVersion int64                 `json:"resourceVersion"`
 }
 
 // mergeExisting when given an existing condition, validates the update based on existing values
@@ -127,5 +83,4 @@ func (c *ConditionUpdate) mergeExisting(existing *ptypes.Condition) (*ptypes.Con
 		State:      c.State,
 		Status:     c.Status,
 	}, nil
-
 }
