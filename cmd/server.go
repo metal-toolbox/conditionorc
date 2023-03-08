@@ -37,7 +37,6 @@ var cmdServer = &cobra.Command{
 			server.WithLogger(app.Logger),
 			server.WithListenAddress(app.Config.ListenAddress),
 			server.WithStore(repository),
-			server.WithStreamBroker(app.NewEventStreamBrokerFromConfig()),
 		}
 
 		srv := server.New(options...)

@@ -4,10 +4,10 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
-	"github.com/metal-toolbox/conditionorc/internal/events"
 	"github.com/metal-toolbox/conditionorc/internal/store"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
+	"go.hollow.sh/toolbox/events"
 	"go.hollow.sh/toolbox/ginjwt"
 )
 

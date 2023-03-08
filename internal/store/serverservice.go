@@ -6,7 +6,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/davecgh/go-spew/spew"
 	"github.com/google/uuid"
 	"github.com/metal-toolbox/conditionorc/internal/app"
 	ptypes "github.com/metal-toolbox/conditionorc/pkg/types"
@@ -170,12 +169,10 @@ func (s *Serverservice) ListServersWithCondition(ctx context.Context, conditionK
 		},
 	}
 
-	got, _, err := s.client.List(ctx, params)
+	_, _, err := s.client.List(ctx, params)
 	if err != nil {
 		return nil, err
 	}
-
-	spew.Dump(got)
 
 	return nil, nil
 }

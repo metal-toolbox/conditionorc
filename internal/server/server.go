@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/metal-toolbox/conditionorc/internal/events"
 	"github.com/metal-toolbox/conditionorc/internal/store"
 	"github.com/metal-toolbox/conditionorc/pkg/api/v1/routes"
 	"github.com/pkg/errors"
@@ -28,7 +27,6 @@ type Server struct {
 	logger        *logrus.Logger
 	listenAddress string
 	repository    store.Repository
-	streamBroker  events.StreamBroker
 }
 
 // Option type sets a parameter on the Server type.
@@ -38,13 +36,6 @@ type Option func(*Server)
 func WithStore(repository store.Repository) Option {
 	return func(s *Server) {
 		s.repository = repository
-	}
-}
-
-// WithStreamBroker sets the event stream broker on the Server type.
-func WithStreamBroker(broker events.StreamBroker) Option {
-	return func(s *Server) {
-		s.streamBroker = broker
 	}
 }
 
@@ -77,7 +68,6 @@ func New(opts ...Option) *http.Server {
 	options := []routes.Option{
 		routes.WithLogger(s.logger),
 		routes.WithStore(s.repository),
-		routes.WithStreamBroker(s.streamBroker),
 	}
 
 	v1Router, err := routes.NewRoutes(options...)

@@ -8,6 +8,7 @@ import (
 	"github.com/metal-toolbox/conditionorc/internal/orchestrator"
 	"github.com/metal-toolbox/conditionorc/internal/store"
 	"github.com/spf13/cobra"
+	"go.hollow.sh/toolbox/events"
 )
 
 // install orchestrator command
@@ -25,11 +26,16 @@ var cmdOrchestrator = &cobra.Command{
 			app.Logger.Fatal(err)
 		}
 
+		streamBroker := events.NewStreamBroker()
+		if err := streamBroker.Open(app.Config.NatsOptions); err != nil {
+			app.Logger.Fatal(err)
+		}
+
 		options := []orchestrator.Option{
 			orchestrator.WithLogger(app.Logger),
 			orchestrator.WithListenAddress(app.Config.ListenAddress),
 			orchestrator.WithStore(repository),
-			orchestrator.WithStreamBroker(app.NewEventStreamBrokerFromConfig()),
+			orchestrator.WithStreamBroker(streamBroker),
 		}
 
 		orc := orchestrator.New(options...)

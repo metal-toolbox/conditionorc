@@ -6,20 +6,13 @@ import (
 	"strings"
 	"time"
 
-	"github.com/metal-toolbox/conditionorc/internal/events"
 	"github.com/metal-toolbox/conditionorc/internal/model"
 	"github.com/pkg/errors"
+	"go.hollow.sh/toolbox/events"
 )
 
 var (
 	ErrConfig = errors.New("configuration error")
-)
-
-var (
-	defaultNatsStreamURNNamespace = "hollow"
-	defaultNatsStreamPrefix       = "com.hollow.sh.events"
-	defaultNatsStreamSubjects     = []string{"com.hollow.sh.events.>"}
-	defaultNatsConnectTimeout     = 100 * time.Millisecond
 )
 
 // Configuration holds application configuration read from a YAML or set by env variables.
@@ -56,7 +49,7 @@ type Configuration struct {
 	// NatsOptions defines the NATs events broker configuration parameters.
 	//
 	// This parameter is required when EventsBrokerKind is set to nats.
-	NatsOptions NatsOptions `mapstructure:"nats_options"`
+	NatsOptions events.NatsOptions `mapstructure:"nats_options"`
 }
 
 // ServerserviceOptions defines configuration for the Serverservice client.
@@ -71,18 +64,6 @@ type ServerserviceOptions struct {
 	OidcClientID         string   `mapstructure:"oidc_client_id"`
 	OidcClientScopes     []string `mapstructure:"oidc_client_scopes"`
 	DisableOAuth         bool     `mapstructure:"disable_oauth"`
-}
-
-type NatsOptions struct {
-	StreamURL          string        `mapstructure:"stream_url"`
-	StreamUser         string        `mapstructure:"stream_user"`
-	StreamPass         string        `mapstructure:"stream_pass"`
-	CredsFile          string        `mapstructure:"creds_file"`
-	StreamName         string        `mapstructure:"stream_name"`
-	StreamPrefix       string        `mapstructure:"stream_prefix"`
-	StreamURNNamespace string        `mapstructure:"stream_urn_ns"`
-	StreamSubjects     []string      `mapstructure:"stream_subjects"`
-	ConnectTimeout     time.Duration `mapstructure:"connect_timeout"`
 }
 
 func (a *App) LoadConfiguration() error {
@@ -132,8 +113,6 @@ func (a *App) envVarOverrides() error {
 		if err := a.envVarNatsOverrides(); err != nil {
 			return err
 		}
-
-		a.setNATSDefaults()
 	}
 
 	switch a.Config.StoreKind {
@@ -149,35 +128,16 @@ func (a *App) envVarOverrides() error {
 }
 
 // NATs streaming configuration
-
-func (a *App) setNATSDefaults() {
-	if a.Config.NatsOptions.StreamName == "" {
-		a.Config.NatsOptions.StreamName = model.AppName
-	}
-
-	if a.Config.NatsOptions.StreamPrefix == "" {
-		a.Config.NatsOptions.StreamPrefix = defaultNatsStreamPrefix
-	}
-
-	if a.Config.NatsOptions.StreamURNNamespace == "" {
-		a.Config.NatsOptions.StreamURNNamespace = defaultNatsStreamURNNamespace
-	}
-
-	if len(a.Config.NatsOptions.StreamSubjects) == 0 {
-		a.Config.NatsOptions.StreamSubjects = defaultNatsStreamSubjects
-	}
-
-	if a.Config.NatsOptions.ConnectTimeout == 0 {
-		a.Config.NatsOptions.ConnectTimeout = defaultNatsConnectTimeout
-	}
-}
+var (
+	defaultNatsConnectTimeout = 100 * time.Millisecond
+)
 
 func (a *App) envVarNatsOverrides() error {
 	if a.v.GetString("nats.url") != "" {
-		a.Config.NatsOptions.StreamURL = a.v.GetString("nats.url")
+		a.Config.NatsOptions.URL = a.v.GetString("nats.url")
 	}
 
-	if a.Config.NatsOptions.StreamURL == "" {
+	if a.Config.NatsOptions.URL == "" {
 		return errors.New("missing parameter: nats.url")
 	}
 
@@ -194,41 +154,14 @@ func (a *App) envVarNatsOverrides() error {
 	}
 
 	if a.v.GetString("nats.stream.name") != "" {
-		a.Config.NatsOptions.StreamName = a.v.GetString("nats.stream.name")
+		a.Config.NatsOptions.Stream.Name = a.v.GetString("nats.stream.name")
 	}
 
-	if a.v.GetString("nats.stream.prefix") != "" {
-		a.Config.NatsOptions.StreamPrefix = a.v.GetString("nats.stream.prefix")
-	}
-
-	if a.v.GetString("nats.stream.subjects") != "" {
-		a.Config.NatsOptions.StreamSubjects = a.v.GetStringSlice("nats.stream.subjects")
-	}
-
-	if a.v.GetString("nats.stream.urn.ns") != "" {
-		a.Config.NatsOptions.StreamURNNamespace = a.v.GetString("nats.stream.urn.ns")
-	}
-
-	if a.v.GetString("nats.stream.connect.timeout") != "" {
-		a.Config.NatsOptions.ConnectTimeout = a.v.GetDuration("nats.stream.connect.timeout")
+	if a.Config.NatsOptions.ConnectTimeout == 0 {
+		a.Config.NatsOptions.ConnectTimeout = defaultNatsConnectTimeout
 	}
 
 	return nil
-}
-
-func (a *App) NewEventStreamBrokerFromConfig() events.StreamBroker {
-	return events.NewStreamBroker(
-		model.AppName,
-		a.Config.NatsOptions.CredsFile,
-		a.Config.NatsOptions.StreamURL,
-		a.Config.NatsOptions.StreamName,
-		a.Config.NatsOptions.StreamPrefix,
-		a.Config.NatsOptions.StreamSubjects,
-		a.Config.NatsOptions.StreamURNNamespace,
-		a.Config.NatsOptions.StreamUser,
-		a.Config.NatsOptions.StreamPass,
-		a.Config.NatsOptions.ConnectTimeout,
-	)
 }
 
 // Server service configuration options
