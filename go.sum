@@ -1531,8 +1531,8 @@ go.etcd.io/etcd/raft/v3 v3.5.0/go.mod h1:UFOHSIvO/nKwd4lhkwabrTD3cqW5yVyYYf/KlD0
 go.etcd.io/etcd/server/v3 v3.5.0/go.mod h1:3Ah5ruV+M+7RZr0+Y/5mNLwC+eQlni+mQmOVdCRJoS4=
 go.hollow.sh/serverservice v0.15.1 h1:ZbUBMDQsjbKvDWzkprpZQgJ1wZGrUeSRty1qAkEPaxw=
 go.hollow.sh/serverservice v0.15.1/go.mod h1:Jm4ITHWFEw4V4NggzlvvjbiI+RsyAFPgALUe0FgnSOo=
-go.hollow.sh/toolbox v0.5.2-0.20230308150213-fbd070cc9759 h1:EnjtT3rrLNqPs11TH+CPDwq0gaMbZYGekPx5zVj1bVw=
-go.hollow.sh/toolbox v0.5.2-0.20230308150213-fbd070cc9759/go.mod h1:JpUE7ZLoZbMGI3jM/HfwaNe0MDL2AxYBprMxcSZsyYk=
+go.hollow.sh/toolbox v0.5.2-0.20230308211515-7639e08e9b17 h1:uInxPzSA8LfOgHqAwXZ/5cAWuRhRPXrJd5VeQnNTDfo=
+go.hollow.sh/toolbox v0.5.2-0.20230308211515-7639e08e9b17/go.mod h1:JpUE7ZLoZbMGI3jM/HfwaNe0MDL2AxYBprMxcSZsyYk=
 go.infratographer.com/x v0.0.3 h1:7txN1iBq1Ts4XF6Ea/9/LWK2vpTeXKnh+DjdJ1OLHVQ=
 go.infratographer.com/x v0.0.3/go.mod h1:6qJTwrxN8O3X0v/v2/O7pZkq1T8V7rNDSnzZKJeEmRQ=
 go.mongodb.org/mongo-driver v1.7.3/go.mod h1:NqaYOwnXWr5Pm7AOpO5QFxKJ503nbMse/R79oO62zWg=

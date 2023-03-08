@@ -169,7 +169,16 @@ https://github.com/nats-io/nats.docs/blob/d8880e8006161940a92553b99360ad189eb655
 
 
 
- ## nats: multiple non-filtered consumers not allowed on workqueue stream:
+## nats: multiple non-filtered consumers not allowed on workqueue stream:
+
+A work-queue retention policy satisfies a very common use case of queuing up messages that are intended to be processed once and only once.
+
+This retention policy supports queuing up messages from publishers independent of consummption. Since each message is intended to be processed only once, this retention type allows for a set of consumers that have non-overlapping interest on subjects. In other words, if multiple consumers are bound to a work-queue stream, they must have disjoint filter subjects. This is in constrast to a standard limits-based or interest-based stream which supports multiple consumers with overlapping interest.
+
+https://natsbyexample.com/examples/jetstream/workqueue-stream/go
+
+To create multiple consumers on a workqueue stream, a subject filter needs to be applied that would
+scope the consumer.
 
 # nats: consumer deliver subject forms a cycle: error adding consumer on nats jetstream
 -
