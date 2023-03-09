@@ -14,7 +14,7 @@ import (
 	"github.com/metal-toolbox/conditionorc/internal/store"
 	"github.com/stretchr/testify/assert"
 
-	"github.com/metal-toolbox/conditionorc/pkg/api/v1/routes"
+	v1types "github.com/metal-toolbox/conditionorc/pkg/api/v1/types"
 	ptypes "github.com/metal-toolbox/conditionorc/pkg/types"
 	"github.com/sirupsen/logrus"
 )
@@ -81,7 +81,7 @@ func TestIntegration_ConditionsGet(t *testing.T) {
 		name                string
 		conditionKind       ptypes.ConditionKind
 		mockStore           func(r *store.MockRepository)
-		expectResponse      func() *routes.ServerResponse
+		expectResponse      func() *v1types.ServerResponse
 		expectErrorContains string
 	}{
 		{
@@ -116,7 +116,7 @@ func TestIntegration_ConditionsGet(t *testing.T) {
 						nil).
 					Times(1)
 			},
-			func() *routes.ServerResponse {
+			func() *v1types.ServerResponse {
 				parameters, err := json.Marshal(&ptypes.FirmwareInstallOutofbandParameters{
 					InventoryAfterUpdate: true,
 					ForceInstall:         true,
@@ -127,9 +127,9 @@ func TestIntegration_ConditionsGet(t *testing.T) {
 					t.Error(err)
 				}
 
-				return &routes.ServerResponse{
+				return &v1types.ServerResponse{
 					StatusCode: 200,
-					Record: &routes.ConditionResponse{
+					Record: &v1types.ConditionResponse{
 						ServerID: serverID,
 						Condition: &ptypes.Condition{
 							Kind:       ptypes.FirmwareInstallOutofband,
@@ -159,8 +159,8 @@ func TestIntegration_ConditionsGet(t *testing.T) {
 						nil).
 					Times(1)
 			},
-			func() *routes.ServerResponse {
-				return &routes.ServerResponse{
+			func() *v1types.ServerResponse {
+				return &v1types.ServerResponse{
 					Message:    "conditionKind not found on server",
 					StatusCode: 404,
 				}
@@ -171,8 +171,8 @@ func TestIntegration_ConditionsGet(t *testing.T) {
 			"400 response",
 			ptypes.ConditionKind("invalid"),
 			nil,
-			func() *routes.ServerResponse {
-				return &routes.ServerResponse{
+			func() *v1types.ServerResponse {
+				return &v1types.ServerResponse{
 					Message:    "unsupported condition kind: invalid",
 					StatusCode: 400,
 				}
@@ -218,7 +218,7 @@ func TestIntegration_ConditionsList(t *testing.T) {
 		name                string
 		conditionState      ptypes.ConditionState
 		mockStore           func(r *store.MockRepository)
-		expectResponse      func() *routes.ServerResponse
+		expectResponse      func() *v1types.ServerResponse
 		expectErrorContains string
 	}{
 		{
@@ -261,7 +261,7 @@ func TestIntegration_ConditionsList(t *testing.T) {
 						nil).
 					Times(1)
 			},
-			func() *routes.ServerResponse {
+			func() *v1types.ServerResponse {
 				parameters, err := json.Marshal(&ptypes.FirmwareInstallOutofbandParameters{
 					InventoryAfterUpdate: true,
 					ForceInstall:         true,
@@ -272,9 +272,9 @@ func TestIntegration_ConditionsList(t *testing.T) {
 					t.Error(err)
 				}
 
-				return &routes.ServerResponse{
+				return &v1types.ServerResponse{
 					StatusCode: 200,
-					Records: &routes.ConditionsResponse{
+					Records: &v1types.ConditionsResponse{
 						ServerID: serverID,
 						Conditions: []*ptypes.Condition{
 							{
@@ -312,8 +312,8 @@ func TestIntegration_ConditionsList(t *testing.T) {
 						nil).
 					Times(1)
 			},
-			func() *routes.ServerResponse {
-				return &routes.ServerResponse{
+			func() *v1types.ServerResponse {
+				return &v1types.ServerResponse{
 					Message:    "no conditions in given state found on server",
 					StatusCode: 404,
 				}
@@ -324,8 +324,8 @@ func TestIntegration_ConditionsList(t *testing.T) {
 			"400 response",
 			ptypes.ConditionState("invalid"),
 			nil,
-			func() *routes.ServerResponse {
-				return &routes.ServerResponse{
+			func() *v1types.ServerResponse {
+				return &v1types.ServerResponse{
 					Message:    "unsupported condition state: invalid",
 					StatusCode: 400,
 				}
@@ -370,15 +370,15 @@ func TestIntegration_ConditionsCreate(t *testing.T) {
 	testcases := []struct {
 		name                string
 		conditionKind       ptypes.ConditionKind
-		payload             routes.ConditionCreate
+		payload             v1types.ConditionCreate
 		mockStore           func(r *store.MockRepository)
-		expectResponse      func() *routes.ServerResponse
+		expectResponse      func() *v1types.ServerResponse
 		expectErrorContains string
 	}{
 		{
 			"valid payload sent",
 			ptypes.FirmwareInstallOutofband,
-			routes.ConditionCreate{Parameters: []byte(`{"hello":"world"}`)},
+			v1types.ConditionCreate{Parameters: []byte(`{"hello":"world"}`)},
 			// mock repository
 			func(r *store.MockRepository) {
 				r.EXPECT().
@@ -406,8 +406,8 @@ func TestIntegration_ConditionsCreate(t *testing.T) {
 					Return(nil).
 					Times(1)
 			},
-			func() *routes.ServerResponse {
-				return &routes.ServerResponse{
+			func() *v1types.ServerResponse {
+				return &v1types.ServerResponse{
 					StatusCode: 200,
 					Message:    "condition set",
 				}
@@ -417,7 +417,7 @@ func TestIntegration_ConditionsCreate(t *testing.T) {
 		{
 			"400 response",
 			ptypes.FirmwareInstallOutofband,
-			routes.ConditionCreate{Parameters: []byte(`{"hello":"world"}`)},
+			v1types.ConditionCreate{Parameters: []byte(`{"hello":"world"}`)},
 			// mock repository
 			func(r *store.MockRepository) {
 				// condition exists
@@ -435,8 +435,8 @@ func TestIntegration_ConditionsCreate(t *testing.T) {
 						nil).
 					Times(1)
 			},
-			func() *routes.ServerResponse {
-				return &routes.ServerResponse{
+			func() *v1types.ServerResponse {
+				return &v1types.ServerResponse{
 					Message:    "condition present non-finalized state: active",
 					StatusCode: 400,
 				}
@@ -481,15 +481,15 @@ func TestIntegration_ConditionsUpdate(t *testing.T) {
 	testcases := []struct {
 		name                string
 		conditionKind       ptypes.ConditionKind
-		payload             routes.ConditionUpdate
+		payload             v1types.ConditionUpdate
 		mockStore           func(r *store.MockRepository)
-		expectResponse      func() *routes.ServerResponse
+		expectResponse      func() *v1types.ServerResponse
 		expectErrorContains string
 	}{
 		{
 			"valid payload sent",
 			ptypes.FirmwareInstallOutofband,
-			routes.ConditionUpdate{
+			v1types.ConditionUpdate{
 				State:           ptypes.Active,
 				Status:          []byte(`{"hello":"world"}`),
 				ResourceVersion: 1,
@@ -521,8 +521,8 @@ func TestIntegration_ConditionsUpdate(t *testing.T) {
 					Return(nil).
 					Times(1)
 			},
-			func() *routes.ServerResponse {
-				return &routes.ServerResponse{
+			func() *v1types.ServerResponse {
+				return &v1types.ServerResponse{
 					StatusCode: 200,
 					Message:    "condition updated",
 				}
@@ -532,7 +532,7 @@ func TestIntegration_ConditionsUpdate(t *testing.T) {
 		{
 			"400 response",
 			ptypes.FirmwareInstallOutofband,
-			routes.ConditionUpdate{
+			v1types.ConditionUpdate{
 				State:           ptypes.Active,
 				Status:          []byte(`{"hello":"world"}`),
 				ResourceVersion: 1,
@@ -559,8 +559,8 @@ func TestIntegration_ConditionsUpdate(t *testing.T) {
 					Return(nil).
 					Times(1)
 			},
-			func() *routes.ServerResponse {
-				return &routes.ServerResponse{
+			func() *v1types.ServerResponse {
+				return &v1types.ServerResponse{
 					StatusCode: 400,
 					Message:    "no existing condition found for update",
 				}
@@ -606,7 +606,7 @@ func TestIntegration_ConditionsDelete(t *testing.T) {
 		name                string
 		conditionKind       ptypes.ConditionKind
 		mockStore           func(r *store.MockRepository)
-		expectResponse      func() *routes.ServerResponse
+		expectResponse      func() *v1types.ServerResponse
 		expectErrorContains string
 	}{
 		{
@@ -650,8 +650,8 @@ func TestIntegration_ConditionsDelete(t *testing.T) {
 					Return(nil).
 					Times(1)
 			},
-			func() *routes.ServerResponse {
-				return &routes.ServerResponse{
+			func() *v1types.ServerResponse {
+				return &v1types.ServerResponse{
 					StatusCode: 200,
 					Message:    "condition deleted",
 				}
@@ -675,8 +675,8 @@ func TestIntegration_ConditionsDelete(t *testing.T) {
 						nil).
 					Times(1)
 			},
-			func() *routes.ServerResponse {
-				return &routes.ServerResponse{
+			func() *v1types.ServerResponse {
+				return &v1types.ServerResponse{
 					Message:    "no such condition found",
 					StatusCode: 400,
 				}

@@ -6,11 +6,13 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/davecgh/go-spew/spew"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
 
 	"github.com/metal-toolbox/conditionorc/internal/store"
+	v1types "github.com/metal-toolbox/conditionorc/pkg/api/v1/types"
 	ptypes "github.com/metal-toolbox/conditionorc/pkg/types"
 )
 
@@ -24,7 +26,7 @@ func (r *Routes) serverConditionUpdate(c *gin.Context) {
 	if err != nil {
 		c.JSON(
 			http.StatusBadRequest,
-			&ServerResponse{Message: err.Error()},
+			&v1types.ServerResponse{Message: err.Error()},
 		)
 
 		return
@@ -34,17 +36,17 @@ func (r *Routes) serverConditionUpdate(c *gin.Context) {
 	if !ptypes.ConditionKindValid(kind) {
 		c.JSON(
 			http.StatusBadRequest,
-			&ServerResponse{Message: "unsupported condition kind: " + string(kind)},
+			&v1types.ServerResponse{Message: "unsupported condition kind: " + string(kind)},
 		)
 
 		return
 	}
 
-	var conditionUpdate ConditionUpdate
+	var conditionUpdate v1types.ConditionUpdate
 	if err = c.ShouldBindJSON(&conditionUpdate); err != nil {
 		c.JSON(
 			http.StatusBadRequest,
-			&ServerResponse{Message: "invalid ConditionUpdate payload " + err.Error()},
+			&v1types.ServerResponse{Message: "invalid ConditionUpdate payload " + err.Error()},
 		)
 
 		return
@@ -53,7 +55,7 @@ func (r *Routes) serverConditionUpdate(c *gin.Context) {
 	if conditionUpdate.ResourceVersion == 0 {
 		c.JSON(
 			http.StatusBadRequest,
-			&ServerResponse{Message: "invalid ConditionUpdate payload, expected a valid resourceVersion"},
+			&v1types.ServerResponse{Message: "invalid ConditionUpdate payload, expected a valid resourceVersion"},
 		)
 
 		return
@@ -62,7 +64,7 @@ func (r *Routes) serverConditionUpdate(c *gin.Context) {
 	if conditionUpdate.State == "" && conditionUpdate.Status == nil {
 		c.JSON(
 			http.StatusBadRequest,
-			&ServerResponse{Message: "invalid ConditionUpdate payload, either a state or a status attribute is expected"},
+			&v1types.ServerResponse{Message: "invalid ConditionUpdate payload, either a state or a status attribute is expected"},
 		)
 
 		return
@@ -73,25 +75,27 @@ func (r *Routes) serverConditionUpdate(c *gin.Context) {
 	if err != nil {
 		c.JSON(
 			http.StatusBadRequest,
-			&ServerResponse{Message: err.Error()},
+			&v1types.ServerResponse{Message: err.Error()},
 		)
 
 		return
 	}
 
+	spew.Dump(conditionUpdate)
+
 	// nothing to update
 	if existing.State == conditionUpdate.State && bytes.Equal(existing.Status, conditionUpdate.Status) {
-		c.JSON(http.StatusOK, &ServerResponse{Message: "no changes to be applied"})
+		c.JSON(http.StatusOK, &v1types.ServerResponse{Message: "no changes to be applied"})
 
 		return
 	}
 
 	// merge update with existing
-	update, err := conditionUpdate.mergeExisting(existing)
+	update, err := conditionUpdate.MergeExisting(existing)
 	if err != nil {
 		c.JSON(
 			http.StatusBadRequest,
-			&ServerResponse{Message: err.Error()},
+			&v1types.ServerResponse{Message: err.Error()},
 		)
 
 		return
@@ -101,13 +105,13 @@ func (r *Routes) serverConditionUpdate(c *gin.Context) {
 	if err := r.repository.Update(c.Request.Context(), serverID, update); err != nil {
 		c.JSON(
 			http.StatusInternalServerError,
-			&ServerResponse{Message: err.Error()},
+			&v1types.ServerResponse{Message: err.Error()},
 		)
 
 		return
 	}
 
-	c.JSON(http.StatusOK, &ServerResponse{Message: "condition updated"})
+	c.JSON(http.StatusOK, &v1types.ServerResponse{Message: "condition updated"})
 }
 
 func (r *Routes) serverConditionCreate(c *gin.Context) {
@@ -115,7 +119,7 @@ func (r *Routes) serverConditionCreate(c *gin.Context) {
 	if err != nil {
 		c.JSON(
 			http.StatusBadRequest,
-			&ServerResponse{Message: err.Error()},
+			&v1types.ServerResponse{Message: err.Error()},
 		)
 
 		return
@@ -125,30 +129,30 @@ func (r *Routes) serverConditionCreate(c *gin.Context) {
 	if !ptypes.ConditionKindValid(kind) {
 		c.JSON(
 			http.StatusBadRequest,
-			&ServerResponse{Message: "unsupported condition kind: " + string(kind)},
+			&v1types.ServerResponse{Message: "unsupported condition kind: " + string(kind)},
 		)
 
 		return
 	}
 
-	var conditionCreate ConditionCreate
+	var conditionCreate v1types.ConditionCreate
 	if err = c.ShouldBindJSON(&conditionCreate); err != nil {
 		c.JSON(
 			http.StatusBadRequest,
-			&ServerResponse{Message: "invalid ConditionCreate payload: " + err.Error()},
+			&v1types.ServerResponse{Message: "invalid ConditionCreate payload: " + err.Error()},
 		)
 
 		return
 	}
 
-	condition := conditionCreate.newCondition(kind)
+	condition := conditionCreate.NewCondition(kind)
 
 	// check the condition doesn't already exist in a non-finalized state
 	existing, err := r.repository.Get(c.Request.Context(), serverID, kind)
 	if err != nil && !errors.Is(err, store.ErrConditionNotFound) {
 		c.JSON(
 			http.StatusBadRequest,
-			&ServerResponse{Message: err.Error()},
+			&v1types.ServerResponse{Message: err.Error()},
 		)
 
 		return
@@ -157,7 +161,7 @@ func (r *Routes) serverConditionCreate(c *gin.Context) {
 	if existing != nil && !ptypes.ConditionStateFinalized(existing.State) {
 		c.JSON(
 			http.StatusBadRequest,
-			&ServerResponse{Message: "condition present non-finalized state: " + string(existing.State)},
+			&v1types.ServerResponse{Message: "condition present non-finalized state: " + string(existing.State)},
 		)
 
 		return
@@ -168,7 +172,7 @@ func (r *Routes) serverConditionCreate(c *gin.Context) {
 		if errors.Is(errEx, ErrConditionExclusive) {
 			c.JSON(
 				http.StatusBadRequest,
-				&ServerResponse{Message: errEx.Error()},
+				&v1types.ServerResponse{Message: errEx.Error()},
 			)
 
 			return
@@ -176,7 +180,7 @@ func (r *Routes) serverConditionCreate(c *gin.Context) {
 
 		c.JSON(
 			http.StatusInternalServerError,
-			&ServerResponse{Message: errEx.Error()},
+			&v1types.ServerResponse{Message: errEx.Error()},
 		)
 
 		return
@@ -187,7 +191,7 @@ func (r *Routes) serverConditionCreate(c *gin.Context) {
 	if err != nil && !errors.Is(err, store.ErrConditionNotFound) {
 		c.JSON(
 			http.StatusInternalServerError,
-			&ServerResponse{Message: err.Error()},
+			&v1types.ServerResponse{Message: err.Error()},
 		)
 
 		return
@@ -198,13 +202,13 @@ func (r *Routes) serverConditionCreate(c *gin.Context) {
 	if err != nil {
 		c.JSON(
 			http.StatusInternalServerError,
-			&ServerResponse{Message: err.Error()},
+			&v1types.ServerResponse{Message: err.Error()},
 		)
 
 		return
 	}
 
-	c.JSON(http.StatusOK, &ServerResponse{Message: "condition set"})
+	c.JSON(http.StatusOK, &v1types.ServerResponse{Message: "condition set"})
 }
 
 func (r *Routes) exclusiveNonFinalConditionExists(ctx context.Context, serverID uuid.UUID) error {
@@ -236,7 +240,7 @@ func (r *Routes) serverConditionDelete(c *gin.Context) {
 	if err != nil {
 		c.JSON(
 			http.StatusBadRequest,
-			&ServerResponse{Message: err.Error()},
+			&v1types.ServerResponse{Message: err.Error()},
 		)
 
 		return
@@ -246,7 +250,7 @@ func (r *Routes) serverConditionDelete(c *gin.Context) {
 	if !ptypes.ConditionKindValid(kind) {
 		c.JSON(
 			http.StatusBadRequest,
-			&ServerResponse{Message: "unsupported condition kind: " + string(kind)},
+			&v1types.ServerResponse{Message: "unsupported condition kind: " + string(kind)},
 		)
 
 		return
@@ -256,7 +260,7 @@ func (r *Routes) serverConditionDelete(c *gin.Context) {
 	if err != nil {
 		c.JSON(
 			http.StatusBadRequest,
-			&ServerResponse{Message: err.Error()},
+			&v1types.ServerResponse{Message: err.Error()},
 		)
 
 		return
@@ -265,7 +269,7 @@ func (r *Routes) serverConditionDelete(c *gin.Context) {
 	if existing == nil {
 		c.JSON(
 			http.StatusBadRequest,
-			&ServerResponse{Message: "no such condition found"},
+			&v1types.ServerResponse{Message: "no such condition found"},
 		)
 
 		return
@@ -274,13 +278,13 @@ func (r *Routes) serverConditionDelete(c *gin.Context) {
 	if err := r.repository.Delete(c.Request.Context(), serverID, kind); err != nil {
 		c.JSON(
 			http.StatusInternalServerError,
-			&ServerResponse{Message: err.Error()},
+			&v1types.ServerResponse{Message: err.Error()},
 		)
 
 		return
 	}
 
-	c.JSON(http.StatusOK, &ServerResponse{Message: "condition deleted"})
+	c.JSON(http.StatusOK, &v1types.ServerResponse{Message: "condition deleted"})
 }
 
 func (r *Routes) serverConditionList(c *gin.Context) {
@@ -288,7 +292,7 @@ func (r *Routes) serverConditionList(c *gin.Context) {
 	if err != nil {
 		c.JSON(
 			http.StatusBadRequest,
-			&ServerResponse{Message: err.Error()},
+			&v1types.ServerResponse{Message: err.Error()},
 		)
 
 		return
@@ -298,7 +302,7 @@ func (r *Routes) serverConditionList(c *gin.Context) {
 	if state != "" && !ptypes.ConditionStateValid(state) {
 		c.JSON(
 			http.StatusBadRequest,
-			&ServerResponse{Message: "unsupported condition state: " + string(state)},
+			&v1types.ServerResponse{Message: "unsupported condition state: " + string(state)},
 		)
 
 		return
@@ -308,21 +312,21 @@ func (r *Routes) serverConditionList(c *gin.Context) {
 	if err != nil {
 		c.JSON(
 			http.StatusInternalServerError,
-			&ServerResponse{Message: err.Error()},
+			&v1types.ServerResponse{Message: err.Error()},
 		)
 
 		return
 	}
 
 	if len(found) == 0 {
-		c.JSON(http.StatusNotFound, &ServerResponse{Message: "no conditions in given state found on server"})
+		c.JSON(http.StatusNotFound, &v1types.ServerResponse{Message: "no conditions in given state found on server"})
 
 		return
 	}
 
-	data := ConditionsResponse{ServerID: serverID, Conditions: found}
+	data := v1types.ConditionsResponse{ServerID: serverID, Conditions: found}
 
-	c.JSON(http.StatusOK, &ServerResponse{Records: &data})
+	c.JSON(http.StatusOK, &v1types.ServerResponse{Records: &data})
 }
 
 func (r *Routes) serverConditionGet(c *gin.Context) {
@@ -330,7 +334,7 @@ func (r *Routes) serverConditionGet(c *gin.Context) {
 	if err != nil {
 		c.JSON(
 			http.StatusBadRequest,
-			&ServerResponse{Message: err.Error()},
+			&v1types.ServerResponse{Message: err.Error()},
 		)
 
 		return
@@ -340,7 +344,7 @@ func (r *Routes) serverConditionGet(c *gin.Context) {
 	if !ptypes.ConditionKindValid(kind) {
 		c.JSON(
 			http.StatusBadRequest,
-			&ServerResponse{Message: "unsupported condition kind: " + string(kind)},
+			&v1types.ServerResponse{Message: "unsupported condition kind: " + string(kind)},
 		)
 
 		return
@@ -349,26 +353,26 @@ func (r *Routes) serverConditionGet(c *gin.Context) {
 	found, err := r.repository.Get(c.Request.Context(), serverID, kind)
 	if err != nil {
 		if errors.Is(err, store.ErrConditionNotFound) {
-			c.JSON(http.StatusNotFound, &ServerResponse{Message: "conditionKind not found on server"})
+			c.JSON(http.StatusNotFound, &v1types.ServerResponse{Message: "conditionKind not found on server"})
 
 			return
 		}
 
 		c.JSON(
 			http.StatusInternalServerError,
-			&ServerResponse{Message: err.Error()},
+			&v1types.ServerResponse{Message: err.Error()},
 		)
 
 		return
 	}
 
 	if found == nil {
-		c.JSON(http.StatusNotFound, &ServerResponse{Message: "conditionKind not found on server"})
+		c.JSON(http.StatusNotFound, &v1types.ServerResponse{Message: "conditionKind not found on server"})
 
 		return
 	}
 
-	data := ConditionResponse{ServerID: serverID, Condition: found}
+	data := v1types.ConditionResponse{ServerID: serverID, Condition: found}
 
-	c.JSON(http.StatusOK, &ServerResponse{Record: &data})
+	c.JSON(http.StatusOK, &v1types.ServerResponse{Record: &data})
 }

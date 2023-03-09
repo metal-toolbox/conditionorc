@@ -1,4 +1,4 @@
-package routes
+package types
 
 import (
 	"testing"
@@ -62,7 +62,7 @@ func TestConditionUpdate_mergeExisting(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := tt.update.mergeExisting(tt.existing)
+			got, err := tt.update.MergeExisting(tt.existing)
 			if err != nil {
 				assert.Contains(t, err.Error(), tt.wantErrContains)
 				return

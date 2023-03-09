@@ -1,4 +1,4 @@
-package routes
+package types
 
 import (
 	"encoding/json"
@@ -34,8 +34,8 @@ type ConditionCreate struct {
 	Parameters json.RawMessage `json:"parameters"`
 }
 
-// newCondition validates its field values and returns a Condition type.
-func (c *ConditionCreate) newCondition(kind ptypes.ConditionKind) *ptypes.Condition {
+// NewCondition returns a new Condition type.
+func (c *ConditionCreate) NewCondition(kind ptypes.ConditionKind) *ptypes.Condition {
 	return &ptypes.Condition{
 		Kind:       kind,
 		State:      ptypes.Pending,
@@ -51,13 +51,13 @@ type ConditionUpdate struct {
 	ResourceVersion int64                 `json:"resourceVersion"`
 }
 
-// mergeExisting when given an existing condition, validates the update based on existing values
+// MergeExisting when given an existing condition, validates the update based on existing values
 // and returns a condition that can be passed to the repository for update.
 //
 // The resourceVersion is not updated here and is left for the repository Store to update.
 //
 // This method makes sure that update does not overwrite existing data inadvertently.
-func (c *ConditionUpdate) mergeExisting(existing *ptypes.Condition) (*ptypes.Condition, error) {
+func (c *ConditionUpdate) MergeExisting(existing *ptypes.Condition) (*ptypes.Condition, error) {
 	// 1. condition must already exist for update.
 	if existing == nil {
 		return nil, errors.New("no existing condition found for update")

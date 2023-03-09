@@ -11,9 +11,10 @@ import (
 
 	"github.com/metal-toolbox/conditionorc/internal/version"
 	"github.com/metal-toolbox/conditionorc/pkg/api/v1/routes"
+	v1types "github.com/metal-toolbox/conditionorc/pkg/api/v1/types"
 )
 
-func (c *Client) get(ctx context.Context, path string) (*routes.ServerResponse, error) {
+func (c *Client) get(ctx context.Context, path string) (*v1types.ServerResponse, error) {
 	requestURL, err := url.Parse(fmt.Sprintf("%s%s/%s", c.serverAddress, routes.PathPrefix, path))
 	if err != nil {
 		return nil, Error{Cause: err.Error()}
@@ -27,7 +28,7 @@ func (c *Client) get(ctx context.Context, path string) (*routes.ServerResponse, 
 	return c.do(req)
 }
 
-func (c *Client) put(ctx context.Context, path string, body interface{}) (*routes.ServerResponse, error) {
+func (c *Client) put(ctx context.Context, path string, body interface{}) (*v1types.ServerResponse, error) {
 	requestURL, err := url.Parse(fmt.Sprintf("%s%s/%s", c.serverAddress, routes.PathPrefix, path))
 	if err != nil {
 		return nil, Error{Cause: err.Error()}
@@ -46,7 +47,7 @@ func (c *Client) put(ctx context.Context, path string, body interface{}) (*route
 	return c.do(req)
 }
 
-func (c *Client) post(ctx context.Context, path string, body interface{}) (*routes.ServerResponse, error) {
+func (c *Client) post(ctx context.Context, path string, body interface{}) (*v1types.ServerResponse, error) {
 	requestURL, err := url.Parse(fmt.Sprintf("%s%s/%s", c.serverAddress, routes.PathPrefix, path))
 	if err != nil {
 		return nil, Error{Cause: err.Error()}
@@ -65,7 +66,7 @@ func (c *Client) post(ctx context.Context, path string, body interface{}) (*rout
 	return c.do(req)
 }
 
-func (c *Client) delete(ctx context.Context, path string) (*routes.ServerResponse, error) {
+func (c *Client) delete(ctx context.Context, path string) (*v1types.ServerResponse, error) {
 	requestURL, err := url.Parse(fmt.Sprintf("%s%s/%s", c.serverAddress, routes.PathPrefix, path))
 	if err != nil {
 		return nil, Error{Cause: err.Error()}
@@ -79,7 +80,7 @@ func (c *Client) delete(ctx context.Context, path string) (*routes.ServerRespons
 	return c.do(req)
 }
 
-func (c *Client) do(req *http.Request) (*routes.ServerResponse, error) {
+func (c *Client) do(req *http.Request) (*v1types.ServerResponse, error) {
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", fmt.Sprintf("bearer %s", c.authToken))
 	req.Header.Set("User-Agent", fmt.Sprintf("conditionorc-client (%s)", version.Current().String()))
@@ -103,7 +104,7 @@ func (c *Client) do(req *http.Request) (*routes.ServerResponse, error) {
 		}
 	}
 
-	serverResponse := &routes.ServerResponse{}
+	serverResponse := &v1types.ServerResponse{}
 
 	if err := json.Unmarshal(data, &serverResponse); err != nil {
 		return nil, RequestError{

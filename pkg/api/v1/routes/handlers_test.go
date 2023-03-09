@@ -15,6 +15,7 @@ import (
 	"github.com/golang/mock/gomock"
 	"github.com/google/uuid"
 	"github.com/metal-toolbox/conditionorc/internal/store"
+	v1types "github.com/metal-toolbox/conditionorc/pkg/api/v1/types"
 	ptypes "github.com/metal-toolbox/conditionorc/pkg/types"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
@@ -57,7 +58,7 @@ func asBytes(t *testing.T, b *bytes.Buffer) []byte {
 	return body
 }
 
-func asJSONBytes(t *testing.T, s *ServerResponse) []byte {
+func asJSONBytes(t *testing.T, s *v1types.ServerResponse) []byte {
 	t.Helper()
 
 	b, err := json.Marshal(s)
@@ -76,7 +77,7 @@ func TestServerConditionUpdate(t *testing.T) {
 		t.Error(err)
 	}
 
-	updateValid := ConditionUpdate{
+	updateValid := v1types.ConditionUpdate{
 		State:           ptypes.Active,
 		Status:          []byte(`{"foo": "bar"}`),
 		ResourceVersion: int64(time.Now().Nanosecond()),
@@ -348,7 +349,7 @@ func TestServerConditionCreate(t *testing.T) {
 					Times(1)
 			},
 			func(t *testing.T) *http.Request {
-				payload, err := json.Marshal(&ConditionCreate{Parameters: []byte(`{"some param": "1"}`)})
+				payload, err := json.Marshal(&v1types.ConditionCreate{Parameters: []byte(`{"some param": "1"}`)})
 				if err != nil {
 					t.Error()
 				}
@@ -363,7 +364,7 @@ func TestServerConditionCreate(t *testing.T) {
 			},
 			func(t *testing.T, r *httptest.ResponseRecorder) {
 				assert.Equal(t, http.StatusOK, r.Code)
-				assert.Equal(t, asJSONBytes(t, &ServerResponse{Message: "condition set"}), asBytes(t, r.Body))
+				assert.Equal(t, asJSONBytes(t, &v1types.ServerResponse{Message: "condition set"}), asBytes(t, r.Body))
 			},
 		},
 		{
@@ -509,8 +510,8 @@ func TestServerConditionList(t *testing.T) {
 
 				want := asJSONBytes(
 					t,
-					&ServerResponse{
-						Records: &ConditionsResponse{
+					&v1types.ServerResponse{
+						Records: &v1types.ConditionsResponse{
 							ServerID:   serverID,
 							Conditions: conditions,
 						},
@@ -618,8 +619,8 @@ func TestServerConditionGet(t *testing.T) {
 
 				want := asJSONBytes(
 					t,
-					&ServerResponse{
-						Record: &ConditionResponse{
+					&v1types.ServerResponse{
+						Record: &v1types.ConditionResponse{
 							ServerID:  serverID,
 							Condition: condition,
 						},
@@ -723,7 +724,7 @@ func TestServerConditionDelete(t *testing.T) {
 
 				want := asJSONBytes(
 					t,
-					&ServerResponse{
+					&v1types.ServerResponse{
 						Message: "no such condition found",
 					},
 				)
@@ -759,7 +760,7 @@ func TestServerConditionDelete(t *testing.T) {
 
 				want := asJSONBytes(
 					t,
-					&ServerResponse{
+					&v1types.ServerResponse{
 						Message: "condition deleted",
 					},
 				)
