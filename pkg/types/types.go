@@ -18,7 +18,7 @@ const (
 	FirmwareInstallOutofband ConditionKind = "firmwareInstallOutofband"
 	InventoryOutofband       ConditionKind = "inventoryOutofband"
 	GenerateFirmwareSet      ConditionKind = "generateFirmwareSet"
-	ServerResourceType       string        = "server"
+	ServerResourceType       string        = "servers"
 
 	EventTypeConditionUpdate events.EventType = "conditionUpdate"
 )

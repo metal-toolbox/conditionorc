@@ -87,7 +87,7 @@ func (o *Orchestrator) Run(ctx context.Context) {
 				continue
 			}
 		case <-tickerFetchWork:
-			o.fetchWork(ctx, eventsCh)
+			// o.fetchWork(ctx, eventsCh)
 		case <-ctx.Done():
 			o.streamBroker.Close()
 			return
@@ -138,11 +138,27 @@ func (o *Orchestrator) processMsg(ctx context.Context, msg events.Message) {
 
 	}
 
+	if urn.ResourceType != ptypes.ServerResourceType {
+		o.logger.WithFields(
+			logrus.Fields{"urn ns": urn.Namespace, "resourceType": urn.ResourceType},
+		).Error("msg with unknown ResourceType in URN")
+
+		return
+	}
+
+	fmt.Println(3)
 	switch urn.Namespace {
 	case "hollow":
 		o.handleHollowEvent(ctx, data, urn)
 	case "hollow-controllers":
 		o.handleHollowControllerEvent(ctx, data, urn)
+	default:
+		if err := msg.Ack(); err != nil {
+			o.logger.Warn(err)
+		}
+		o.logger.WithFields(
+			logrus.Fields{"err": err.Error(), "urn ns": urn.Namespace},
+		).Error("msg with unknown URN namespace ignored")
 	}
 }
 
@@ -154,10 +170,6 @@ func (o *Orchestrator) handleHollowControllerEvent(ctx context.Context, event *p
 }
 
 func (o *Orchestrator) handleHollowEvent(ctx context.Context, event *pubsubx.Message, urn *urnx.URN) {
-	if urn.ResourceType != ptypes.ServerResourceType {
-		return
-	}
-
 	switch event.EventType {
 	case string(events.Create):
 		condition := &ptypes.Condition{
@@ -175,6 +187,11 @@ func (o *Orchestrator) handleHollowEvent(ctx context.Context, event *pubsubx.Mes
 		}
 
 		o.publishCondition(ctx, urn.ResourceID, condition)
+	default:
+		o.logger.WithFields(
+			logrus.Fields{"eventType": event.EventType, "urn ns": urn.Namespace},
+		).Error("msg with unknown eventType ignored")
+
 	}
 }
 
@@ -184,6 +201,7 @@ func (o *Orchestrator) publishCondition(ctx context.Context, serverID uuid.UUID,
 		return
 	}
 
+	fmt.Println("publishing msg with condition..")
 	if err := o.streamBroker.PublishAsyncWithContext(
 		ctx,
 		"server",
