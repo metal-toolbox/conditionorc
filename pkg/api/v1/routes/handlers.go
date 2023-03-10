@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/davecgh/go-spew/spew"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
@@ -80,8 +79,6 @@ func (r *Routes) serverConditionUpdate(c *gin.Context) {
 
 		return
 	}
-
-	spew.Dump(conditionUpdate)
 
 	// nothing to update
 	if existing.State == conditionUpdate.State && bytes.Equal(existing.Status, conditionUpdate.Status) {

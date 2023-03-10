@@ -147,13 +147,14 @@ func (o *Orchestrator) processMsg(ctx context.Context, msg events.Message) {
 }
 
 func (o *Orchestrator) handleHollowControllerEvent(ctx context.Context, event *pubsubx.Message, urn *urnx.URN) {
-	fmt.Println("Im supposed to do something with this controller event, but not yet.")
+	fmt.Println("I don't handle replies from controllers as yet.")
 	spew.Dump(event)
 	spew.Dump(urn)
+
 }
 
 func (o *Orchestrator) handleHollowEvent(ctx context.Context, event *pubsubx.Message, urn *urnx.URN) {
-	if urn.ResourceType != "servers" {
+	if urn.ResourceType != ptypes.ServerResourceType {
 		return
 	}
 

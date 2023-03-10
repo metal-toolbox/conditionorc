@@ -46,6 +46,7 @@ func (c *ConditionCreate) NewCondition(kind ptypes.ConditionKind) *ptypes.Condit
 
 // ConditionUpdate is the request payload to update an existing condition.
 type ConditionUpdate struct {
+	Kind            ptypes.ConditionKind  `json:"-"`
 	State           ptypes.ConditionState `json:"state,omitempty"`
 	Status          json.RawMessage       `json:"status,omitempty"`
 	ResourceVersion int64                 `json:"resourceVersion"`

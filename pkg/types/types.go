@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"go.hollow.sh/toolbox/events"
 	"golang.org/x/exp/slices"
 )
 
@@ -17,6 +18,9 @@ const (
 	FirmwareInstallOutofband ConditionKind = "firmwareInstallOutofband"
 	InventoryOutofband       ConditionKind = "inventoryOutofband"
 	GenerateFirmwareSet      ConditionKind = "generateFirmwareSet"
+	ServerResourceType       string        = "server"
+
+	EventTypeConditionUpdate events.EventType = "conditionUpdate"
 )
 
 // ConditionKinds returns the list of ConditionKinds defined.
@@ -104,6 +108,10 @@ type Condition struct {
 	// This is left here to be implemented later
 	// OnSuccess *Condition `json:"onSuccess,omitempty"`
 
+	// Should the worker executing this condition fail if its unable to checkpoint
+	// the status of work on this condition.
+	FailOnCheckpointError bool `json:"failOnCheckpointError,omitempty"`
+
 	// Exclusive indicates this condition holds exclusive access to the device
 	// and other conditions have to wait until this is in a finalized state.
 	Exclusive bool `json:"exclusive,omitempty"`
@@ -124,19 +132,4 @@ type Condition struct {
 type ServerConditions struct {
 	ServerID   uuid.UUID
 	Conditions []*Condition
-}
-
-type InventoryOutofbandParameters struct{}
-
-// Validate fields
-func (i *InventoryOutofbandParameters) Validate() error {
-	return nil
-}
-
-type GenerateFirmwareSetParameters struct {
-}
-
-// Validate fields
-func (g *GenerateFirmwareSetParameters) Validate() error {
-	return nil
 }

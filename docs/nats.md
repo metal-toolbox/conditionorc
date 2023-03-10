@@ -1,6 +1,6 @@
 
 ## Jetstream
-
+https://github.com/nats-io/stan.go#nats-streaming
 
 We use the stream as a queue - queue group, with consumers as pull consumers.
 
@@ -66,29 +66,8 @@ On unsubscribing the JetStream consumer is automatically deleted, eonsumer is no
 
 
 ## Stream parameters
-```
-            Retention: Limits
-     Acknowledgements: true
-       Discard Policy: Old
-     Duplicate Window: 2m0s
-    Allows Msg Delete: true
-         Allows Purge: true
-       Allows Rollups: false
-```
-
 ## consumer parameters
-```
-        Durable Name: alloy
-           Pull Mode: true
-      Filter Subject: com.hollow.sh.events.>
-      Deliver Policy: All
-          Ack Policy: All
-            Ack Wait: 30s
-       Replay Policy: Instant
-     Max Ack Pending: 1,000
-   Max Waiting Pulls: 512
 
-```
 
 ### consumer
 
