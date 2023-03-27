@@ -1,0 +1,54 @@
+log_level: debug
+listen_address: 0.0.0.0:9001
+store_kind: serverservice
+serverservice:
+  endpoint: http://serverservice:8000
+  disable_oauth: true
+  facility_code: dc13
+conditions:
+  - kind: inventoryOutofband
+    exclusive: false
+    failOnCheckpointError: false
+  - kind: firmwareInstallOutofband
+    exclusive: true
+    failOnCheckpointError: true
+  - kind: resetBmc
+    exclusive: true
+    failOnCheckpointError: false
+  - kind: changeBmcPassword
+    exclusive: true
+    failOnCheckpointError: true
+  - kind: provisionDevice
+    exclusive: true
+    failOnCheckpointError: false
+# API server publishes commands when conditions are created.
+events_broker_kind: nats
+nats:
+  url: nats://nats:4222
+  app_name: conditionorc
+  publisher_subject_prefix: com.hollow.sh.controllers.commands
+  stream_urn_ns: hollow-controllers
+  subscribe_subjects:
+    - com.hollow.sh.serverservice.events.>
+  connect_timeout: 500ms
+  stream_user: conditionorc
+  stream_pass: password
+  #creds_file:
+  stream:
+    name: controllers
+    subjects:
+      - com.hollow.sh.controllers.commands.>
+      - com.hollow.sh.controllers.responses.>
+    acknowledgements: true
+    duplicate_window: 5m
+    retention: workQueue
+  consumer:
+    pull: true
+    name: conditionorc
+    ack_wait: 5m
+    max_ack_pending: 10
+    subscribe_subjects:
+      - com.hollow.sh.controllers.responses.>
+    # filter_subject required for a workqueue stream, must be unique
+    # between consumers.
+    filter_subject: com.hollow.sh.controllers.responses.>
