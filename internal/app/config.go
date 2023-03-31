@@ -178,7 +178,7 @@ func (a *App) envVarServerserviceOverrides() error {
 	}
 
 	if a.v.GetString("serverservice.facilitycode") != "" {
-		a.Config.ServerserviceOptions.Endpoint = a.v.GetString("serverservice.facilitycode")
+		a.Config.ServerserviceOptions.FacilityCode = a.v.GetString("serverservice.facilitycode")
 	}
 
 	if a.Config.ServerserviceOptions.FacilityCode == "" {
