@@ -17,7 +17,7 @@ var cmdOrchestrator = &cobra.Command{
 	Use:   "orchestrator",
 	Short: "Run condition orchestrator service",
 	Run: func(cmd *cobra.Command, args []string) {
-		app, err := app.New(cmd.Context(), model.AppKindOrchestrator, cfgFile, model.LogLevel(logLevel))
+		app, termCh, err := app.New(cmd.Context(), model.AppKindOrchestrator, cfgFile, model.LogLevel(logLevel))
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -27,7 +27,7 @@ var cmdOrchestrator = &cobra.Command{
 
 		// routine listens for termination signal and cancels the context
 		go func() {
-			<-app.TermCh
+			<-termCh
 			app.Logger.Info("got TERM signal, exiting...")
 			cancelFunc()
 		}()
