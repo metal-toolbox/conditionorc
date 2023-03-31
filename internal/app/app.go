@@ -40,7 +40,7 @@ func New(ctx context.Context, appKind model.AppKind, cfgFile string, loglevel mo
 		Logger: logrus.New(),
 	}
 
-	termCh := make(chan os.Signal)
+	termCh := make(chan os.Signal, 1)
 
 	if err := app.LoadConfiguration(); err != nil {
 		return nil, termCh, err
