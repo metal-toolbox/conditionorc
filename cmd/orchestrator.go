@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"context"
 	"log"
 
 	"github.com/metal-toolbox/conditionorc/internal/app"
@@ -21,7 +22,17 @@ var cmdOrchestrator = &cobra.Command{
 			log.Fatal(err)
 		}
 
-		repository, err := store.NewStore(cmd.Context(), app.Config, app.Config.ConditionDefinitions, app.Logger)
+		// setup cancel context with cancel func
+		ctx, cancelFunc := context.WithCancel(cmd.Context())
+
+		// routine listens for termination signal and cancels the context
+		go func() {
+			<-app.TermCh
+			app.Logger.Info("got TERM signal, exiting...")
+			cancelFunc()
+		}()
+
+		repository, err := store.NewStore(ctx, app.Config, app.Config.ConditionDefinitions, app.Logger)
 		if err != nil {
 			app.Logger.Fatal(err)
 		}
@@ -43,14 +54,7 @@ var cmdOrchestrator = &cobra.Command{
 		}
 
 		orc := orchestrator.New(options...)
-		go func() {
-			orc.Run(cmd.Context())
-		}()
-
-		// sit around for term signal
-		<-app.TermCh
-		app.Logger.Info("got TERM signal, exiting")
-
+		orc.Run(ctx)
 	},
 }
 
