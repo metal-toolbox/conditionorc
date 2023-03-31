@@ -24,7 +24,7 @@ var cmdServer = &cobra.Command{
 	Use:   "server",
 	Short: "Run condition orchestrator API service",
 	Run: func(cmd *cobra.Command, args []string) {
-		app, err := app.New(cmd.Context(), model.AppKindServer, cfgFile, model.LogLevel(logLevel))
+		app, termCh, err := app.New(cmd.Context(), model.AppKindServer, cfgFile, model.LogLevel(logLevel))
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -59,7 +59,7 @@ var cmdServer = &cobra.Command{
 		}()
 
 		// sit around for term signal
-		<-app.TermCh
+		<-termCh
 		app.Logger.Info("got TERM signal, shutting down server...")
 
 		// call server shutdown with timeout

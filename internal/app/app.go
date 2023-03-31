@@ -24,14 +24,12 @@ type App struct {
 	SyncWG *sync.WaitGroup
 	// Flasher configuration.
 	Config *Configuration
-	// TermCh is the channel to terminate the app based on a signal.
-	TermCh chan os.Signal
 	// Logger is the app logger.
 	Logger *logrus.Logger
 }
 
 // New returns returns a new instance of the flasher app
-func New(ctx context.Context, appKind model.AppKind, cfgFile string, loglevel model.LogLevel) (*App, error) {
+func New(ctx context.Context, appKind model.AppKind, cfgFile string, loglevel model.LogLevel) (*App, <-chan os.Signal, error) {
 	app := &App{
 		v:       viper.New(),
 		AppKind: appKind,
@@ -40,19 +38,20 @@ func New(ctx context.Context, appKind model.AppKind, cfgFile string, loglevel mo
 		},
 		SyncWG: &sync.WaitGroup{},
 		Logger: logrus.New(),
-		TermCh: make(chan os.Signal),
 	}
 
+	termCh := make(chan os.Signal)
+
 	if err := app.LoadConfiguration(); err != nil {
-		return nil, err
+		return nil, termCh, err
 	}
 
 	app.SetLogger(loglevel)
 
 	// register for SIGINT, SIGTERM
-	signal.Notify(app.TermCh, syscall.SIGINT, syscall.SIGTERM)
+	signal.Notify(termCh, syscall.SIGINT, syscall.SIGTERM)
 
-	return app, nil
+	return app, termCh, nil
 }
 
 func (a *App) SetLogger(level model.LogLevel) {
