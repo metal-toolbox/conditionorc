@@ -16,7 +16,7 @@ import (
 )
 
 var (
-	shutdownTimeout = time.Second * 10
+	shutdownTimeout = 10 * time.Second
 )
 
 // install server command

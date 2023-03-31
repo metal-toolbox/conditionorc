@@ -7,11 +7,10 @@ import (
 	"sync"
 	"syscall"
 
-	"github.com/metal-toolbox/conditionorc/internal/model"
-	"github.com/spf13/viper"
-
 	runtime "github.com/banzaicloud/logrus-runtime-formatter"
+	"github.com/metal-toolbox/conditionorc/internal/model"
 	"github.com/sirupsen/logrus"
+	"github.com/spf13/viper"
 )
 
 // Config holds configuration data when running mctl
