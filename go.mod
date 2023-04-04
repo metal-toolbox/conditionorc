@@ -15,7 +15,7 @@ require (
 	github.com/stretchr/testify v1.8.2
 	github.com/toorop/gin-logrus v0.0.0-20210225092905-2c785434f26f
 	go.hollow.sh/serverservice v0.15.1
-	go.hollow.sh/toolbox v0.5.2-0.20230313133144-c03fdd3c2362
+	go.hollow.sh/toolbox v0.5.2-0.20230403084733-0bfb6095e5a5
 	go.infratographer.com/x v0.0.3
 	golang.org/x/exp v0.0.0-20230321023759-10a507213a29
 )
@@ -57,7 +57,6 @@ require (
 	github.com/lib/pq v1.10.7 // indirect
 	github.com/magiconair/properties v1.8.7 // indirect
 	github.com/mattn/go-isatty v0.0.18 // indirect
-	github.com/minio/highwayhash v1.0.2 // indirect
 	github.com/mitchellh/mapstructure v1.5.0 // indirect
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.2 // indirect
