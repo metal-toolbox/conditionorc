@@ -27,7 +27,7 @@ var (
 type Server struct {
 	// Logger is the app logger
 	logger               *logrus.Logger
-	streamBroker         events.StreamBroker
+	streamBroker         events.Stream
 	listenAddress        string
 	conditionDefinitions ptypes.ConditionDefinitions
 	repository           store.Repository
@@ -58,7 +58,7 @@ func WithListenAddress(addr string) Option {
 }
 
 // WithStreamBroker sets the event stream broker.
-func WithStreamBroker(broker events.StreamBroker) Option {
+func WithStreamBroker(broker events.Stream) Option {
 	return func(s *Server) {
 		s.streamBroker = broker
 	}

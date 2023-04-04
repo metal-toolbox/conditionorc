@@ -20,7 +20,7 @@ type Orchestrator struct {
 	logger        *logrus.Logger
 	listenAddress string
 	repository    store.Repository
-	streamBroker  events.StreamBroker
+	streamBroker  events.Stream
 }
 
 // Option type sets a parameter on the Orchestrator type.
@@ -34,7 +34,7 @@ func WithStore(repository store.Repository) Option {
 }
 
 // WithStreamBroker sets the event stream broker on the Orchestrator type.
-func WithStreamBroker(broker events.StreamBroker) Option {
+func WithStreamBroker(broker events.Stream) Option {
 	return func(o *Orchestrator) {
 		o.streamBroker = broker
 	}
