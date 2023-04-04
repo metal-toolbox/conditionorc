@@ -34,7 +34,7 @@ var cmdServer = &cobra.Command{
 			app.Logger.Fatal(err)
 		}
 
-		streamBroker, err := events.NewStreamBroker(app.Config.NatsOptions)
+		streamBroker, err := events.NewStream(app.Config.NatsOptions)
 		if err != nil {
 			app.Logger.Fatal(err)
 		}

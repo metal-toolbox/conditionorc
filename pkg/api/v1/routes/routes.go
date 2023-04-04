@@ -20,7 +20,7 @@ const (
 type Routes struct {
 	authMW               *ginjwt.Middleware
 	repository           store.Repository
-	streamBroker         events.StreamBroker
+	streamBroker         events.Stream
 	conditionDefinitions ptypes.ConditionDefinitions
 	logger               *logrus.Logger
 }
@@ -36,7 +36,7 @@ func WithStore(repository store.Repository) Option {
 }
 
 // WithStreamBroker sets the event stream broker.
-func WithStreamBroker(broker events.StreamBroker) Option {
+func WithStreamBroker(broker events.Stream) Option {
 	return func(r *Routes) {
 		r.streamBroker = broker
 	}
