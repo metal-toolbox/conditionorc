@@ -484,7 +484,7 @@ func TestServerConditionCreate(t *testing.T) {
 			},
 			func(t *testing.T, r *httptest.ResponseRecorder) {
 				assert.Equal(t, http.StatusBadRequest, r.Code)
-				assert.Contains(t, string(asBytes(t, r.Body)), "condition present non-finalized state")
+				assert.Contains(t, string(asBytes(t, r.Body)), "condition present in an incomplete state")
 			},
 		},
 		{
