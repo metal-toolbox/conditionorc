@@ -132,8 +132,9 @@ func (o *Orchestrator) processMsg(ctx context.Context, msg events.Message) {
 }
 
 func (o *Orchestrator) handleHollowControllerEvent(ctx context.Context, event *pubsubx.Message, urn *urnx.URN) {
-	fmt.Println("I don't handle replies from controllers as yet.")
-	spew.Dump(urn)
+	o.logger.WithFields(
+		logrus.Fields{"source": event.Source, "resource": urn.ResourceType},
+	).Debug("controller reply handler not implemented, event dropped")
 }
 
 func (o *Orchestrator) handleHollowEvent(ctx context.Context, event *pubsubx.Message, urn *urnx.URN) {
