@@ -58,12 +58,12 @@ func (current ConditionState) TransitionValid(next ConditionState) bool {
 }
 
 // ConditionStateValid validates the ConditionState.
-func ConditionStateValid(s ConditionState) bool {
+func ConditionStateIsValid(s ConditionState) bool {
 	return slices.Contains(ConditionStates(), s)
 }
 
-// ConditionStateFinalized returns true when the state is finalized.
-func ConditionStateFinalized(s ConditionState) bool {
+// ConditionStateComplete returns true when the given state is considered to be final.
+func ConditionStateIsComplete(s ConditionState) bool {
 	return slices.Contains([]ConditionState{Failed, Succeeded}, s)
 }
 
@@ -131,6 +131,16 @@ type Condition struct {
 
 	// CreatedAt is when this object was created.
 	CreatedAt time.Time `json:"createdAt,omitempty"`
+}
+
+// StateValid validates the Condition State field.
+func (c *Condition) StateValid() bool {
+	return ConditionStateIsValid(c.State)
+}
+
+// IsComplete returns true if the condition has a state that is final.
+func (c *Condition) IsComplete() bool {
+	return ConditionStateIsComplete(c.State)
 }
 
 // ServerConditions is a type to hold a server ID and the conditions associated with it.
