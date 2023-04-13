@@ -2,16 +2,19 @@ package orchestrator
 
 import (
 	"context"
-	"fmt"
 
-	"github.com/davecgh/go-spew/spew"
 	"github.com/google/uuid"
 	"github.com/metal-toolbox/conditionorc/internal/store"
 	ptypes "github.com/metal-toolbox/conditionorc/pkg/types"
+	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"go.hollow.sh/toolbox/events"
 	"go.infratographer.com/x/pubsubx"
 	"go.infratographer.com/x/urnx"
+)
+
+var (
+	ErrPublishEvent = errors.New("error publishing event")
 )
 
 // Orchestrator type holds attributes of the condition orchestrator service
@@ -150,7 +153,20 @@ func (o *Orchestrator) handleHollowEvent(ctx context.Context, event *pubsubx.Mes
 			return
 		}
 
-		o.publishCondition(ctx, urn.ResourceID, condition)
+		if errPublish := o.publishCondition(ctx, urn.ResourceID, condition); errPublish != nil {
+			o.logger.WithFields(
+				logrus.Fields{"err": errPublish.Error()},
+			).Error("condition publish returned an error")
+
+			return
+		}
+
+		o.logger.WithFields(
+			logrus.Fields{
+				"condition": condition.Kind,
+			},
+		).Info("condition published")
+
 	default:
 		o.logger.WithFields(
 			logrus.Fields{"eventType": event.EventType, "urn ns": urn.Namespace},
@@ -158,10 +174,9 @@ func (o *Orchestrator) handleHollowEvent(ctx context.Context, event *pubsubx.Mes
 	}
 }
 
-func (o *Orchestrator) publishCondition(ctx context.Context, serverID uuid.UUID, condition *ptypes.Condition) {
+func (o *Orchestrator) publishCondition(ctx context.Context, serverID uuid.UUID, condition *ptypes.Condition) error {
 	if o.streamBroker == nil {
-		o.logger.Warn("Event publish skipped, not connected to stream borker")
-		return
+		return errors.Wrap(ErrPublishEvent, "not connected to event stream")
 	}
 
 	if err := o.streamBroker.PublishAsyncWithContext(
@@ -171,14 +186,8 @@ func (o *Orchestrator) publishCondition(ctx context.Context, serverID uuid.UUID,
 		serverID.String(),
 		condition,
 	); err != nil {
-		o.logger.WithFields(
-			logrus.Fields{"err": err.Error()},
-		).Error("error publishing condition event")
+		return errors.Wrap(ErrPublishEvent, err.Error())
 	}
 
-	o.logger.WithFields(
-		logrus.Fields{
-			"condition": condition.Kind,
-		},
-	).Info("published condition event")
+	return nil
 }
