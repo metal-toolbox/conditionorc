@@ -49,7 +49,7 @@ var (
 	ErrRepository = errors.New("storage repository error")
 )
 
-func NewStore(ctx context.Context, config *app.Configuration, conditionDefs ptypes.ConditionDefinitions, logger *logrus.Logger) (Repository, error) {
+func NewStore(_ context.Context, config *app.Configuration, conditionDefs ptypes.ConditionDefinitions, logger *logrus.Logger) (Repository, error) {
 	switch config.StoreKind {
 	case model.ServerserviceStore:
 		return newServerserviceStore(&config.ServerserviceOptions, conditionDefs, logger)
