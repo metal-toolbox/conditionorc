@@ -371,9 +371,15 @@ func (r *Routes) serverConditionGet(c *gin.Context) {
 		return
 	}
 
-	data := v1types.ConditionResponse{ServerID: serverID, Condition: found}
-
-	c.JSON(http.StatusOK, &v1types.ServerResponse{Record: &data})
+	c.JSON(http.StatusOK,
+		&v1types.ServerResponse{
+			Records: &v1types.ConditionsResponse{
+				ServerID: serverID,
+				Conditions: []*ptypes.Condition{
+					found,
+				},
+			},
+		})
 }
 
 func (r *Routes) publishCondition(ctx context.Context, serverID uuid.UUID, condition *ptypes.Condition) {

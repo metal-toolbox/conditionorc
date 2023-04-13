@@ -158,13 +158,15 @@ func TestIntegration_ConditionsGet(t *testing.T) {
 
 				return &v1types.ServerResponse{
 					StatusCode: 200,
-					Record: &v1types.ConditionResponse{
+					Records: &v1types.ConditionsResponse{
 						ServerID: serverID,
-						Condition: &ptypes.Condition{
-							Kind:       ptypes.FirmwareInstallOutofband,
-							State:      ptypes.Pending,
-							Status:     []byte(`{"hello":"world"}`),
-							Parameters: parameters,
+						Conditions: []*ptypes.Condition{
+							{
+								Kind:       ptypes.FirmwareInstallOutofband,
+								State:      ptypes.Pending,
+								Status:     []byte(`{"hello":"world"}`),
+								Parameters: parameters,
+							},
 						},
 					},
 				}
