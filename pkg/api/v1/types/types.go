@@ -37,6 +37,7 @@ type ConditionCreate struct {
 // NewCondition returns a new Condition type.
 func (c *ConditionCreate) NewCondition(kind ptypes.ConditionKind) *ptypes.Condition {
 	return &ptypes.Condition{
+		Version:    ptypes.ConditionStructVersion,
 		Kind:       kind,
 		State:      ptypes.Pending,
 		Exclusive:  c.Exclusive,

@@ -352,6 +352,7 @@ func TestServerConditionCreate(t *testing.T) {
 						gomock.Eq(serverID),
 						gomock.Eq(
 							&ptypes.Condition{
+								Version:    ptypes.ConditionStructVersion,
 								Kind:       ptypes.FirmwareInstallOutofband,
 								Parameters: parametersJSON,
 								State:      ptypes.Pending,
@@ -426,6 +427,7 @@ func TestServerConditionCreate(t *testing.T) {
 						gomock.Eq(serverID),
 						gomock.Eq(
 							&ptypes.Condition{
+								Version:    ptypes.ConditionStructVersion,
 								Kind:       ptypes.FirmwareInstallOutofband,
 								Parameters: parametersJSON,
 								State:      ptypes.Pending,

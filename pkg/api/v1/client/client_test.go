@@ -436,6 +436,7 @@ func TestIntegration_ConditionsCreate(t *testing.T) {
 						gomock.Any(),
 						gomock.Eq(serverID),
 						gomock.Eq(&ptypes.Condition{
+							Version:    ptypes.ConditionStructVersion,
 							Kind:       ptypes.FirmwareInstallOutofband,
 							Parameters: []byte(`{"hello":"world"}`),
 							State:      ptypes.Pending,
