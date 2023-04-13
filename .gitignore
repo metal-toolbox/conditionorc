@@ -6,7 +6,7 @@
 # Application binary itself
 /alloy
 /alloy-osx
-
+/conditionorc
 *~
 .*.swp
 .*.swo
