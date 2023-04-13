@@ -832,45 +832,9 @@ func TestServerConditionDelete(t *testing.T) {
 			},
 		},
 		{
-			"no such condition on server returns error",
-			// mock repository
-			func(r *store.MockRepository) {
-				r.EXPECT().
-					Get(gomock.Any(), gomock.Eq(serverID), gomock.Eq(ptypes.FirmwareInstallOutofband)).
-					Times(1).
-					Return(nil, nil)
-			},
-			func(t *testing.T) *http.Request {
-				url := fmt.Sprintf("/api/v1/servers/%s/condition/%s", serverID.String(), ptypes.FirmwareInstallOutofband)
-
-				request, err := http.NewRequestWithContext(context.TODO(), http.MethodDelete, url, http.NoBody)
-				if err != nil {
-					t.Fatal(err)
-				}
-
-				return request
-			},
-			func(t *testing.T, r *httptest.ResponseRecorder) {
-				assert.Equal(t, http.StatusBadRequest, r.Code)
-
-				want := asJSONBytes(
-					t,
-					&v1types.ServerResponse{
-						Message: "no such condition found",
-					},
-				)
-				assert.Equal(t, asBytes(t, r.Body), want)
-			},
-		},
-		{
 			"condition deleted successfully",
 			// mock repository
 			func(r *store.MockRepository) {
-				r.EXPECT().
-					Get(gomock.Any(), gomock.Eq(serverID), gomock.Eq(ptypes.FirmwareInstallOutofband)).
-					Times(1).
-					Return(&ptypes.Condition{Kind: ptypes.FirmwareInstallOutofband}, nil)
-
 				r.EXPECT().
 					Delete(gomock.Any(), gomock.Eq(serverID), gomock.Eq(ptypes.FirmwareInstallOutofband)).
 					Times(1).
