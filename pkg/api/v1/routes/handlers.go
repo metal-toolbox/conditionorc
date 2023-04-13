@@ -160,7 +160,7 @@ func (r *Routes) serverConditionCreate(c *gin.Context) {
 
 	condition := conditionCreate.NewCondition(kind)
 
-	// check the condition doesn't already exist in a non-finalized state
+	// check the condition doesn't already exist in an incomplete state
 	existing, err := r.repository.Get(c.Request.Context(), serverID, kind)
 	if err != nil && !errors.Is(err, store.ErrConditionNotFound) {
 		c.JSON(
@@ -171,10 +171,10 @@ func (r *Routes) serverConditionCreate(c *gin.Context) {
 		return
 	}
 
-	if existing != nil && !ptypes.ConditionStateFinalized(existing.State) {
+	if existing != nil && !existing.IsComplete() {
 		c.JSON(
 			http.StatusBadRequest,
-			&v1types.ServerResponse{Message: "condition present non-finalized state: " + string(existing.State)},
+			&v1types.ServerResponse{Message: "condition present in an incomplete state: " + string(existing.State)},
 		)
 
 		return
@@ -193,7 +193,7 @@ func (r *Routes) serverConditionCreate(c *gin.Context) {
 		}
 	}
 
-	// check if any condition with exclusive set is in non-finalized states
+	// check if any condition with exclusive set is in incomplete states
 	if errEx := r.exclusiveNonFinalConditionExists(c.Request.Context(), serverID); errEx != nil {
 		if errors.Is(errEx, ErrConditionExclusive) {
 			c.JSON(
@@ -231,7 +231,7 @@ func (r *Routes) serverConditionCreate(c *gin.Context) {
 
 func (r *Routes) exclusiveNonFinalConditionExists(ctx context.Context, serverID uuid.UUID) error {
 	for _, state := range ptypes.ConditionStates() {
-		if ptypes.ConditionStateFinalized(state) {
+		if ptypes.ConditionStateIsComplete(state) {
 			continue
 		}
 
@@ -244,7 +244,7 @@ func (r *Routes) exclusiveNonFinalConditionExists(ctx context.Context, serverID 
 			if condition.Exclusive && condition.State == state {
 				return errors.Wrap(
 					ErrConditionExclusive,
-					fmt.Sprintf("%s condition exists in non-finalized state - %s", condition.Kind, string(condition.State)),
+					fmt.Sprintf("%s condition exists in an incomplete state - %s", condition.Kind, string(condition.State)),
 				)
 			}
 		}
@@ -317,7 +317,7 @@ func (r *Routes) serverConditionList(c *gin.Context) {
 	}
 
 	state := ptypes.ConditionState(c.Param("conditionState"))
-	if state != "" && !ptypes.ConditionStateValid(state) {
+	if state != "" && !ptypes.ConditionStateIsValid(state) {
 		c.JSON(
 			http.StatusBadRequest,
 			&v1types.ServerResponse{Message: "unsupported condition state: " + string(state)},

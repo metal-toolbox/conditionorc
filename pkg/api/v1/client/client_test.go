@@ -475,7 +475,7 @@ func TestIntegration_ConditionsCreate(t *testing.T) {
 			},
 			func() *v1types.ServerResponse {
 				return &v1types.ServerResponse{
-					Message:    "condition present non-finalized state: active",
+					Message:    "condition present in an incomplete state: active",
 					StatusCode: 400,
 				}
 			},
