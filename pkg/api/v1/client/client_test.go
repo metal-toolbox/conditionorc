@@ -652,33 +652,6 @@ func TestIntegration_ConditionsDelete(t *testing.T) {
 			ptypes.FirmwareInstallOutofband,
 			// mock repository
 			func(r *store.MockRepository) {
-				parameters, err := json.Marshal(&FirmwareInstallOutofbandParameters{
-					InventoryAfterUpdate: true,
-					ForceInstall:         true,
-					FirmwareSetID:        "fake",
-				})
-
-				if err != nil {
-					t.Error(err)
-				}
-
-				// lookup existing condition
-				r.EXPECT().
-					Get(
-						gomock.Any(),
-						gomock.Eq(serverID),
-						gomock.Eq(ptypes.FirmwareInstallOutofband),
-					).
-					Return(
-						&ptypes.Condition{
-							Kind:       ptypes.FirmwareInstallOutofband,
-							State:      ptypes.Pending,
-							Status:     []byte(`{"hello":"world"}`),
-							Parameters: parameters,
-						},
-						nil).
-					Times(1)
-
 				r.EXPECT().
 					Delete(
 						gomock.Any(),
@@ -692,31 +665,6 @@ func TestIntegration_ConditionsDelete(t *testing.T) {
 				return &v1types.ServerResponse{
 					StatusCode: 200,
 					Message:    "condition deleted",
-				}
-			},
-			"",
-		},
-		{
-			"404 response",
-			ptypes.FirmwareInstallOutofband,
-			// mock repository
-			func(r *store.MockRepository) {
-				// lookup existing condition
-				r.EXPECT().
-					Get(
-						gomock.Any(),
-						gomock.Eq(serverID),
-						gomock.Eq(ptypes.FirmwareInstallOutofband),
-					).
-					Return(
-						nil,
-						nil).
-					Times(1)
-			},
-			func() *v1types.ServerResponse {
-				return &v1types.ServerResponse{
-					Message:    "no such condition found",
-					StatusCode: 400,
 				}
 			},
 			"",

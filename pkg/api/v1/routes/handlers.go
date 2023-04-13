@@ -274,25 +274,6 @@ func (r *Routes) serverConditionDelete(c *gin.Context) {
 		return
 	}
 
-	existing, err := r.repository.Get(c.Request.Context(), serverID, kind)
-	if err != nil {
-		c.JSON(
-			http.StatusBadRequest,
-			&v1types.ServerResponse{Message: err.Error()},
-		)
-
-		return
-	}
-
-	if existing == nil {
-		c.JSON(
-			http.StatusBadRequest,
-			&v1types.ServerResponse{Message: "no such condition found"},
-		)
-
-		return
-	}
-
 	if err := r.repository.Delete(c.Request.Context(), serverID, kind); err != nil {
 		c.JSON(
 			http.StatusInternalServerError,
