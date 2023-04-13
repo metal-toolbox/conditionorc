@@ -68,12 +68,6 @@ var cmdServer = &cobra.Command{
 		if err := srv.Shutdown(ctx); err != nil {
 			app.Logger.Fatal("server shutdown error:", err)
 		}
-
-		// wait until context is done
-		<-ctx.Done()
-		app.Logger.Info("server shutdown exceeded timeout")
-
-		app.Logger.Info("server shutdown complete.")
 	},
 }
 
