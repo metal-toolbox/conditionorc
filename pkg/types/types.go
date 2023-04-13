@@ -96,6 +96,9 @@ func (c ConditionDefinitions) FindByKind(k ConditionKind) *ConditionDefinition {
 
 // Condition defines model for Condition.
 type Condition struct {
+	// ID is the identifier for this condition.
+	ID uuid.UUID `json:"id"`
+
 	// Kind is one of ConditionKind.
 	Kind ConditionKind `json:"kind,omitempty"`
 
