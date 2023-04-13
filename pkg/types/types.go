@@ -20,6 +20,9 @@ const (
 	ServerResourceType       string        = "servers"
 
 	ConditionEventType events.EventType = "condition"
+
+	// ConditionStructVersion identifies the condition struct revision
+	ConditionStructVersion string = "1"
 )
 
 // ConditionState defines model for ConditionState.
@@ -96,6 +99,9 @@ func (c ConditionDefinitions) FindByKind(k ConditionKind) *ConditionDefinition {
 
 // Condition defines model for Condition.
 type Condition struct {
+	// Version identifies the revision number for this struct.
+	Version string `json:"version"`
+
 	// ID is the identifier for this condition.
 	ID uuid.UUID `json:"id"`
 
