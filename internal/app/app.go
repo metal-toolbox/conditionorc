@@ -4,7 +4,6 @@ import (
 	"context"
 	"os"
 	"os/signal"
-	"sync"
 	"syscall"
 
 	runtime "github.com/banzaicloud/logrus-runtime-formatter"
@@ -20,8 +19,6 @@ type App struct {
 	v *viper.Viper
 	// The kind of application - server/orchestrator
 	AppKind model.AppKind
-	// Sync waitgroup to wait for running go routines on termination.
-	SyncWG *sync.WaitGroup
 	// Flasher configuration.
 	Config *Configuration
 	// Logger is the app logger.
@@ -36,7 +33,6 @@ func New(ctx context.Context, appKind model.AppKind, cfgFile string, loglevel mo
 		Config: &Configuration{
 			file: cfgFile,
 		},
-		SyncWG: &sync.WaitGroup{},
 		Logger: logrus.New(),
 	}
 
