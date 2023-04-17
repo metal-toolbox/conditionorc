@@ -94,7 +94,7 @@ func (r *Routes) serverConditionUpdate(c *gin.Context) {
 	existing, err := r.repository.Get(c.Request.Context(), serverID, kind)
 	if err != nil {
 		c.JSON(
-			http.StatusBadRequest, // XXX: should this be a 5XX level error?
+			http.StatusServiceUnavailable, // HTTP 503 -- this should signal a retry from the client
 			&v1types.ServerResponse{Message: err.Error()},
 		)
 		r.logger.WithFields(logrus.Fields{
@@ -210,7 +210,7 @@ func (r *Routes) serverConditionCreate(c *gin.Context) {
 	existing, err := r.repository.Get(c.Request.Context(), serverID, kind)
 	if err != nil && !errors.Is(err, store.ErrConditionNotFound) {
 		c.JSON(
-			http.StatusBadRequest,
+			http.StatusServiceUnavailable,
 			&v1types.ServerResponse{Message: err.Error()},
 		)
 		r.logger.WithFields(logrus.Fields{
@@ -437,7 +437,7 @@ func (r *Routes) serverConditionGet(c *gin.Context) {
 		}
 
 		c.JSON(
-			http.StatusInternalServerError,
+			http.StatusServiceUnavailable,
 			&v1types.ServerResponse{Message: err.Error()},
 		)
 
