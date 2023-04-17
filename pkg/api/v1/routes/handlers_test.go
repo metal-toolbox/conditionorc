@@ -158,7 +158,6 @@ func TestServerConditionUpdate(t *testing.T) {
 			func(t *testing.T, r *httptest.ResponseRecorder) {
 				assert.Equal(t, http.StatusBadRequest, r.Code)
 				responseBody := string(asBytes(t, r.Body))
-				//t.Logf("server update reply body: => '%s'\n", responseBody)
 				assert.Contains(t, responseBody, "invalid ConditionUpdate payload")
 			},
 		},
