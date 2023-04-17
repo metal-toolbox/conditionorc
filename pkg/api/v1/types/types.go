@@ -2,14 +2,18 @@ package types
 
 import (
 	"encoding/json"
-	"fmt"
 
 	"github.com/google/uuid"
 	ptypes "github.com/metal-toolbox/conditionorc/pkg/types"
 	"github.com/pkg/errors"
 )
 
-// the Records field is allowed to be empty or have only one record.
+var (
+	errBadUpdateTarget         error = errors.New("no existing condition found for update")
+	errResourceVersionMismatch error = errors.New("resource version mismatch, retry request with current resourceVersion")
+	errInvalidStateTransition  error = errors.New("invalid state transition")
+)
+
 type ServerResponse struct {
 	StatusCode int                 `json:"statusCode,omitempty"`
 	Message    string              `json:"message,omitempty"`
@@ -31,6 +35,7 @@ type ConditionCreate struct {
 // NewCondition returns a new Condition type.
 func (c *ConditionCreate) NewCondition(kind ptypes.ConditionKind) *ptypes.Condition {
 	return &ptypes.Condition{
+		ID:         uuid.New(),
 		Version:    ptypes.ConditionStructVersion,
 		Kind:       kind,
 		State:      ptypes.Pending,
@@ -53,31 +58,33 @@ type ConditionUpdate struct {
 //
 // This method makes sure that update does not overwrite existing data inadvertently.
 func (c *ConditionUpdate) MergeExisting(existing *ptypes.Condition) (*ptypes.Condition, error) {
+	// XXX: This make more sense for the caller to check?
 	// 1. condition must already exist for update.
 	if existing == nil {
-		return nil, errors.New("no existing condition found for update")
+		return nil, errBadUpdateTarget
 	}
 
 	// resourceVersion must match
 	if existing.ResourceVersion != c.ResourceVersion {
-		return nil, errors.New("resource version mismatch, retry request with current resourceVersion")
+		return nil, errResourceVersionMismatch
 	}
 
 	// transition is valid
 	if !existing.State.TransitionValid(c.State) {
-		return nil,
-			// nolint:goerr113 // error needs to be dynamic.
-			fmt.Errorf(
-				"transition from exiting state %s to new state %s is not allowed",
-				existing.State,
-				c.State)
+		return nil, errInvalidStateTransition
 	}
 
 	return &ptypes.Condition{
-		Kind:       existing.Kind,
-		Parameters: existing.Parameters,
-		Exclusive:  existing.Exclusive,
-		State:      c.State,
-		Status:     c.Status,
+		Version:               existing.Version,
+		ID:                    existing.ID,
+		Kind:                  existing.Kind,
+		Parameters:            existing.Parameters,
+		State:                 c.State,
+		Status:                c.Status,
+		FailOnCheckpointError: existing.FailOnCheckpointError,
+		Exclusive:             existing.Exclusive,
+		ResourceVersion:       existing.ResourceVersion,
+		UpdatedAt:             existing.UpdatedAt,
+		CreatedAt:             existing.CreatedAt,
 	}, nil
 }
