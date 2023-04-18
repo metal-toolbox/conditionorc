@@ -103,7 +103,6 @@ func (r *Routes) serverConditionUpdate(c *gin.Context) {
 		return
 	}
 
-	// XXX: doing this here duplicates effort done in MergeExisting
 	if existing == nil {
 		c.JSON(
 			http.StatusNotFound,

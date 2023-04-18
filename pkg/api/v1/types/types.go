@@ -58,7 +58,6 @@ type ConditionUpdate struct {
 //
 // This method makes sure that update does not overwrite existing data inadvertently.
 func (c *ConditionUpdate) MergeExisting(existing *ptypes.Condition) (*ptypes.Condition, error) {
-	// XXX: This make more sense for the caller to check?
 	// 1. condition must already exist for update.
 	if existing == nil {
 		return nil, errBadUpdateTarget
