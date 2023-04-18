@@ -82,6 +82,22 @@ func TestServerConditionUpdate(t *testing.T) {
 		t.Error(err)
 	}
 
+	updateNoState, err := json.Marshal(&v1types.ConditionUpdate{
+		Status:          []byte(`{"hi": "there"}`),
+		ResourceVersion: int64(1),
+	})
+	if err != nil {
+		t.Error(err)
+	}
+
+	updateNoStatus, err := json.Marshal(&v1types.ConditionUpdate{
+		State:           ptypes.Active,
+		ResourceVersion: int64(1),
+	})
+	if err != nil {
+		t.Error(err)
+	}
+
 	updateValid := v1types.ConditionUpdate{
 		State:           ptypes.Active,
 		Status:          []byte(`{"foo": "bar"}`),
@@ -161,6 +177,43 @@ func TestServerConditionUpdate(t *testing.T) {
 				assert.Contains(t, responseBody, "invalid ConditionUpdate payload")
 			},
 		},
+		{
+			"update with no state returns an error",
+			nil,
+			func(t *testing.T) *http.Request {
+				url := fmt.Sprintf("/api/v1/servers/%s/condition/%s", serverID.String(), ptypes.FirmwareInstallOutofband)
+				request, err := http.NewRequestWithContext(context.TODO(), http.MethodPut, url, bytes.NewReader(updateNoState))
+				if err != nil {
+					t.Fatal(err)
+				}
+
+				return request
+			},
+			func(t *testing.T, r *httptest.ResponseRecorder) {
+				assert.Equal(t, http.StatusBadRequest, r.Code)
+				responseBody := string(asBytes(t, r.Body))
+				assert.Contains(t, responseBody, "invalid ConditionUpdate payload")
+			},
+		},
+		{
+			"update with no status returns an error",
+			nil,
+			func(t *testing.T) *http.Request {
+				url := fmt.Sprintf("/api/v1/servers/%s/condition/%s", serverID.String(), ptypes.FirmwareInstallOutofband)
+				request, err := http.NewRequestWithContext(context.TODO(), http.MethodPut, url, bytes.NewReader(updateNoStatus))
+				if err != nil {
+					t.Fatal(err)
+				}
+
+				return request
+			},
+			func(t *testing.T, r *httptest.ResponseRecorder) {
+				assert.Equal(t, http.StatusBadRequest, r.Code)
+				responseBody := string(asBytes(t, r.Body))
+				assert.Contains(t, responseBody, "invalid ConditionUpdate payload")
+			},
+		},
+
 		{
 			"update on non existing server condition returns error",
 			// mock repository

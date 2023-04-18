@@ -78,12 +78,10 @@ func (r *Routes) serverConditionUpdate(c *gin.Context) {
 		return
 	}
 
-	// XXX: shouldn't both of these fields be set in all cases? Even if status is something like
-	// []byte("{status: \"in progress\"})
-	if conditionUpdate.State == "" && conditionUpdate.Status == nil {
+	if conditionUpdate.State == "" || conditionUpdate.Status == nil {
 		c.JSON(
 			http.StatusBadRequest,
-			&v1types.ServerResponse{Message: "invalid ConditionUpdate payload, either a state or a status attribute is expected"},
+			&v1types.ServerResponse{Message: "invalid ConditionUpdate payload: state and status attributes are expected"},
 		)
 		r.logger.Info("invalid state and status pair")
 
