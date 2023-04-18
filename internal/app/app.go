@@ -26,7 +26,7 @@ type App struct {
 }
 
 // New returns returns a new instance of the flasher app
-func New(ctx context.Context, appKind model.AppKind, cfgFile string, loglevel model.LogLevel) (*App, <-chan os.Signal, error) {
+func New(_ context.Context, appKind model.AppKind, cfgFile string, loglevel model.LogLevel) (*App, <-chan os.Signal, error) {
 	app := &App{
 		v:       viper.New(),
 		AppKind: appKind,

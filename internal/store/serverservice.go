@@ -53,7 +53,7 @@ func newServerserviceStore(config *app.ServerserviceOptions, conditionDefs ptype
 }
 
 // Ping tests the repository is available.
-func (s *Serverservice) Ping(ctx context.Context) error {
+func (s *Serverservice) Ping(_ context.Context) error {
 	// TODO: implement
 	return nil
 }

@@ -753,9 +753,11 @@ func TestServerConditionGet(t *testing.T) {
 				want := asJSONBytes(
 					t,
 					&v1types.ServerResponse{
-						Record: &v1types.ConditionResponse{
-							ServerID:  serverID,
-							Condition: condition,
+						Records: &v1types.ConditionsResponse{
+							ServerID: serverID,
+							Conditions: []*ptypes.Condition{
+								condition,
+							},
 						},
 					},
 				)

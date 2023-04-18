@@ -9,17 +9,11 @@ import (
 	"github.com/pkg/errors"
 )
 
+// the Records field is allowed to be empty or have only one record.
 type ServerResponse struct {
 	StatusCode int                 `json:"statusCode,omitempty"`
 	Message    string              `json:"message,omitempty"`
-	Record     *ConditionResponse  `json:"record,omitempty"`
 	Records    *ConditionsResponse `json:"records,omitempty"`
-}
-
-// ConditionResponse is the response returned for a single condition request.
-type ConditionResponse struct {
-	ServerID  uuid.UUID         `json:"serverID,omitempty"`
-	Condition *ptypes.Condition `json:"condition,omitempty"`
 }
 
 // ConditionsResponse is the response returned for listing multiple conditions on a server.
