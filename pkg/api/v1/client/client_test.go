@@ -437,14 +437,15 @@ func TestIntegration_ConditionsCreate(t *testing.T) {
 					Create(
 						gomock.Any(),
 						gomock.Eq(serverID),
-						gomock.Eq(&ptypes.Condition{
-							Version:    ptypes.ConditionStructVersion,
-							Kind:       ptypes.FirmwareInstallOutofband,
-							Parameters: []byte(`{"hello":"world"}`),
-							State:      ptypes.Pending,
-						}),
+						gomock.Any(),
 					).
-					Return(nil).
+					DoAndReturn(func(_ context.Context, _ uuid.UUID, c *ptypes.Condition) error {
+						assert.Equal(t, ptypes.ConditionStructVersion, c.Version, "condition version mismatch")
+						assert.Equal(t, ptypes.FirmwareInstallOutofband, c.Kind, "condition kind mismatch")
+						assert.Equal(t, json.RawMessage(`{"hello":"world"}`), c.Parameters, "condition parameters mismatch")
+						assert.Equal(t, ptypes.Pending, c.State, "condition state mismatch")
+						return nil
+					}).
 					Times(1)
 			},
 			func() *v1types.ServerResponse {

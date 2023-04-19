@@ -4,37 +4,37 @@ import (
 	"testing"
 
 	ptypes "github.com/metal-toolbox/conditionorc/pkg/types"
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestConditionUpdate_mergeExisting(t *testing.T) {
 	tests := []struct {
-		name            string
-		update          *ConditionUpdate
-		existing        *ptypes.Condition
-		want            *ptypes.Condition
-		wantErrContains string
+		name     string
+		update   *ConditionUpdate
+		existing *ptypes.Condition
+		want     *ptypes.Condition
+		wantErr  error
 	}{
 		{
 			"no existing condition returns error",
 			&ConditionUpdate{},
 			nil,
 			nil,
-			"no existing condition found for update",
+			errBadUpdateTarget,
 		},
 		{
 			"resource version mismatch returns error",
 			&ConditionUpdate{ResourceVersion: 0},
 			&ptypes.Condition{ResourceVersion: 1},
 			nil,
-			"resource version mismatch",
+			errResourceVersionMismatch,
 		},
 		{
 			"transition state invalid error",
 			&ConditionUpdate{ResourceVersion: 1, State: ptypes.Active},
 			&ptypes.Condition{ResourceVersion: 1, State: ptypes.Failed},
 			nil,
-			"is not allowed",
+			errInvalidStateTransition,
 		},
 		{
 			"existing merged with update",
@@ -53,27 +53,23 @@ func TestConditionUpdate_mergeExisting(t *testing.T) {
 			&ptypes.Condition{
 				Kind:            ptypes.FirmwareInstallOutofband,
 				Parameters:      nil,
-				ResourceVersion: 0, // resource version is set by the store
+				ResourceVersion: 1,
 				State:           ptypes.Active,
 				Status:          []byte("{'foo': 'bar'}"),
 			},
-			"",
+			nil,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got, err := tt.update.MergeExisting(tt.existing)
-			if err != nil {
-				assert.Contains(t, err.Error(), tt.wantErrContains)
-				return
+			if tt.wantErr != nil {
+				require.Error(t, err, "no error when one is expected")
+				require.Equal(t, tt.wantErr, err, "error does not match expectation")
+			} else {
+				require.NoError(t, err, "unexpected error")
+				require.Equal(t, tt.want, got, "received does not match expected")
 			}
-
-			if tt.wantErrContains != "" {
-				t.Error("expected error, got none")
-				return
-			}
-
-			assert.Equal(t, tt.want, got)
 		})
 	}
 }

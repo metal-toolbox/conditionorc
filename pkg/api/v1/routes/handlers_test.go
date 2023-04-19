@@ -82,6 +82,22 @@ func TestServerConditionUpdate(t *testing.T) {
 		t.Error(err)
 	}
 
+	updateNoState, err := json.Marshal(&v1types.ConditionUpdate{
+		Status:          []byte(`{"hi": "there"}`),
+		ResourceVersion: int64(1),
+	})
+	if err != nil {
+		t.Error(err)
+	}
+
+	updateNoStatus, err := json.Marshal(&v1types.ConditionUpdate{
+		State:           ptypes.Active,
+		ResourceVersion: int64(1),
+	})
+	if err != nil {
+		t.Error(err)
+	}
+
 	updateValid := v1types.ConditionUpdate{
 		State:           ptypes.Active,
 		Status:          []byte(`{"foo": "bar"}`),
@@ -157,9 +173,47 @@ func TestServerConditionUpdate(t *testing.T) {
 			},
 			func(t *testing.T, r *httptest.ResponseRecorder) {
 				assert.Equal(t, http.StatusBadRequest, r.Code)
-				assert.Contains(t, string(asBytes(t, r.Body)), "invalid ConditionUpdate payload")
+				responseBody := string(asBytes(t, r.Body))
+				assert.Contains(t, responseBody, "invalid ConditionUpdate payload")
 			},
 		},
+		{
+			"update with no state returns an error",
+			nil,
+			func(t *testing.T) *http.Request {
+				url := fmt.Sprintf("/api/v1/servers/%s/condition/%s", serverID.String(), ptypes.FirmwareInstallOutofband)
+				request, err := http.NewRequestWithContext(context.TODO(), http.MethodPut, url, bytes.NewReader(updateNoState))
+				if err != nil {
+					t.Fatal(err)
+				}
+
+				return request
+			},
+			func(t *testing.T, r *httptest.ResponseRecorder) {
+				assert.Equal(t, http.StatusBadRequest, r.Code)
+				responseBody := string(asBytes(t, r.Body))
+				assert.Contains(t, responseBody, "invalid ConditionUpdate payload")
+			},
+		},
+		{
+			"update with no status returns an error",
+			nil,
+			func(t *testing.T) *http.Request {
+				url := fmt.Sprintf("/api/v1/servers/%s/condition/%s", serverID.String(), ptypes.FirmwareInstallOutofband)
+				request, err := http.NewRequestWithContext(context.TODO(), http.MethodPut, url, bytes.NewReader(updateNoStatus))
+				if err != nil {
+					t.Fatal(err)
+				}
+
+				return request
+			},
+			func(t *testing.T, r *httptest.ResponseRecorder) {
+				assert.Equal(t, http.StatusBadRequest, r.Code)
+				responseBody := string(asBytes(t, r.Body))
+				assert.Contains(t, responseBody, "invalid ConditionUpdate payload")
+			},
+		},
+
 		{
 			"update on non existing server condition returns error",
 			// mock repository
@@ -321,10 +375,7 @@ func TestServerConditionCreate(t *testing.T) {
 			"valid server condition created",
 			// mock repository
 			func(r *store.MockRepository) {
-				parametersJSON, err := json.Marshal(json.RawMessage(`{"some param": "1"}`))
-				if err != nil {
-					t.Error()
-				}
+				parametersJSON, _ := json.Marshal(json.RawMessage(`{"some param": "1"}`))
 
 				// lookup for an existing condition
 				r.EXPECT().
@@ -350,16 +401,15 @@ func TestServerConditionCreate(t *testing.T) {
 					Create(
 						gomock.Any(),
 						gomock.Eq(serverID),
-						gomock.Eq(
-							&ptypes.Condition{
-								Version:    ptypes.ConditionStructVersion,
-								Kind:       ptypes.FirmwareInstallOutofband,
-								Parameters: parametersJSON,
-								State:      ptypes.Pending,
-							},
-						),
+						gomock.Any(),
 					).
-					Return(nil).
+					DoAndReturn(func(_ context.Context, _ uuid.UUID, c *ptypes.Condition) error {
+						assert.Equal(t, ptypes.ConditionStructVersion, c.Version, "condition version mismatch")
+						assert.Equal(t, ptypes.FirmwareInstallOutofband, c.Kind, "condition kind mismatch")
+						assert.Equal(t, json.RawMessage(parametersJSON), c.Parameters, "condition parameters mismatch")
+						assert.Equal(t, ptypes.Pending, c.State, "condition state mismatch")
+						return nil
+					}).
 					Times(1)
 			},
 			func(t *testing.T) *http.Request {
@@ -425,16 +475,15 @@ func TestServerConditionCreate(t *testing.T) {
 					Create(
 						gomock.Any(),
 						gomock.Eq(serverID),
-						gomock.Eq(
-							&ptypes.Condition{
-								Version:    ptypes.ConditionStructVersion,
-								Kind:       ptypes.FirmwareInstallOutofband,
-								Parameters: parametersJSON,
-								State:      ptypes.Pending,
-							},
-						),
+						gomock.Any(),
 					).
-					Return(nil).
+					DoAndReturn(func(_ context.Context, _ uuid.UUID, c *ptypes.Condition) error {
+						assert.Equal(t, ptypes.ConditionStructVersion, c.Version, "condition version mismatch")
+						assert.Equal(t, ptypes.FirmwareInstallOutofband, c.Kind, "condition kind mismatch")
+						assert.Equal(t, json.RawMessage(parametersJSON), c.Parameters, "condition parameters mismatch")
+						assert.Equal(t, ptypes.Pending, c.State, "condition state mismatch")
+						return nil
+					}).
 					Times(1)
 			},
 			func(t *testing.T) *http.Request {
