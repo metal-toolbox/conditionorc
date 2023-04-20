@@ -9,6 +9,7 @@ import (
 	"github.com/metal-toolbox/conditionorc/pkg/api/v1/routes"
 	ptypes "github.com/metal-toolbox/conditionorc/pkg/types"
 	"github.com/pkg/errors"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/sirupsen/logrus"
 	ginlogrus "github.com/toorop/gin-logrus"
 	"go.hollow.sh/toolbox/events"
@@ -82,6 +83,8 @@ func New(opts ...Option) *http.Server {
 	g.Use(ginlogrus.Logger(s.logger), gin.Recovery())
 
 	g.GET("/healthz/readiness", s.ping)
+
+	g.GET("/metrics", gin.WrapH(promhttp.Handler()))
 
 	options := []routes.Option{
 		routes.WithLogger(s.logger),
