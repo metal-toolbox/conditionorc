@@ -8,6 +8,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/metal-toolbox/conditionorc/internal/app"
+	"github.com/metal-toolbox/conditionorc/internal/metrics"
 	ptypes "github.com/metal-toolbox/conditionorc/pkg/types"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -36,6 +37,10 @@ var (
 	// ServerserviceConditionsNSFmtStr attribute namespace format string value for server condition attributes.
 	ServerserviceConditionsNSFmtStr = "sh.hollow.condition.%s"
 )
+
+func serverServiceError() {
+	metrics.DependencyError("serverservice")
+}
 
 func newServerserviceStore(config *app.ServerserviceOptions, conditionDefs ptypes.ConditionDefinitions, logger *logrus.Logger) (Repository, error) {
 	s := &Serverservice{logger: logger, conditionDefinitions: conditionDefs, config: config}
@@ -68,12 +73,24 @@ func (s *Serverservice) Get(ctx context.Context, serverID uuid.UUID, conditionKi
 		if strings.Contains(err.Error(), "404") {
 			return nil, ErrConditionNotFound
 		}
-
+		s.logger.WithFields(logrus.Fields{
+			"serverID": serverID.String(),
+			"kind":     conditionKind,
+			"error":    err,
+			"method":   "Get",
+		}).Warn("error reaching serverservice")
+		serverServiceError()
 		return nil, errors.Wrap(ErrServerserviceQuery, err.Error())
 	}
 
 	if attributes == nil {
-		return nil, ErrConditionNotFound
+		// XXX: is this a realistic failure case?
+		s.logger.WithFields(logrus.Fields{
+			"serverID": serverID.String(),
+			"kind":     conditionKind,
+		}).Warn("malformed condition data")
+		serverServiceError()
+		return nil, ErrMalformedCondition
 	}
 
 	// return condition object from attribute
@@ -92,7 +109,13 @@ func (s *Serverservice) List(ctx context.Context, serverID uuid.UUID, conditionS
 			if strings.Contains(err.Error(), "404") {
 				continue
 			}
-
+			s.logger.WithFields(logrus.Fields{
+				"serverID": serverID.String(),
+				"kind":     condition.Kind,
+				"error":    err,
+				"method":   "List",
+			}).Warn("error reaching serverservice")
+			serverServiceError()
 			return nil, errors.Wrap(ErrServerserviceQuery, err.Error())
 		}
 
@@ -122,7 +145,14 @@ func (s *Serverservice) Create(ctx context.Context, serverID uuid.UUID, conditio
 	}
 
 	_, err = s.client.CreateAttributes(ctx, serverID, data)
-
+	if err != nil {
+		s.logger.WithFields(logrus.Fields{
+			"serverID": serverID.String(),
+			"kind":     condition.Kind,
+			"error":    err,
+		}).Warn("error creating condition")
+		serverServiceError()
+	}
 	return err
 }
 
@@ -140,10 +170,22 @@ func (s *Serverservice) Update(ctx context.Context, serverID uuid.UUID, conditio
 	}
 
 	_, err = s.client.UpdateAttributes(ctx, serverID, s.conditionNS(condition.Kind), payload)
-	if err != nil && strings.Contains(err.Error(), "404") {
-		return ErrConditionNotFound
+	if err != nil {
+		if strings.Contains(err.Error(), "404") {
+			s.logger.WithFields(logrus.Fields{
+				"serverID": serverID.String(),
+				"kind":     condition.Kind,
+				"method":   "Update",
+			}).Warn("no condition match for this server")
+			return ErrConditionNotFound
+		}
+		s.logger.WithFields(logrus.Fields{
+			"serverID": serverID.String(),
+			"kind":     condition.Kind,
+			"error":    err,
+		}).Warn("error updating condition")
+		serverServiceError()
 	}
-
 	return err
 }
 
@@ -152,10 +194,22 @@ func (s *Serverservice) Update(ctx context.Context, serverID uuid.UUID, conditio
 // @conditionKind: required
 func (s *Serverservice) Delete(ctx context.Context, serverID uuid.UUID, conditionKind ptypes.ConditionKind) error {
 	_, err := s.client.DeleteAttributes(ctx, serverID, s.conditionNS(conditionKind))
-	if err != nil && strings.Contains(err.Error(), "404") {
-		return ErrConditionNotFound
+	if err != nil {
+		if strings.Contains(err.Error(), "404") {
+			s.logger.WithFields(logrus.Fields{
+				"serverID": serverID.String(),
+				"kind":     conditionKind,
+				"method":   "Delete",
+			}).Warn("no condition match for this server")
+			return ErrConditionNotFound
+		}
+		s.logger.WithFields(logrus.Fields{
+			"serverID": serverID.String(),
+			"kind":     conditionKind,
+			"error":    err,
+		}).Warn("error deleting condition")
+		serverServiceError()
 	}
-
 	return err
 }
 
@@ -175,6 +229,12 @@ func (s *Serverservice) ListServersWithCondition(ctx context.Context, conditionK
 
 	_, _, err := s.client.List(ctx, params)
 	if err != nil {
+		s.logger.WithFields(logrus.Fields{
+			"kind":  conditionKind,
+			"state": conditionState,
+			"error": err,
+		}).Warn("error listing servers")
+		serverServiceError()
 		return nil, err
 	}
 
