@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/google/uuid"
+	"github.com/metal-toolbox/conditionorc/internal/metrics"
 	"github.com/metal-toolbox/conditionorc/internal/store"
 	ptypes "github.com/metal-toolbox/conditionorc/pkg/types"
 	"github.com/pkg/errors"
@@ -16,6 +17,10 @@ import (
 var (
 	ErrPublishEvent = errors.New("error publishing event")
 )
+
+func eventsError() {
+	metrics.DependencyError("events")
+}
 
 // Orchestrator type holds attributes of the condition orchestrator service
 type Orchestrator struct {
@@ -150,7 +155,7 @@ func (o *Orchestrator) handleHollowEvent(ctx context.Context, event *pubsubx.Mes
 			o.logger.WithFields(
 				logrus.Fields{"err": err.Error()},
 			).Error("error creating condition on server")
-
+			eventsError()
 			return
 		}
 
@@ -158,7 +163,7 @@ func (o *Orchestrator) handleHollowEvent(ctx context.Context, event *pubsubx.Mes
 			o.logger.WithFields(
 				logrus.Fields{"err": errPublish.Error()},
 			).Error("condition publish returned an error")
-
+			eventsError()
 			return
 		}
 
@@ -183,10 +188,16 @@ func (o *Orchestrator) publishCondition(ctx context.Context, serverID uuid.UUID,
 	if err := o.streamBroker.PublishAsyncWithContext(
 		ctx,
 		events.ResourceType(ptypes.ServerResourceType),
-		events.EventType(ptypes.InventoryOutofband),
+		events.EventType(ptypes.InventoryOutofband), // XXX: is this right?
 		serverID.String(),
 		condition,
 	); err != nil {
+		o.logger.WithFields(logrus.Fields{
+			"error":       err,
+			"conditionID": condition.ID.String(),
+			"kind":        condition.Kind,
+		}).Warn("error publishing condition")
+		eventsError()
 		return errors.Wrap(ErrPublishEvent, err.Error())
 	}
 
