@@ -322,7 +322,6 @@ func (r *Routes) serverConditionDelete(c *gin.Context) (int, *v1types.ServerResp
 		}
 	}
 
-	// TODO (vc): the repository Delete route should take a condition id
 	if err := r.repository.Delete(c.Request.Context(), serverID, kind); err != nil {
 		r.logger.WithFields(logrus.Fields{
 			"serverID": serverID.String(),
