@@ -19,7 +19,7 @@ func init() {
 	dependencyErrorCount = promauto.NewCounterVec(
 		prometheus.CounterOpts{
 			Namespace: "conditionorc",
-			Subsystem: "depencencies",
+			Subsystem: "dependencies",
 			Name:      "errors_total",
 			Help:      "a count of all errors attempting to reach conditionorc dependencies",
 		}, []string{
@@ -49,8 +49,8 @@ func DependencyError(name string) {
 }
 
 // APICallEpilog observes the results and latency of an API call
-func APICallEpilog(start time.Time, endpoint string, response_code int) {
-	code := strconv.Itoa(response_code)
-	elapsed := time.Now().Sub(start).Seconds()
+func APICallEpilog(start time.Time, endpoint string, responseCode int) {
+	code := strconv.Itoa(responseCode)
+	elapsed := time.Since(start).Seconds()
 	apiLatencySeconds.WithLabelValues(endpoint, code).Observe(elapsed)
 }

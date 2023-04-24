@@ -76,9 +76,9 @@ func wrapAPICall(fn apiHandler) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		start := time.Now()
 		endpoint := ctx.FullPath()
-		response_code, obj := fn(ctx)
-		ctx.JSON(response_code, obj)
-		metrics.APICallEpilog(start, endpoint, response_code)
+		responseCode, obj := fn(ctx)
+		ctx.JSON(responseCode, obj)
+		metrics.APICallEpilog(start, endpoint, responseCode)
 	}
 }
 
