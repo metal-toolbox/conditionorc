@@ -25,7 +25,7 @@ type App struct {
 	Logger *logrus.Logger
 }
 
-// New returns returns a new instance of the flasher app
+// New returns returns a new instance of the conditionorc app
 func New(_ context.Context, appKind model.AppKind, cfgFile string, loglevel model.LogLevel) (*App, <-chan os.Signal, error) {
 	app := &App{
 		v:       viper.New(),

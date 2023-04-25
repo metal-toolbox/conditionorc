@@ -45,7 +45,7 @@ type Configuration struct {
 	// EventsBrokerKind indicates the kind of event broker configuration to enable,
 	//
 	// Supported parameter value - nats
-	EventsBorkerKind model.EventBrokerKind `mapstructure:"events_broker_kind"`
+	EventsBrokerKind model.EventBrokerKind `mapstructure:"events_broker_kind"`
 
 	// NatsOptions defines the NATs events broker configuration parameters.
 	//
@@ -114,7 +114,7 @@ func (a *App) envVarOverrides() error {
 		return errors.Wrap(ErrConfig, "expected one or more condition definitions")
 	}
 
-	if a.Config.EventsBorkerKind == model.NatsEventBroker {
+	if a.Config.EventsBrokerKind == model.NatsEventBroker {
 		if err := a.envVarNatsOverrides(); err != nil {
 			return err
 		}

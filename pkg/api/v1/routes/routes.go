@@ -2,9 +2,12 @@ package routes
 
 import (
 	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/metal-toolbox/conditionorc/internal/metrics"
 	"github.com/metal-toolbox/conditionorc/internal/store"
+	v1types "github.com/metal-toolbox/conditionorc/pkg/api/v1/types"
 	ptypes "github.com/metal-toolbox/conditionorc/pkg/types"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -63,6 +66,22 @@ func WithConditionDefinitions(defs ptypes.ConditionDefinitions) Option {
 	}
 }
 
+// apiHandler is a function that performs real work for the ConditionOrc API
+type apiHandler func(c *gin.Context) (int, *v1types.ServerResponse)
+
+// wrapAPICall wraps a conditionorc routine that does work with some prometheus
+// metrics collection and returns a gin.HandlerFunc so the middleware can execute
+// directly
+func wrapAPICall(fn apiHandler) gin.HandlerFunc {
+	return func(ctx *gin.Context) {
+		start := time.Now()
+		endpoint := ctx.FullPath()
+		responseCode, obj := fn(ctx)
+		ctx.JSON(responseCode, obj)
+		metrics.APICallEpilog(start, endpoint, responseCode)
+	}
+}
+
 // NewRoutes returns a new conditionorc API routes with handlers registered.
 func NewRoutes(options ...Option) (*Routes, error) {
 	routes := &Routes{}
@@ -92,21 +111,21 @@ func (r *Routes) Routes(g *gin.RouterGroup) {
 		// /servers/:uuid/state/:conditionState
 		serverCondition := servers.Group("/state")
 
-		serverCondition.GET("/:conditionState", r.serverConditionList)
+		serverCondition.GET("/:conditionState", wrapAPICall(r.serverConditionList))
 
 		// /servers/:uuid/condition/:conditionKind
 		serverConditionBySlug := servers.Group("/condition")
 
 		// List condition on a server.
-		serverConditionBySlug.GET("/:conditionKind", r.serverConditionGet)
+		serverConditionBySlug.GET("/:conditionKind", wrapAPICall(r.serverConditionGet))
 
 		// Create a condition on a server.
-		serverConditionBySlug.POST("/:conditionKind", r.serverConditionCreate)
+		serverConditionBySlug.POST("/:conditionKind", wrapAPICall(r.serverConditionCreate))
 
 		// Update an existing condition attributes on a server.
-		serverConditionBySlug.PUT("/:conditionKind", r.serverConditionUpdate)
+		serverConditionBySlug.PUT("/:conditionKind", wrapAPICall(r.serverConditionUpdate))
 
 		// Remove a condition from a server.
-		serverConditionBySlug.DELETE("/:conditionKind", r.serverConditionDelete)
+		serverConditionBySlug.DELETE("/:conditionKind", wrapAPICall(r.serverConditionDelete))
 	}
 }
