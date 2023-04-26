@@ -12,10 +12,12 @@ import (
 	"go.hollow.sh/toolbox/events"
 	"go.infratographer.com/x/pubsubx"
 	"go.infratographer.com/x/urnx"
+	"go.opentelemetry.io/otel"
 )
 
 var (
 	ErrPublishEvent = errors.New("error publishing event")
+	pkgName         = "internal/orchestrator"
 )
 
 func eventsError() {
@@ -94,6 +96,9 @@ func (o *Orchestrator) Run(ctx context.Context) {
 }
 
 func (o *Orchestrator) processMsg(ctx context.Context, msg events.Message) {
+	otelCtx, span := otel.Tracer(pkgName).Start(ctx, "processMsg")
+	defer span.End()
+
 	data, err := msg.Data()
 	if err != nil {
 		o.logger.WithFields(
@@ -122,9 +127,9 @@ func (o *Orchestrator) processMsg(ctx context.Context, msg events.Message) {
 
 	switch urn.Namespace {
 	case "hollow":
-		o.handleHollowEvent(ctx, data, urn)
+		o.handleHollowEvent(otelCtx, data, urn)
 	case "hollow-controllers":
-		o.handleHollowControllerEvent(ctx, data, urn)
+		o.handleHollowControllerEvent(otelCtx, data, urn)
 	default:
 		if errAck := msg.Ack(); errAck != nil {
 			o.logger.Warn(errAck)
@@ -136,13 +141,17 @@ func (o *Orchestrator) processMsg(ctx context.Context, msg events.Message) {
 	}
 }
 
-func (o *Orchestrator) handleHollowControllerEvent(_ context.Context, event *pubsubx.Message, urn *urnx.URN) {
+func (o *Orchestrator) handleHollowControllerEvent(ctx context.Context, event *pubsubx.Message, urn *urnx.URN) {
+	_, span := otel.Tracer(pkgName).Start(ctx, "handleHollowControllerEvent")
+	defer span.End()
 	o.logger.WithFields(
 		logrus.Fields{"source": event.Source, "resource": urn.ResourceType},
 	).Debug("controller reply handler not implemented, event dropped")
 }
 
 func (o *Orchestrator) handleHollowEvent(ctx context.Context, event *pubsubx.Message, urn *urnx.URN) {
+	otelCtx, span := otel.Tracer(pkgName).Start(ctx, "handleHollowEvent")
+	defer span.End()
 	switch event.EventType {
 	case string(events.Create):
 		condition := &ptypes.Condition{
@@ -151,7 +160,7 @@ func (o *Orchestrator) handleHollowEvent(ctx context.Context, event *pubsubx.Mes
 			Exclusive: false,
 		}
 
-		if err := o.repository.Create(ctx, urn.ResourceID, condition); err != nil {
+		if err := o.repository.Create(otelCtx, urn.ResourceID, condition); err != nil {
 			o.logger.WithFields(
 				logrus.Fields{"err": err.Error()},
 			).Error("error creating condition on server")
@@ -159,7 +168,7 @@ func (o *Orchestrator) handleHollowEvent(ctx context.Context, event *pubsubx.Mes
 			return
 		}
 
-		if errPublish := o.publishCondition(ctx, urn.ResourceID, condition); errPublish != nil {
+		if errPublish := o.publishCondition(otelCtx, urn.ResourceID, condition); errPublish != nil {
 			o.logger.WithFields(
 				logrus.Fields{"err": errPublish.Error()},
 			).Error("condition publish returned an error")
@@ -181,12 +190,14 @@ func (o *Orchestrator) handleHollowEvent(ctx context.Context, event *pubsubx.Mes
 }
 
 func (o *Orchestrator) publishCondition(ctx context.Context, serverID uuid.UUID, condition *ptypes.Condition) error {
+	otelCtx, span := otel.Tracer(pkgName).Start(ctx, "publishCondition")
+	defer span.End()
 	if o.streamBroker == nil {
 		return errors.Wrap(ErrPublishEvent, "not connected to event stream")
 	}
 
 	if err := o.streamBroker.PublishAsyncWithContext(
-		ctx,
+		otelCtx,
 		events.ResourceType(ptypes.ServerResourceType),
 		events.EventType(ptypes.InventoryOutofband), // XXX: is this right?
 		serverID.String(),

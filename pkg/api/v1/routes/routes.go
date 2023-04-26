@@ -19,6 +19,8 @@ const (
 	PathPrefix = "/api/v1"
 )
 
+var pkgName = "pkg/api/v1/routes"
+
 // Routes type sets up the conditionorc API  router routes.
 type Routes struct {
 	authMW               *ginjwt.Middleware
