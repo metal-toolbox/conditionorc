@@ -11,6 +11,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"go.hollow.sh/toolbox/events"
+	"go.opentelemetry.io/otel"
 
 	"github.com/metal-toolbox/conditionorc/internal/store"
 	v1types "github.com/metal-toolbox/conditionorc/pkg/api/v1/types"
@@ -28,6 +29,8 @@ func (r *Routes) conditionKindValid(kind ptypes.ConditionKind) bool {
 }
 
 func (r *Routes) serverConditionUpdate(c *gin.Context) (int, *v1types.ServerResponse) {
+	otelCtx, span := otel.Tracer(pkgName).Start(c.Request.Context(), "Routes.serverConditionUpdate")
+	defer span.End()
 	// XXX: should "uuid" be "server-uuid" or something?
 	serverID, err := uuid.Parse(c.Param("uuid"))
 	if err != nil {
@@ -80,7 +83,7 @@ func (r *Routes) serverConditionUpdate(c *gin.Context) (int, *v1types.ServerResp
 	}
 
 	// query existing condition
-	existing, err := r.repository.Get(c.Request.Context(), serverID, kind)
+	existing, err := r.repository.Get(otelCtx, serverID, kind)
 	if err != nil {
 		r.logger.WithFields(logrus.Fields{
 			"error":    err,
@@ -127,7 +130,7 @@ func (r *Routes) serverConditionUpdate(c *gin.Context) (int, *v1types.ServerResp
 	}
 
 	// update
-	if err := r.repository.Update(c.Request.Context(), serverID, update); err != nil {
+	if err := r.repository.Update(otelCtx, serverID, update); err != nil {
 		r.logger.WithFields(logrus.Fields{
 			"error":             err,
 			"serverID":          serverID,
@@ -144,6 +147,8 @@ func (r *Routes) serverConditionUpdate(c *gin.Context) (int, *v1types.ServerResp
 }
 
 func (r *Routes) serverConditionCreate(c *gin.Context) (int, *v1types.ServerResponse) {
+	otelCtx, span := otel.Tracer(pkgName).Start(c.Request.Context(), "Routes.serverConditionUpdate")
+	defer span.End()
 	serverID, err := uuid.Parse(c.Param("uuid"))
 	if err != nil {
 		r.logger.WithFields(logrus.Fields{
@@ -180,7 +185,7 @@ func (r *Routes) serverConditionCreate(c *gin.Context) (int, *v1types.ServerResp
 	condition := conditionCreate.NewCondition(kind)
 
 	// check the condition doesn't already exist in an incomplete state
-	existing, err := r.repository.Get(c.Request.Context(), serverID, kind)
+	existing, err := r.repository.Get(otelCtx, serverID, kind)
 	if err != nil && !errors.Is(err, store.ErrConditionNotFound) {
 		r.logger.WithFields(logrus.Fields{
 			"error":    err,
@@ -207,7 +212,7 @@ func (r *Routes) serverConditionCreate(c *gin.Context) (int, *v1types.ServerResp
 
 	// purge the existing condition
 	if existing != nil {
-		err = r.repository.Delete(c.Request.Context(), serverID, kind)
+		err = r.repository.Delete(otelCtx, serverID, kind)
 		if err != nil && !errors.Is(err, store.ErrConditionNotFound) {
 			r.logger.WithFields(logrus.Fields{
 				"error": err,
@@ -222,7 +227,7 @@ func (r *Routes) serverConditionCreate(c *gin.Context) (int, *v1types.ServerResp
 	// XXX: if this is a check for another condition holding a lock is there a way to do this without
 	// iterating all conditions?
 	// check if any condition with exclusive set is in incomplete states
-	if errEx := r.exclusiveNonFinalConditionExists(c.Request.Context(), serverID); errEx != nil {
+	if errEx := r.exclusiveNonFinalConditionExists(otelCtx, serverID); errEx != nil {
 		if errors.Is(errEx, ErrConditionExclusive) {
 			r.logger.WithFields(logrus.Fields{
 				"error": err,
@@ -244,7 +249,7 @@ func (r *Routes) serverConditionCreate(c *gin.Context) (int, *v1types.ServerResp
 	}
 
 	// Create the new condition
-	err = r.repository.Create(c.Request.Context(), serverID, condition)
+	err = r.repository.Create(otelCtx, serverID, condition)
 	if err != nil {
 		r.logger.WithFields(logrus.Fields{
 			"error": err,
@@ -257,7 +262,7 @@ func (r *Routes) serverConditionCreate(c *gin.Context) (int, *v1types.ServerResp
 
 	// XXX: this operation can't ignore errors
 	// publish the condition
-	r.publishCondition(c.Request.Context(), serverID, condition)
+	r.publishCondition(otelCtx, serverID, condition)
 
 	return http.StatusOK, &v1types.ServerResponse{
 		Message: "condition set",
@@ -265,12 +270,14 @@ func (r *Routes) serverConditionCreate(c *gin.Context) (int, *v1types.ServerResp
 }
 
 func (r *Routes) exclusiveNonFinalConditionExists(ctx context.Context, serverID uuid.UUID) error {
+	otelCtx, span := otel.Tracer(pkgName).Start(ctx, "Routes.exclusiveNonFinalConditionExists")
+	defer span.End()
 	for _, state := range ptypes.ConditionStates() {
 		if ptypes.ConditionStateIsComplete(state) {
 			continue
 		}
 
-		existing, err := r.repository.List(ctx, serverID, state)
+		existing, err := r.repository.List(otelCtx, serverID, state)
 		if err != nil && !errors.Is(err, store.ErrConditionNotFound) {
 			r.logger.WithFields(logrus.Fields{
 				"serverID": serverID.String(),
@@ -300,6 +307,8 @@ func (r *Routes) exclusiveNonFinalConditionExists(ctx context.Context, serverID 
 }
 
 func (r *Routes) serverConditionDelete(c *gin.Context) (int, *v1types.ServerResponse) {
+	otelCtx, span := otel.Tracer(pkgName).Start(c.Request.Context(), "Routes.serverConditionDelete")
+	defer span.End()
 	serverID, err := uuid.Parse(c.Param("uuid"))
 	if err != nil {
 		r.logger.WithFields(logrus.Fields{
@@ -322,7 +331,7 @@ func (r *Routes) serverConditionDelete(c *gin.Context) (int, *v1types.ServerResp
 		}
 	}
 
-	if err := r.repository.Delete(c.Request.Context(), serverID, kind); err != nil {
+	if err := r.repository.Delete(otelCtx, serverID, kind); err != nil {
 		r.logger.WithFields(logrus.Fields{
 			"serverID": serverID.String(),
 			"kind":     kind,
@@ -340,6 +349,8 @@ func (r *Routes) serverConditionDelete(c *gin.Context) (int, *v1types.ServerResp
 }
 
 func (r *Routes) serverConditionList(c *gin.Context) (int, *v1types.ServerResponse) {
+	otelCtx, span := otel.Tracer(pkgName).Start(c.Request.Context(), "Routes.serverConditionList")
+	defer span.End()
 	serverID, err := uuid.Parse(c.Param("uuid"))
 	if err != nil {
 		return http.StatusBadRequest, &v1types.ServerResponse{Message: err.Error()}
@@ -353,7 +364,7 @@ func (r *Routes) serverConditionList(c *gin.Context) (int, *v1types.ServerRespon
 		}
 	}
 
-	found, err := r.repository.List(c.Request.Context(), serverID, state)
+	found, err := r.repository.List(otelCtx, serverID, state)
 	if err != nil {
 		return http.StatusInternalServerError, &v1types.ServerResponse{
 			Message: err.Error(),
@@ -375,6 +386,8 @@ func (r *Routes) serverConditionList(c *gin.Context) (int, *v1types.ServerRespon
 }
 
 func (r *Routes) serverConditionGet(c *gin.Context) (int, *v1types.ServerResponse) {
+	otelCtx, span := otel.Tracer(pkgName).Start(c.Request.Context(), "Routes.serverConditionGet")
+	defer span.End()
 	serverID, err := uuid.Parse(c.Param("uuid"))
 	if err != nil {
 		return http.StatusBadRequest, &v1types.ServerResponse{
@@ -389,7 +402,7 @@ func (r *Routes) serverConditionGet(c *gin.Context) (int, *v1types.ServerRespons
 		}
 	}
 
-	found, err := r.repository.Get(c.Request.Context(), serverID, kind)
+	found, err := r.repository.Get(otelCtx, serverID, kind)
 	if err != nil {
 		if errors.Is(err, store.ErrConditionNotFound) {
 			return http.StatusNotFound, &v1types.ServerResponse{
@@ -419,13 +432,15 @@ func (r *Routes) serverConditionGet(c *gin.Context) (int, *v1types.ServerRespons
 }
 
 func (r *Routes) publishCondition(ctx context.Context, serverID uuid.UUID, condition *ptypes.Condition) {
+	otelCtx, span := otel.Tracer(pkgName).Start(ctx, "Routes.publishCondition")
+	defer span.End()
 	if r.streamBroker == nil {
 		r.logger.Warn("Event publish skipped, not connected to stream broker")
 		return
 	}
 
 	if err := r.streamBroker.PublishAsyncWithContext(
-		ctx,
+		otelCtx,
 		events.ResourceType(ptypes.ServerResourceType),
 		events.EventType(condition.Kind),
 		serverID.String(),

@@ -12,6 +12,7 @@ import (
 	ptypes "github.com/metal-toolbox/conditionorc/pkg/types"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
+	"go.opentelemetry.io/otel"
 
 	sservice "go.hollow.sh/serverservice/pkg/api/v1"
 )
@@ -36,6 +37,8 @@ var (
 
 	// ServerserviceConditionsNSFmtStr attribute namespace format string value for server condition attributes.
 	ServerserviceConditionsNSFmtStr = "sh.hollow.condition.%s"
+
+	pkgName = "internal/store"
 )
 
 func serverServiceError() {
@@ -66,9 +69,12 @@ func (s *Serverservice) Ping(_ context.Context) error {
 // Get a condition set on a server.
 // @id: required
 // @conditionKind: required
-func (s *Serverservice) Get(ctx context.Context, serverID uuid.UUID, conditionKind ptypes.ConditionKind) (*ptypes.Condition, error) {
+func (s *Serverservice) Get(ctx context.Context, serverID uuid.UUID,
+	conditionKind ptypes.ConditionKind) (*ptypes.Condition, error) {
+	otelCtx, span := otel.Tracer(pkgName).Start(ctx, "Serverservice.Get")
+	defer span.End()
 	// list attributes on a server
-	attributes, _, err := s.client.GetAttributes(ctx, serverID, s.conditionNS(conditionKind))
+	attributes, _, err := s.client.GetAttributes(otelCtx, serverID, s.conditionNS(conditionKind))
 	if err != nil {
 		if strings.Contains(err.Error(), "404") {
 			return nil, ErrConditionNotFound
@@ -100,11 +106,14 @@ func (s *Serverservice) Get(ctx context.Context, serverID uuid.UUID, conditionKi
 // List all conditions set on a server.
 // @id: required
 // @conditionState: optional
-func (s *Serverservice) List(ctx context.Context, serverID uuid.UUID, conditionState ptypes.ConditionState) ([]*ptypes.Condition, error) {
+func (s *Serverservice) List(ctx context.Context, serverID uuid.UUID,
+	conditionState ptypes.ConditionState) ([]*ptypes.Condition, error) {
+	otelCtx, span := otel.Tracer(pkgName).Start(ctx, "Serverservice.List")
+	defer span.End()
 	found := []*sservice.Attributes{}
 
 	for _, condition := range s.conditionDefinitions {
-		attr, _, err := s.client.GetAttributes(ctx, serverID, s.conditionNS(condition.Kind))
+		attr, _, err := s.client.GetAttributes(otelCtx, serverID, s.conditionNS(condition.Kind))
 		if err != nil {
 			if strings.Contains(err.Error(), "404") {
 				continue
@@ -132,6 +141,8 @@ func (s *Serverservice) List(ctx context.Context, serverID uuid.UUID, conditionS
 //
 // Note: its upto the caller to validate the condition payload and to delete any existing condition before creating.
 func (s *Serverservice) Create(ctx context.Context, serverID uuid.UUID, condition *ptypes.Condition) error {
+	otelCtx, span := otel.Tracer(pkgName).Start(ctx, "Serverservice.Create")
+	defer span.End()
 	condition.ResourceVersion = time.Now().UnixNano()
 
 	payload, err := json.Marshal(condition)
@@ -144,7 +155,7 @@ func (s *Serverservice) Create(ctx context.Context, serverID uuid.UUID, conditio
 		Data:      payload,
 	}
 
-	_, err = s.client.CreateAttributes(ctx, serverID, data)
+	_, err = s.client.CreateAttributes(otelCtx, serverID, data)
 	if err != nil {
 		s.logger.WithFields(logrus.Fields{
 			"serverID": serverID.String(),
@@ -162,6 +173,8 @@ func (s *Serverservice) Create(ctx context.Context, serverID uuid.UUID, conditio
 //
 // Note: its upto the caller to validate the condition update payload.
 func (s *Serverservice) Update(ctx context.Context, serverID uuid.UUID, condition *ptypes.Condition) error {
+	otelCtx, span := otel.Tracer(pkgName).Start(ctx, "Serverservice.Update")
+	defer span.End()
 	condition.ResourceVersion = time.Now().UnixNano()
 
 	payload, err := json.Marshal(condition)
@@ -169,7 +182,7 @@ func (s *Serverservice) Update(ctx context.Context, serverID uuid.UUID, conditio
 		return errors.Wrap(ErrServerserviceAttribute, err.Error())
 	}
 
-	_, err = s.client.UpdateAttributes(ctx, serverID, s.conditionNS(condition.Kind), payload)
+	_, err = s.client.UpdateAttributes(otelCtx, serverID, s.conditionNS(condition.Kind), payload)
 	if err != nil {
 		if strings.Contains(err.Error(), "404") {
 			s.logger.WithFields(logrus.Fields{
@@ -193,7 +206,9 @@ func (s *Serverservice) Update(ctx context.Context, serverID uuid.UUID, conditio
 // @id: required
 // @conditionKind: required
 func (s *Serverservice) Delete(ctx context.Context, serverID uuid.UUID, conditionKind ptypes.ConditionKind) error {
-	_, err := s.client.DeleteAttributes(ctx, serverID, s.conditionNS(conditionKind))
+	otelCtx, span := otel.Tracer(pkgName).Start(ctx, "Serverservice.Delete")
+	defer span.End()
+	_, err := s.client.DeleteAttributes(otelCtx, serverID, s.conditionNS(conditionKind))
 	if err != nil {
 		if strings.Contains(err.Error(), "404") {
 			s.logger.WithFields(logrus.Fields{
@@ -214,7 +229,10 @@ func (s *Serverservice) Delete(ctx context.Context, serverID uuid.UUID, conditio
 }
 
 // ListServersWithCondition lists servers with the given condition kind.
-func (s *Serverservice) ListServersWithCondition(ctx context.Context, conditionKind ptypes.ConditionKind, conditionState ptypes.ConditionState) ([]*ptypes.ServerConditions, error) {
+func (s *Serverservice) ListServersWithCondition(ctx context.Context,
+	conditionKind ptypes.ConditionKind, conditionState ptypes.ConditionState) ([]*ptypes.ServerConditions, error) {
+	otelCtx, span := otel.Tracer(pkgName).Start(ctx, "Serverservice.ListServersWithCondition")
+	defer span.End()
 	params := &sservice.ServerListParams{
 		FacilityCode: s.config.FacilityCode,
 		AttributeListParams: []sservice.AttributeListParams{
@@ -227,7 +245,7 @@ func (s *Serverservice) ListServersWithCondition(ctx context.Context, conditionK
 		},
 	}
 
-	_, _, err := s.client.List(ctx, params)
+	_, _, err := s.client.List(otelCtx, params)
 	if err != nil {
 		s.logger.WithFields(logrus.Fields{
 			"kind":  conditionKind,

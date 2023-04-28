@@ -7,6 +7,8 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/equinix-labs/otel-init-go/otelinit"
+
 	"github.com/metal-toolbox/conditionorc/internal/app"
 	"github.com/metal-toolbox/conditionorc/internal/model"
 	"github.com/metal-toolbox/conditionorc/internal/server"
@@ -43,6 +45,9 @@ var cmdServer = &cobra.Command{
 			app.Logger.Fatal(err)
 		}
 
+		// the ignored parameter here is a context annotated with otel-init-go configuration
+		_, otelShutdown := otelinit.InitOpenTelemetry(cmd.Context(), "conditionorc-api-server")
+
 		options := []server.Option{
 			server.WithLogger(app.Logger),
 			server.WithListenAddress(app.Config.ListenAddress),
@@ -68,6 +73,7 @@ var cmdServer = &cobra.Command{
 		if err := srv.Shutdown(ctx); err != nil {
 			app.Logger.Fatal("server shutdown error:", err)
 		}
+		otelShutdown(ctx)
 	},
 }
 
