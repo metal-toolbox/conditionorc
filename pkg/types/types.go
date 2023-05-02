@@ -2,10 +2,14 @@ package types
 
 import (
 	"encoding/json"
+	"fmt"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/pkg/errors"
 	"go.hollow.sh/toolbox/events"
+	"go.infratographer.com/x/pubsubx"
+	"go.infratographer.com/x/urnx"
 	"golang.org/x/exp/slices"
 )
 
@@ -14,16 +18,38 @@ import (
 // ConditionKind defines model for ConditionKind.
 type ConditionKind string
 
+// EventUrnNamespace is the namespace value set on a stream event.
+//
+// TODO: move into hollow-toolbox/events package.
+type EventUrnNamespace string
+
 const (
 	FirmwareInstallOutofband ConditionKind = "firmwareInstallOutofband"
 	InventoryOutofband       ConditionKind = "inventoryOutofband"
 	ServerResourceType       string        = "servers"
+	ConditionResourceType    string        = "condition"
 
-	ConditionEventType events.EventType = "condition"
+	ServerserviceNamespace EventUrnNamespace = "hollow-serverservice"
+	ControllerUrnNamespace EventUrnNamespace = "hollow-controller"
+
+	ConditionCreateEvent  events.EventType = "conditionCreate"
+	ConditionRequestEvent events.EventType = "conditionRequest"
+	ConditionUpdateEvent  events.EventType = "conditionUpdate"
 
 	// ConditionStructVersion identifies the condition struct revision
 	ConditionStructVersion string = "1"
 )
+
+func (k ConditionKind) EventType() string {
+	switch k {
+	case FirmwareInstallOutofband:
+		return fmt.Sprintf("firmware.%s", FirmwareInstallOutofband)
+	case InventoryOutofband:
+		return fmt.Sprintf("inventory.%s", InventoryOutofband)
+	default:
+		return string(k)
+	}
+}
 
 // ConditionState defines model for ConditionState.
 type ConditionState string
