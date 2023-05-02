@@ -106,14 +106,14 @@ func (c *ConditionUpdateEvent) Validate() error {
 // The resourceVersion is not updated here and is left for the repository Store to update.
 //
 // This method makes sure that update does not overwrite existing data inadvertently.
-func (c *ConditionUpdate) MergeExisting(existing *ptypes.Condition) (*ptypes.Condition, error) {
+func (c *ConditionUpdate) MergeExisting(existing *ptypes.Condition, compareResourceVersion bool) (*ptypes.Condition, error) {
 	// 1. condition must already exist for update.
 	if existing == nil {
 		return nil, errBadUpdateTarget
 	}
 
-	// resourceVersion must match
-	if existing.ResourceVersion != c.ResourceVersion {
+	if compareResourceVersion && existing.ResourceVersion != c.ResourceVersion {
+		// resourceVersion must match
 		return nil, errResourceVersionMismatch
 	}
 
