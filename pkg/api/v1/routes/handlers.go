@@ -67,13 +67,8 @@ func (r *Routes) serverConditionUpdate(c *gin.Context) (int, *v1types.ServerResp
 	}
 
 	if errUpdate := conditionUpdate.Validate(); errUpdate != nil {
-		c.JSON(
-			http.StatusBadRequest,
-			&v1types.ServerResponse{Message: errUpdate.Error()},
-		)
-
 		return http.StatusBadRequest, &v1types.ServerResponse{
-			Message: "invalid ConditionUpdate payload " + err.Error(),
+			Message: "invalid ConditionUpdate payload " + errUpdate.Error(),
 		}
 	}
 
