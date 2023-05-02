@@ -183,3 +183,30 @@ type ServerConditions struct {
 	ServerID   uuid.UUID
 	Conditions []*Condition
 }
+
+// StreamEvent holds a event message retrieved from the stream.
+type StreamEvent struct {
+	// The event URN attributes
+	URN *urnx.URN
+
+	// The stream event that can be used to follow up with an ack/nak.
+	Event events.Message
+
+	// The data part of the event.
+	Data *pubsubx.Message
+}
+
+// UnmarshalAdditionalData unpacks the event Data.AdditionalData field into the given target type
+func (s *StreamEvent) UnmarshalAdditionalData(target interface{}) error {
+	value, ok := s.Data.AdditionalData["data"]
+	if !ok {
+		return errors.New("data field missing")
+	}
+
+	cbytes, err := json.Marshal(value)
+	if err != nil {
+		return err
+	}
+
+	return json.Unmarshal(cbytes, target)
+}
