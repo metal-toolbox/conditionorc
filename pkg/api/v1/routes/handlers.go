@@ -66,19 +66,14 @@ func (r *Routes) serverConditionUpdate(c *gin.Context) (int, *v1types.ServerResp
 		}
 	}
 
-	if conditionUpdate.ResourceVersion == 0 {
-		r.logger.Info("resource version not set")
+	if errUpdate := conditionUpdate.Validate(); errUpdate != nil {
+		c.JSON(
+			http.StatusBadRequest,
+			&v1types.ServerResponse{Message: errUpdate.Error()},
+		)
 
 		return http.StatusBadRequest, &v1types.ServerResponse{
-			Message: "invalid ConditionUpdate payload: resourceVersion not set",
-		}
-	}
-
-	if conditionUpdate.State == "" || conditionUpdate.Status == nil {
-		r.logger.Info("invalid state and status pair")
-
-		return http.StatusBadRequest, &v1types.ServerResponse{
-			Message: "invalid ConditionUpdate payload: state and status attributes are expected",
+			Message: "invalid ConditionUpdate payload " + err.Error(),
 		}
 	}
 
