@@ -3,15 +3,12 @@ package orchestrator
 import (
 	"context"
 
-	"github.com/google/uuid"
-	"github.com/metal-toolbox/conditionorc/internal/metrics"
 	"github.com/metal-toolbox/conditionorc/internal/store"
+	v1EventHandlers "github.com/metal-toolbox/conditionorc/pkg/api/v1/events"
 	ptypes "github.com/metal-toolbox/conditionorc/pkg/types"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"go.hollow.sh/toolbox/events"
-	"go.infratographer.com/x/pubsubx"
-	"go.infratographer.com/x/urnx"
 	"go.opentelemetry.io/otel"
 )
 
@@ -20,10 +17,6 @@ var (
 	pkgName         = "internal/orchestrator"
 )
 
-func eventsError() {
-	metrics.DependencyError("events")
-}
-
 // Orchestrator type holds attributes of the condition orchestrator service
 type Orchestrator struct {
 	// Logger is the app logger
@@ -31,6 +24,7 @@ type Orchestrator struct {
 	listenAddress string
 	repository    store.Repository
 	streamBroker  events.Stream
+	eventHandler  *v1EventHandlers.Handler
 }
 
 // Option type sets a parameter on the Orchestrator type.
@@ -71,6 +65,12 @@ func New(opts ...Option) *Orchestrator {
 	for _, opt := range opts {
 		opt(o)
 	}
+
+	o.eventHandler = v1EventHandlers.NewHandler(
+		o.repository,
+		o.streamBroker,
+		o.logger,
+	)
 
 	return o
 }
@@ -125,11 +125,13 @@ func (o *Orchestrator) processMsg(ctx context.Context, msg events.Message) {
 		return
 	}
 
-	switch urn.Namespace {
-	case "hollow":
-		o.handleHollowEvent(otelCtx, data, urn)
-	case "hollow-controllers":
-		o.handleHollowControllerEvent(otelCtx, data, urn)
+	streamEvent := &ptypes.StreamEvent{URN: urn, Event: msg, Data: data}
+
+	switch ptypes.EventUrnNamespace(urn.Namespace) {
+	case ptypes.ServerserviceNamespace:
+		o.eventHandler.ServerserviceEvent(otelCtx, streamEvent)
+	case ptypes.ControllerUrnNamespace:
+		o.eventHandler.ControllerEvent(otelCtx, streamEvent)
 	default:
 		if errAck := msg.Ack(); errAck != nil {
 			o.logger.Warn(errAck)
@@ -139,78 +141,4 @@ func (o *Orchestrator) processMsg(ctx context.Context, msg events.Message) {
 			logrus.Fields{"err": err.Error(), "urn ns": urn.Namespace},
 		).Error("msg with unknown URN namespace ignored")
 	}
-}
-
-func (o *Orchestrator) handleHollowControllerEvent(ctx context.Context, event *pubsubx.Message, urn *urnx.URN) {
-	_, span := otel.Tracer(pkgName).Start(ctx, "handleHollowControllerEvent")
-	defer span.End()
-	o.logger.WithFields(
-		logrus.Fields{"source": event.Source, "resource": urn.ResourceType},
-	).Debug("controller reply handler not implemented, event dropped")
-}
-
-func (o *Orchestrator) handleHollowEvent(ctx context.Context, event *pubsubx.Message, urn *urnx.URN) {
-	otelCtx, span := otel.Tracer(pkgName).Start(ctx, "handleHollowEvent")
-	defer span.End()
-	switch event.EventType {
-	case string(events.Create):
-		condition := &ptypes.Condition{
-			Kind:      ptypes.InventoryOutofband, // TODO: change, once the condition types package is moved into a shared package
-			State:     ptypes.Pending,
-			Exclusive: false,
-		}
-
-		if err := o.repository.Create(otelCtx, urn.ResourceID, condition); err != nil {
-			o.logger.WithFields(
-				logrus.Fields{"err": err.Error()},
-			).Error("error creating condition on server")
-			eventsError()
-			return
-		}
-
-		if errPublish := o.publishCondition(otelCtx, urn.ResourceID, condition); errPublish != nil {
-			o.logger.WithFields(
-				logrus.Fields{"err": errPublish.Error()},
-			).Error("condition publish returned an error")
-			eventsError()
-			return
-		}
-
-		o.logger.WithFields(
-			logrus.Fields{
-				"condition": condition.Kind,
-			},
-		).Info("condition published")
-
-	default:
-		o.logger.WithFields(
-			logrus.Fields{"eventType": event.EventType, "urn ns": urn.Namespace},
-		).Error("msg with unknown eventType ignored")
-	}
-}
-
-func (o *Orchestrator) publishCondition(ctx context.Context, serverID uuid.UUID, condition *ptypes.Condition) error {
-	otelCtx, span := otel.Tracer(pkgName).Start(ctx, "publishCondition")
-	defer span.End()
-	if o.streamBroker == nil {
-		return errors.Wrap(ErrPublishEvent, "not connected to event stream")
-	}
-
-	if err := o.streamBroker.PublishAsyncWithContext(
-		otelCtx,
-		events.ResourceType(ptypes.ServerResourceType),
-		events.EventType(ptypes.InventoryOutofband), // XXX: is this right?
-		serverID.String(),
-		condition,
-	); err != nil {
-		o.logger.WithFields(logrus.Fields{
-			"error":       err,
-			"conditionID": condition.ID.String(),
-			"kind":        condition.Kind,
-		}).Warn("error publishing condition")
-		eventsError()
-		return errors.Wrap(ErrPublishEvent, err.Error())
-	}
-
-	return nil
 }
