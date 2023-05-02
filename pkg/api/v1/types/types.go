@@ -12,6 +12,8 @@ var (
 	errBadUpdateTarget         error = errors.New("no existing condition found for update")
 	errResourceVersionMismatch error = errors.New("resource version mismatch, retry request with current resourceVersion")
 	errInvalidStateTransition  error = errors.New("invalid state transition")
+
+	errUpdatePayload error = errors.New("invalid payload for update")
 )
 
 type ServerResponse struct {
@@ -49,6 +51,53 @@ type ConditionUpdate struct {
 	State           ptypes.ConditionState `json:"state,omitempty"`
 	Status          json.RawMessage       `json:"status,omitempty"`
 	ResourceVersion int64                 `json:"resourceVersion"`
+}
+
+func (c *ConditionUpdate) Validate() error {
+	if c.ResourceVersion == 0 {
+		return errors.Wrap(errUpdatePayload, "ResourceVersion not set")
+	}
+
+	if c.State == "" || c.Status == nil {
+		return errors.Wrap(errUpdatePayload, "state and status attributes are expected")
+	}
+
+	return nil
+}
+
+// ConditionUpdateEvent is the payload received for a condition update over the event stream.
+type ConditionUpdateEvent struct {
+	ConditionUpdate
+	Kind ptypes.ConditionKind `json:"kind"`
+}
+
+// Validate checks for required attributes.
+//
+// Note:
+// The ResourceVersion attribute is not validated for updates through events,
+// this is because the controllers do not perform requests for the existing condition
+// since implementing a Request-Reply pattern on the NATS Jetstream is tideous and not recommended.
+//
+// The NATS Jetstream guarantees ordered delivery, as long as there is a single consumer of the event,
+// for now we're deploying a single orchestrator instance in each facility and so this check is not required.
+// In the case that we require multiple orchestrators in a facility the stream would need to be partitioned
+// to ensure ordered delivery.
+//
+// ref:
+// https://github.com/nats-io/nats.py/discussions/221
+// https://github.com/nats-io/nats.go/discussions/970#discussioncomment-2690789
+//
+// TODO: move this note into the messaging architecture doc.
+func (c *ConditionUpdateEvent) Validate() error {
+	if c.Kind == "" {
+		return errors.Wrap(errUpdatePayload, "Kind attribute expected")
+	}
+
+	if c.State == "" || c.Status == nil {
+		return errors.Wrap(errUpdatePayload, "state and status attributes are expected")
+	}
+
+	return nil
 }
 
 // MergeExisting when given an existing condition, validates the update based on existing values
