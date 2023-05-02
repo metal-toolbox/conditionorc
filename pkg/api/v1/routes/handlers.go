@@ -432,7 +432,7 @@ func (r *Routes) publishCondition(ctx context.Context, serverID uuid.UUID, condi
 	if err := r.streamBroker.PublishAsyncWithContext(
 		otelCtx,
 		events.ResourceType(ptypes.ServerResourceType),
-		events.EventType(condition.Kind),
+		events.EventType(condition.Kind.EventType()),
 		serverID.String(),
 		condition,
 	); err != nil {
