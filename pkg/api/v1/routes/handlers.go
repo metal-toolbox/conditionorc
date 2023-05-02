@@ -109,7 +109,7 @@ func (r *Routes) serverConditionUpdate(c *gin.Context) (int, *v1types.ServerResp
 	}
 
 	// merge update with existing
-	update, err := conditionUpdate.MergeExisting(existing)
+	update, err := conditionUpdate.MergeExisting(existing, true)
 	if err != nil {
 		r.logger.WithFields(logrus.Fields{
 			"error":            err,
