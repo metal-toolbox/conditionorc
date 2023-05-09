@@ -99,25 +99,31 @@ func (o *Orchestrator) processMsg(ctx context.Context, msg events.Message) {
 	otelCtx, span := otel.Tracer(pkgName).Start(ctx, "processMsg")
 	defer span.End()
 
-	data, err := msg.Data()
+	data, err := event.Data()
 	if err != nil {
+		o.eventAckComplete(event)
+
 		o.logger.WithFields(
-			logrus.Fields{"err": err.Error(), "subject": msg.Subject()},
+			logrus.Fields{"err": err.Error(), "subject": event.Subject()},
 		).Error("data unpack error")
 
 		return
 	}
 
-	urn, err := msg.SubjectURN(data)
+	urn, err := event.SubjectURN(data)
 	if err != nil {
+		o.eventAckComplete(event)
+
 		o.logger.WithFields(
-			logrus.Fields{"err": err.Error(), "subject": msg.Subject()},
+			logrus.Fields{"err": err.Error(), "subject": event.Subject()},
 		).Error("error parsing subject URN in msg")
 
 		return
 	}
 
 	if urn.ResourceType != ptypes.ServerResourceType {
+		o.eventAckComplete(event)
+
 		o.logger.WithFields(
 			logrus.Fields{"urn ns": urn.Namespace, "resourceType": urn.ResourceType},
 		).Error("msg with unknown ResourceType in URN")
@@ -125,7 +131,7 @@ func (o *Orchestrator) processMsg(ctx context.Context, msg events.Message) {
 		return
 	}
 
-	streamEvent := &ptypes.StreamEvent{URN: urn, Event: msg, Data: data}
+	streamEvent := &ptypes.StreamEvent{URN: urn, Event: event, Data: data}
 
 	switch ptypes.EventUrnNamespace(urn.Namespace) {
 	case ptypes.ServerserviceNamespace:
@@ -133,12 +139,28 @@ func (o *Orchestrator) processMsg(ctx context.Context, msg events.Message) {
 	case ptypes.ControllerUrnNamespace:
 		o.eventHandler.ControllerEvent(otelCtx, streamEvent)
 	default:
-		if errAck := msg.Ack(); errAck != nil {
-			o.logger.Warn(errAck)
-		}
+		o.eventAckComplete(event)
 
 		o.logger.WithFields(
 			logrus.Fields{"err": err.Error(), "urn ns": urn.Namespace},
 		).Error("msg with unknown URN namespace ignored")
+	}
+}
+
+func (o *Orchestrator) eventAckInprogress(event events.Message) {
+	if err := event.InProgress(); err != nil {
+		o.logger.WithError(err).Warn("event Ack Inprogress error")
+	}
+}
+
+func (o *Orchestrator) eventAckComplete(event events.Message) {
+	if err := event.Ack(); err != nil {
+		o.logger.WithError(err).Warn("event Ack error")
+	}
+}
+
+func (o *Orchestrator) eventNak(event events.Message) {
+	if err := event.Nak(); err != nil {
+		o.logger.WithError(err).Warn("event Nak error")
 	}
 }
