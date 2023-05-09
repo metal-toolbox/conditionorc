@@ -30,7 +30,7 @@ const (
 	ConditionResourceType    string        = "condition"
 
 	ServerserviceNamespace EventUrnNamespace = "hollow-serverservice"
-	ControllerUrnNamespace EventUrnNamespace = "hollow-controller"
+	ControllerUrnNamespace EventUrnNamespace = "hollow-controllers"
 
 	ConditionCreateEvent  events.EventType = "conditionCreate"
 	ConditionRequestEvent events.EventType = "conditionRequest"
