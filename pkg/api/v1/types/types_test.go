@@ -3,6 +3,7 @@ package types
 import (
 	"testing"
 
+	"github.com/google/uuid"
 	ptypes "github.com/metal-toolbox/conditionorc/pkg/types"
 	"github.com/stretchr/testify/require"
 )
@@ -37,20 +38,42 @@ func TestConditionUpdate_mergeExisting(t *testing.T) {
 			errInvalidStateTransition,
 		},
 		{
-			"existing merged with update",
+			"condition ID mismatch error",
 			&ConditionUpdate{
+				ID:              uuid.New(),
 				ResourceVersion: 1,
 				State:           ptypes.Active,
 				Status:          []byte("{'foo': 'bar'}"),
 			},
 			&ptypes.Condition{
+				ID:              uuid.New(),
 				Kind:            ptypes.FirmwareInstallOutofband,
 				Parameters:      nil,
 				ResourceVersion: 1,
 				State:           ptypes.Pending,
 				Status:          []byte("{'woo': 'alala'}"),
 			},
+			nil,
+			errBadUpdateTarget,
+		},
+		{
+			"existing merged with update",
+			&ConditionUpdate{
+				ID:              uuid.MustParse("48e632e0-d0af-013b-9540-2cde48001122"),
+				ResourceVersion: 1,
+				State:           ptypes.Active,
+				Status:          []byte("{'foo': 'bar'}"),
+			},
 			&ptypes.Condition{
+				Kind:            ptypes.FirmwareInstallOutofband,
+				ID:              uuid.MustParse("48e632e0-d0af-013b-9540-2cde48001122"),
+				Parameters:      nil,
+				ResourceVersion: 1,
+				State:           ptypes.Pending,
+				Status:          []byte("{'woo': 'alala'}"),
+			},
+			&ptypes.Condition{
+				ID:              uuid.MustParse("48e632e0-d0af-013b-9540-2cde48001122"),
 				Kind:            ptypes.FirmwareInstallOutofband,
 				Parameters:      nil,
 				ResourceVersion: 1,
