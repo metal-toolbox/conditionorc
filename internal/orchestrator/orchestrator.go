@@ -2,6 +2,7 @@ package orchestrator
 
 import (
 	"context"
+	"encoding/json"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -18,6 +19,7 @@ import (
 var (
 	fetchEventsInterval = 1 * time.Second
 	ErrPublishEvent     = errors.New("error publishing event")
+	ErrInvalidEvent     = errors.New("invalid event message")
 	pkgName             = "internal/orchestrator"
 )
 
@@ -161,32 +163,20 @@ func (o *Orchestrator) processEvent(ctx context.Context, event events.Message) {
 
 	data, err := event.Data()
 	if err != nil {
-		o.eventAckComplete(event)
-
-		o.logger.WithFields(
-			logrus.Fields{"err": err.Error(), "subject": event.Subject()},
-		).Error("data unpack error")
+		o.ackEvent(event, errors.Wrap(ErrInvalidEvent, "data field error: "+err.Error()))
 
 		return
 	}
 
 	urn, err := event.SubjectURN(data)
 	if err != nil {
-		o.eventAckComplete(event)
-
-		o.logger.WithFields(
-			logrus.Fields{"err": err.Error(), "subject": event.Subject()},
-		).Error("error parsing subject URN in msg")
+		o.ackEvent(event, errors.Wrap(ErrInvalidEvent, "error parsing subject URN in msg: "+err.Error()))
 
 		return
 	}
 
 	if urn.ResourceType != ptypes.ServerResourceType {
-		o.eventAckComplete(event)
-
-		o.logger.WithFields(
-			logrus.Fields{"urn ns": urn.Namespace, "resourceType": urn.ResourceType},
-		).Error("msg with unknown ResourceType in URN")
+		o.ackEvent(event, errors.Wrap(ErrInvalidEvent, "msg with unknown ResourceType in URN: "+err.Error()))
 
 		return
 	}
@@ -199,22 +189,33 @@ func (o *Orchestrator) processEvent(ctx context.Context, event events.Message) {
 	case ptypes.ControllerUrnNamespace:
 		o.eventHandler.ControllerEvent(otelCtx, streamEvent)
 	default:
-		o.eventAckComplete(event)
-
-		o.logger.WithFields(
-			logrus.Fields{"err": err.Error(), "urn ns": urn.Namespace},
-		).Error("msg with unknown URN namespace ignored")
+		o.ackEvent(event, errors.Wrap(ErrInvalidEvent, "msg with unknown URN namespace ignored: "+urn.Namespace))
 	}
 }
 
-func (o *Orchestrator) eventAckComplete(event events.Message) {
+func (o *Orchestrator) ackEvent(event events.Message, err error) {
+	if err != nil {
+		// attempt to format the event as JSON
+		// so its easier to read in the logs.
+		logFields := logrus.Fields{"err": err}
+		data, err := json.Marshal(event)
+		if err == nil {
+			logFields["event"] = data
+		} else {
+			logFields["event"] = event
+		}
+
+		// TODO: add metrics for dropped events
+		o.logger.WithError(err).WithFields(logFields).Error("event with error ack'ed")
+	}
+
 	if err := event.Ack(); err != nil {
-		o.logger.WithError(err).Warn("event Ack error")
+		o.logger.WithError(err).Error("error Ack'ing event")
 	}
 }
 
 func (o *Orchestrator) eventNak(event events.Message) {
 	if err := event.Nak(); err != nil {
-		o.logger.WithError(err).Warn("event Nak error")
+		o.logger.WithError(err).Error("error Nack'ing event")
 	}
 }
