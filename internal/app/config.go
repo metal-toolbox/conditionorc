@@ -30,6 +30,9 @@ type Configuration struct {
 	// ListenAddress is the server listen address
 	ListenAddress string `mapstructure:"listen_address"`
 
+	// Concurrency declares how many events the orchestrator will process concurrently.
+	Concurrency int `mapstructure:"concurrency"`
+
 	// StoreKind indicates the kind of store to store server conditions
 	// supported parameter value - serverservice
 	StoreKind model.StoreKind `mapstructure:"store_kind"`
@@ -100,6 +103,10 @@ func (a *App) envVarOverrides() error {
 
 	if a.v.GetString("app.kind") != "" {
 		a.AppKind = model.AppKind(a.v.GetString("app.kind"))
+	}
+
+	if a.v.GetInt("concurrency") != 0 {
+		a.Config.Concurrency = a.v.GetInt("concurrency")
 	}
 
 	if a.v.GetString("listen.address") != "" {
