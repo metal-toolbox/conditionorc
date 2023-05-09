@@ -2,6 +2,9 @@ package orchestrator
 
 import (
 	"context"
+	"sync"
+	"sync/atomic"
+	"time"
 
 	"github.com/metal-toolbox/conditionorc/internal/store"
 	v1EventHandlers "github.com/metal-toolbox/conditionorc/pkg/api/v1/events"
@@ -13,15 +16,19 @@ import (
 )
 
 var (
-	ErrPublishEvent = errors.New("error publishing event")
-	pkgName         = "internal/orchestrator"
+	fetchEventsInterval = 1 * time.Second
+	ErrPublishEvent     = errors.New("error publishing event")
+	pkgName             = "internal/orchestrator"
 )
 
 // Orchestrator type holds attributes of the condition orchestrator service
 type Orchestrator struct {
 	// Logger is the app logger
 	logger        *logrus.Logger
+	syncWG        *sync.WaitGroup
 	listenAddress string
+	dispatched    int32
+	concurrency   int
 	repository    store.Repository
 	streamBroker  events.Stream
 	eventHandler  *v1EventHandlers.Handler
@@ -58,9 +65,16 @@ func WithListenAddress(addr string) Option {
 	}
 }
 
+// WithConcurrency sets the Orchestrator event concurrency, defaults to 1.
+func WithConcurrency(c int) Option {
+	return func(o *Orchestrator) {
+		o.concurrency = c
+	}
+}
+
 // New returns a new orchestrator service with the given options set.
 func New(opts ...Option) *Orchestrator {
-	o := &Orchestrator{}
+	o := &Orchestrator{concurrency: 1, syncWG: &sync.WaitGroup{}}
 
 	for _, opt := range opts {
 		opt(o)
@@ -77,6 +91,8 @@ func New(opts ...Option) *Orchestrator {
 
 // Run runs the orchestrator which listens for events to action.
 func (o *Orchestrator) Run(ctx context.Context) {
+	tickerFetchEvents := time.NewTicker(fetchEventsInterval).C
+
 	eventsCh, err := o.streamBroker.Subscribe(ctx)
 	if err != nil {
 		o.logger.Fatal(err)
@@ -89,14 +105,58 @@ func (o *Orchestrator) Run(ctx context.Context) {
 		case <-ctx.Done():
 			o.streamBroker.Close()
 			return
+
+		// retrieve and process events sent by controllers.
+		case <-tickerFetchEvents:
+			if o.concurrencyLimit() {
+				continue
+			}
+
+			o.pullEvents(ctx)
+
+		// eventsCh receives events from push based subscriptions, in this case serverservice.
 		case msg := <-eventsCh:
-			o.processMsg(ctx, msg)
+			o.processEvent(ctx, msg)
 		}
 	}
 }
 
-func (o *Orchestrator) processMsg(ctx context.Context, msg events.Message) {
-	otelCtx, span := otel.Tracer(pkgName).Start(ctx, "processMsg")
+func (o *Orchestrator) concurrencyLimit() bool {
+	return int(o.dispatched) >= o.concurrency
+}
+
+func (o *Orchestrator) pullEvents(ctx context.Context) {
+	// XXX: consider having a separate context for message retrieval
+	msgs, err := o.streamBroker.PullMsg(ctx, 1)
+	if err != nil {
+		o.logger.WithFields(
+			logrus.Fields{"err": err.Error()},
+		).Debug("error fetching work")
+	}
+
+	for _, msg := range msgs {
+		if ctx.Err() != nil || o.concurrencyLimit() {
+			o.eventNak(msg)
+
+			return
+		}
+
+		// spawn msg process handler
+		o.syncWG.Add(1)
+
+		go func(msg events.Message) {
+			defer o.syncWG.Done()
+
+			atomic.AddInt32(&o.dispatched, 1)
+			defer atomic.AddInt32(&o.dispatched, -1)
+
+			o.processEvent(ctx, msg)
+		}(msg)
+	}
+}
+
+func (o *Orchestrator) processEvent(ctx context.Context, event events.Message) {
+	otelCtx, span := otel.Tracer(pkgName).Start(ctx, "processEvent")
 	defer span.End()
 
 	data, err := event.Data()
@@ -144,12 +204,6 @@ func (o *Orchestrator) processMsg(ctx context.Context, msg events.Message) {
 		o.logger.WithFields(
 			logrus.Fields{"err": err.Error(), "urn ns": urn.Namespace},
 		).Error("msg with unknown URN namespace ignored")
-	}
-}
-
-func (o *Orchestrator) eventAckInprogress(event events.Message) {
-	if err := event.InProgress(); err != nil {
-		o.logger.WithError(err).Warn("event Ack Inprogress error")
 	}
 }
 
