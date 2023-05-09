@@ -167,6 +167,9 @@ func (h *Handler) updateCondition(ctx context.Context, streamEvent *ptypes.Strea
 		}).Info("condition merge failed")
 
 		// XXX: should this be an nak, instead of a ack.
+		//  - (joel) I don't think so, since this could be an out of order message and
+		// .  MergeExisting returns an error because the state transition cannot be done.
+		//    This could be a NakTerm instead so we can have metrics on it?
 		h.ackEvent(streamEvent)
 
 		return
@@ -181,8 +184,7 @@ func (h *Handler) updateCondition(ctx context.Context, streamEvent *ptypes.Strea
 			"condition_version": update.ResourceVersion,
 		}).Info("condition update failed")
 
-		// XXX: should this be an nak, instead of a ack.
-		h.ackEvent(streamEvent)
+		h.nakEvent(streamEvent)
 
 		return
 	}
