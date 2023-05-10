@@ -206,16 +206,16 @@ func (o *Orchestrator) ackEvent(event events.Message, err error) {
 		}
 
 		// TODO: add metrics for dropped events
-		o.logger.WithError(err).WithFields(logFields).Error("event with error ack'ed")
+		o.logger.WithError(err).WithFields(logFields).Warn("event with error ack'ed")
 	}
 
 	if err := event.Ack(); err != nil {
-		o.logger.WithError(err).Error("error Ack'ing event")
+		o.logger.WithError(err).Warn("error Ack'ing event")
 	}
 }
 
 func (o *Orchestrator) eventNak(event events.Message) {
 	if err := event.Nak(); err != nil {
-		o.logger.WithError(err).Error("error Nack'ing event")
+		o.logger.WithError(err).Warn("error Nack'ing event")
 	}
 }
