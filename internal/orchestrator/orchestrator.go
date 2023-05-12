@@ -76,7 +76,7 @@ func WithConcurrency(c int) Option {
 
 // New returns a new orchestrator service with the given options set.
 func New(opts ...Option) *Orchestrator {
-	o := &Orchestrator{concurrency: 1, syncWG: &sync.WaitGroup{}}
+	o := &Orchestrator{concurrency: 10, syncWG: &sync.WaitGroup{}}
 
 	for _, opt := range opts {
 		opt(o)
@@ -133,7 +133,7 @@ func (o *Orchestrator) pullEvents(ctx context.Context) {
 	if err != nil {
 		o.logger.WithFields(
 			logrus.Fields{"err": err.Error()},
-		).Debug("error fetching work")
+		).Trace("error fetching work")
 	}
 
 	for _, msg := range msgs {

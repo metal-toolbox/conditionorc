@@ -61,7 +61,7 @@ func (h *Handler) ControllerEvent(ctx context.Context, streamEvent *ptypes.Strea
 			"source":   streamEvent.Data.Source,
 			"resource": streamEvent.URN.ResourceType,
 		},
-	).Trace("received controller event")
+	).Debug("received controller event")
 
 	switch streamEvent.Data.EventType {
 	case string(ptypes.ConditionUpdateEvent):
