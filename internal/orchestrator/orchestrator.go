@@ -17,6 +17,7 @@ import (
 )
 
 var (
+	concurrency         = 10
 	fetchEventsInterval = 1 * time.Second
 	ErrPublishEvent     = errors.New("error publishing event")
 	ErrInvalidEvent     = errors.New("invalid event message")
@@ -76,7 +77,7 @@ func WithConcurrency(c int) Option {
 
 // New returns a new orchestrator service with the given options set.
 func New(opts ...Option) *Orchestrator {
-	o := &Orchestrator{concurrency: 10, syncWG: &sync.WaitGroup{}}
+	o := &Orchestrator{concurrency: concurrency, syncWG: &sync.WaitGroup{}}
 
 	for _, opt := range opts {
 		opt(o)
