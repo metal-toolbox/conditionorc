@@ -151,6 +151,8 @@ func (h *Handler) updateCondition(ctx context.Context, streamEvent *ptypes.Strea
 	// nothing to update
 	// XXX: consider just doing the update unconditionally?
 	if existing.State == conditionUpdate.State && bytes.Equal(existing.Status, conditionUpdate.Status) {
+		h.ackEvent(streamEvent)
+
 		return
 	}
 
