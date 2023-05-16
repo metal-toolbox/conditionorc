@@ -32,6 +32,7 @@ type ConditionsResponse struct {
 type ConditionCreate struct {
 	Exclusive  bool            `json:"exclusive"`
 	Parameters json.RawMessage `json:"parameters"`
+	Fault      *ptypes.Fault   `json:"Fault,omitempty"`
 }
 
 // NewCondition returns a new Condition type.
@@ -43,6 +44,7 @@ func (c *ConditionCreate) NewCondition(kind ptypes.ConditionKind) *ptypes.Condit
 		State:      ptypes.Pending,
 		Exclusive:  c.Exclusive,
 		Parameters: c.Parameters,
+		Fault:      c.Fault,
 	}
 }
 
