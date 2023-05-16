@@ -156,6 +156,9 @@ type Condition struct {
 	// and other conditions have to wait until this is in a finalized state.
 	Exclusive bool `json:"exclusive,omitempty"`
 
+	// Fault is used to introduce faults into the controller when executing on a condition.
+	Fault *Fault `json:"fault,omitempty"`
+
 	// ResourceVersion has to be set to the value received by the
 	// client updating it, this it to make sure condition updates
 	// occur in the expected order.
@@ -166,6 +169,23 @@ type Condition struct {
 
 	// CreatedAt is when this object was created.
 	CreatedAt time.Time `json:"createdAt,omitempty"`
+}
+
+// Fault is used to introduce faults into the controller when executing on a condition.
+//
+// Note: this depends on controllers implementing support to honor the given fault.
+type Fault struct {
+	//  will cause the condition execution to panic on the controller.
+	Panic bool `json:"panic"`
+
+	// Introduce specified delay in execution of the condition on the controller.
+	ExecuteWithDelay time.Duration `json:"executionWithDelay,omitempty"`
+
+	// FailAt is a controller specific task/stage that the condition should fail in execution.
+	//
+	// for example, in the flasher controller, setting this field to `init` will cause the
+	// condition task to fail at initialization.
+	FailAt string `json:"failAt,omitempty"`
 }
 
 // StateValid validates the Condition State field.
