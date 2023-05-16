@@ -300,6 +300,7 @@ func TestServerConditionUpdate(t *testing.T) {
 	}
 }
 
+// nolint:gocyclo // cyclomatic tests are cyclomatic
 func TestServerConditionCreate(t *testing.T) {
 	serverID := uuid.New()
 
@@ -416,6 +417,63 @@ func TestServerConditionCreate(t *testing.T) {
 				payload, err := json.Marshal(&v1types.ConditionCreate{Parameters: []byte(`{"some param": "1"}`)})
 				if err != nil {
 					t.Error()
+				}
+
+				url := fmt.Sprintf("/api/v1/servers/%s/condition/%s", serverID.String(), ptypes.FirmwareInstallOutofband)
+				request, err := http.NewRequestWithContext(context.TODO(), http.MethodPost, url, bytes.NewReader(payload))
+				if err != nil {
+					t.Fatal(err)
+				}
+
+				return request
+			},
+			func(t *testing.T, r *httptest.ResponseRecorder) {
+				assert.Equal(t, http.StatusOK, r.Code)
+				assert.Equal(t, asJSONBytes(t, &v1types.ServerResponse{Message: "condition set"}), asBytes(t, r.Body))
+			},
+		},
+		{
+			"condition with Fault created",
+			// mock repository
+			func(r *store.MockRepository) {
+				// lookup for an existing condition
+				r.EXPECT().
+					Get(
+						gomock.Any(),
+						gomock.Eq(serverID),
+						gomock.Eq(ptypes.FirmwareInstallOutofband),
+					).
+					Return(nil, nil). // no condition exists
+					Times(1)
+
+				r.EXPECT().
+					List(
+						gomock.Any(),
+						gomock.Any(),
+						gomock.Any(),
+					).
+					Return(nil, nil).
+					Times(2)
+
+				// create condition query
+				r.EXPECT().
+					Create(
+						gomock.Any(),
+						gomock.Eq(serverID),
+						gomock.Any(),
+					).
+					DoAndReturn(func(_ context.Context, _ uuid.UUID, c *ptypes.Condition) error {
+						expect := &ptypes.Fault{Panic: true, ExecuteWithDelay: 10 * time.Second, FailAt: "foobar"}
+						assert.Equal(t, c.Fault, expect)
+						return nil
+					}).
+					Times(1)
+			},
+			func(t *testing.T) *http.Request {
+				fault := ptypes.Fault{Panic: true, ExecuteWithDelay: 10 * time.Second, FailAt: "foobar"}
+				payload, err := json.Marshal(&v1types.ConditionCreate{Parameters: []byte(`{"some param": "1"}`), Fault: &fault})
+				if err != nil {
+					t.Error(err)
 				}
 
 				url := fmt.Sprintf("/api/v1/servers/%s/condition/%s", serverID.String(), ptypes.FirmwareInstallOutofband)
