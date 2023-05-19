@@ -9,7 +9,7 @@ require (
 	github.com/golang/mock v1.6.0
 	github.com/google/uuid v1.3.0
 	github.com/pkg/errors v0.9.1
-	github.com/prometheus/client_golang v1.14.0
+	github.com/prometheus/client_golang v1.15.1
 	github.com/sirupsen/logrus v1.9.0
 	github.com/spf13/cobra v1.6.1
 	github.com/spf13/viper v1.15.0
@@ -18,6 +18,7 @@ require (
 	go.hollow.sh/serverservice v0.15.1
 	go.hollow.sh/toolbox v0.5.2-0.20230403084733-0bfb6095e5a5
 	go.infratographer.com/x v0.0.3
+	go.opentelemetry.io/otel v1.11.2
 	golang.org/x/exp v0.0.0-20230321023759-10a507213a29
 )
 
@@ -76,7 +77,7 @@ require (
 	github.com/pelletier/go-toml/v2 v2.0.7 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/prometheus/client_model v0.3.0 // indirect
-	github.com/prometheus/common v0.39.0 // indirect
+	github.com/prometheus/common v0.42.0 // indirect
 	github.com/prometheus/procfs v0.9.0 // indirect
 	github.com/spf13/afero v1.9.5 // indirect
 	github.com/spf13/cast v1.5.0 // indirect
@@ -93,7 +94,6 @@ require (
 	github.com/volatiletech/sqlboiler/v4 v4.14.2 // indirect
 	github.com/volatiletech/strmangle v0.0.4 // indirect
 	go.opencensus.io v0.24.0 // indirect
-	go.opentelemetry.io/otel v1.11.2 // indirect
 	go.opentelemetry.io/otel/exporters/otlp/internal/retry v1.11.2 // indirect
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace v1.11.2 // indirect
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc v1.11.2 // indirect
