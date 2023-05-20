@@ -10,7 +10,7 @@ require (
 	github.com/google/uuid v1.3.0
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.14.0
-	github.com/sirupsen/logrus v1.9.0
+	github.com/sirupsen/logrus v1.9.2
 	github.com/spf13/cobra v1.6.1
 	github.com/spf13/viper v1.15.0
 	github.com/stretchr/testify v1.8.2
@@ -18,6 +18,7 @@ require (
 	go.hollow.sh/serverservice v0.15.1
 	go.hollow.sh/toolbox v0.5.2-0.20230403084733-0bfb6095e5a5
 	go.infratographer.com/x v0.0.3
+	go.opentelemetry.io/otel v1.11.2
 	golang.org/x/exp v0.0.0-20230321023759-10a507213a29
 )
 
@@ -93,7 +94,6 @@ require (
 	github.com/volatiletech/sqlboiler/v4 v4.14.2 // indirect
 	github.com/volatiletech/strmangle v0.0.4 // indirect
 	go.opencensus.io v0.24.0 // indirect
-	go.opentelemetry.io/otel v1.11.2 // indirect
 	go.opentelemetry.io/otel/exporters/otlp/internal/retry v1.11.2 // indirect
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace v1.11.2 // indirect
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc v1.11.2 // indirect
