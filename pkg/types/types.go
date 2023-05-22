@@ -213,6 +213,8 @@ type StreamEvent struct {
 	Event events.Message
 
 	// The data part of the event.
+	//
+	// nolint:staticcheck // yes this is deprecated and will be removed soon.
 	Data *pubsubx.Message
 }
 
