@@ -54,6 +54,7 @@ var cmdServer = &cobra.Command{
 			server.WithStore(repository),
 			server.WithStreamBroker(streamBroker),
 			server.WithConditionDefinitions(app.Config.ConditionDefinitions),
+			server.WithAuthMiddlewareConfig(app.Config.APIServerJWTAuth),
 		}
 
 		srv := server.New(options...)

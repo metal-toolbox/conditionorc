@@ -13,6 +13,7 @@ import (
 	"github.com/sirupsen/logrus"
 	ginlogrus "github.com/toorop/gin-logrus"
 	"go.hollow.sh/toolbox/events"
+	"go.hollow.sh/toolbox/ginjwt"
 )
 
 var (
@@ -27,6 +28,7 @@ var (
 // Server type holds attributes of the condition orc server
 type Server struct {
 	// Logger is the app logger
+	authMWConfig         *ginjwt.AuthConfig
 	logger               *logrus.Logger
 	streamBroker         events.Stream
 	listenAddress        string
@@ -72,6 +74,13 @@ func WithConditionDefinitions(defs ptypes.ConditionDefinitions) Option {
 	}
 }
 
+// WithAuthMiddlewareConfig sets the auth middleware configuration.
+func WithAuthMiddlewareConfig(authMWConfig *ginjwt.AuthConfig) Option {
+	return func(s *Server) {
+		s.authMWConfig = authMWConfig
+	}
+}
+
 func New(opts ...Option) *http.Server {
 	s := &Server{}
 
@@ -91,6 +100,16 @@ func New(opts ...Option) *http.Server {
 		routes.WithStore(s.repository),
 		routes.WithStreamBroker(s.streamBroker),
 		routes.WithConditionDefinitions(s.conditionDefinitions),
+	}
+
+	// add auth middleware
+	if s.authMWConfig != nil && s.authMWConfig.Enabled {
+		authMW, err := ginjwt.NewAuthMiddleware(*s.authMWConfig)
+		if err != nil {
+			s.logger.Fatal("failed to initialize auth middleware: ", "error", err)
+		}
+
+		options = append(options, routes.WithAuthMiddleware(authMW))
 	}
 
 	v1Router, err := routes.NewRoutes(options...)
