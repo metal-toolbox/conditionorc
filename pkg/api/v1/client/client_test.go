@@ -1,3 +1,14 @@
+//go:build testtools
+// +build testtools
+
+// Note:
+// The testtools build flag is defined on this file since its required for ginjwt helper methods.
+// Make sure to include `-tags testtools` in the build flags to ensure the tests in this file are run.
+//
+// for example:
+// /usr/local/bin/go test -timeout 10s -run ^TestIntegration_ConditionsGet$ \
+//   -tags testtools github.com/metal-toolbox/conditionorc/pkg/api/v1/client -v
+
 package client
 
 import (
@@ -6,6 +17,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/golang/mock/gomock"
@@ -13,6 +25,9 @@ import (
 	"github.com/metal-toolbox/conditionorc/internal/server"
 	"github.com/metal-toolbox/conditionorc/internal/store"
 	"github.com/stretchr/testify/assert"
+	"go.hollow.sh/toolbox/ginjwt"
+	"gopkg.in/square/go-jose.v2"
+	"gopkg.in/square/go-jose.v2/jwt"
 
 	v1types "github.com/metal-toolbox/conditionorc/pkg/api/v1/types"
 	ptypes "github.com/metal-toolbox/conditionorc/pkg/types"
@@ -20,9 +35,11 @@ import (
 )
 
 type integrationTester struct {
-	handler    http.Handler
-	client     *Client
-	repository *store.MockRepository
+	t               *testing.T
+	assertAuthToken bool
+	handler         http.Handler
+	client          *Client
+	repository      *store.MockRepository
 }
 
 // Do implements the HTTPRequestDoer interface to swap the response writer
@@ -34,10 +51,16 @@ func (i *integrationTester) Do(req *http.Request) (*http.Response, error) {
 	w := httptest.NewRecorder()
 	i.handler.ServeHTTP(w, req)
 
+	if i.assertAuthToken {
+		assert.NotEmpty(i.t, req.Header.Get("Authorization"))
+	} else {
+		assert.Empty(i.t, req.Header.Get("Authorization"))
+	}
+
 	return w.Result(), nil
 }
 
-func newTester(t *testing.T) *integrationTester {
+func newTester(t *testing.T, enableAuth bool, authToken string) *integrationTester {
 	t.Helper()
 
 	ctrl := gomock.NewController(t)
@@ -47,7 +70,7 @@ func newTester(t *testing.T) *integrationTester {
 
 	l := logrus.New()
 	l.Level = logrus.Level(logrus.ErrorLevel)
-	options := []server.Option{
+	serverOptions := []server.Option{
 		server.WithLogger(l),
 		server.WithListenAddress("localhost:9999"),
 		server.WithStore(repository),
@@ -58,16 +81,45 @@ func newTester(t *testing.T) *integrationTester {
 		),
 	}
 
+	// setup JWT auth middleware on router when a non-empty auth token was provided
+	if enableAuth {
+		jwksURI := ginjwt.TestHelperJWKSProvider(ginjwt.TestPrivRSAKey1ID, ginjwt.TestPrivRSAKey2ID)
+
+		serverOptions = append(serverOptions,
+			server.WithAuthMiddlewareConfig(&ginjwt.AuthConfig{
+				Enabled:  true,
+				Issuer:   "conditionorc.oidc.issuer",
+				Audience: "conditionorc.client",
+				JWKSURI:  jwksURI,
+			},
+			),
+		)
+
+	}
+
 	gin.SetMode(gin.ReleaseMode)
 
-	srv := server.New(options...)
+	srv := server.New(serverOptions...)
 
+	// setup test server httptest recorder
 	tester := &integrationTester{
+		t:          t,
 		handler:    srv.Handler,
 		repository: repository,
 	}
 
-	client, err := NewClient("http://localhost:9999", WithHTTPClient(tester))
+	// setup test client
+	clientOptions := []Option{WithHTTPClient(tester)}
+
+	if enableAuth {
+		// enable auth token assert on the server
+		tester.assertAuthToken = true
+
+		// client to include Authorization header
+		clientOptions = append(clientOptions, WithAuthToken(authToken))
+	}
+
+	client, err := NewClient("http://localhost:9999", clientOptions...)
 	if err != nil {
 		t.Error(err)
 	}
@@ -101,8 +153,145 @@ type FirmwareInstallOutofbandParameters struct {
 	FirmwareList         []*Firmware `json:"firmwareList,omitempty"`
 }
 
+func testAuthToken(t *testing.T) string {
+	t.Helper()
+
+	claims := jwt.Claims{
+		Subject:   "test-user",
+		Issuer:    "conditionorc.oidc.issuer",
+		NotBefore: jwt.NewNumericDate(time.Now().Add(-1 * time.Hour)),
+		Expiry:    jwt.NewNumericDate(time.Now().Add(1 * time.Hour)),
+		IssuedAt:  jwt.NewNumericDate(time.Now()),
+		Audience:  jwt.Audience{"conditionorc.client"},
+	}
+	signer := ginjwt.TestHelperMustMakeSigner(jose.RS256, ginjwt.TestPrivRSAKey1ID, ginjwt.TestPrivRSAKey1)
+
+	token, err := jwt.Signed(signer).Claims(claims).CompactSerialize()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	return token
+}
+
+func TestIntegration_AuthToken(t *testing.T) {
+	serverID := uuid.New()
+
+	testcases := []struct {
+		name                string
+		conditionKind       ptypes.ConditionKind
+		tester              *integrationTester
+		mockStore           func(r *store.MockRepository)
+		expectResponse      func() *v1types.ServerResponse
+		expectErrorContains string
+	}{
+		{
+			"invalid auth token returns 401",
+			ptypes.FirmwareInstallOutofband,
+			newTester(t, true, "asdf"),
+			// mock repository
+			nil,
+			func() *v1types.ServerResponse {
+				return &v1types.ServerResponse{
+					StatusCode: 401,
+					Message:    "unable to parse auth token",
+				}
+			},
+			"",
+		},
+		{
+			"valid auth token works",
+			ptypes.FirmwareInstallOutofband,
+			newTester(t, true, testAuthToken(t)),
+			// mock repository
+			func(r *store.MockRepository) {
+				parameters, err := json.Marshal(&FirmwareInstallOutofbandParameters{
+					InventoryAfterUpdate: true,
+					ForceInstall:         true,
+					FirmwareSetID:        "fake",
+				})
+
+				if err != nil {
+					t.Error(err)
+				}
+
+				// lookup existing condition
+				r.EXPECT().
+					Get(
+						gomock.Any(),
+						gomock.Eq(serverID),
+						gomock.Eq(ptypes.FirmwareInstallOutofband),
+					).
+					Return(
+						&ptypes.Condition{
+							Kind:       ptypes.FirmwareInstallOutofband,
+							State:      ptypes.Pending,
+							Status:     []byte(`{"hello":"world"}`),
+							Parameters: parameters,
+						},
+						nil).
+					Times(1)
+			},
+			func() *v1types.ServerResponse {
+				parameters, err := json.Marshal(&FirmwareInstallOutofbandParameters{
+					InventoryAfterUpdate: true,
+					ForceInstall:         true,
+					FirmwareSetID:        "fake",
+				})
+
+				if err != nil {
+					t.Error(err)
+				}
+
+				return &v1types.ServerResponse{
+					StatusCode: 200,
+					Records: &v1types.ConditionsResponse{
+						ServerID: serverID,
+						Conditions: []*ptypes.Condition{
+							{
+								Kind:       ptypes.FirmwareInstallOutofband,
+								State:      ptypes.Pending,
+								Status:     []byte(`{"hello":"world"}`),
+								Parameters: parameters,
+							},
+						},
+					},
+				}
+			},
+			"",
+		},
+	}
+
+	for _, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+			if tc.mockStore != nil {
+				tc.mockStore(tc.tester.repository)
+			}
+
+			got, err := tc.tester.client.ServerConditionGet(context.TODO(), serverID, tc.conditionKind)
+			if err != nil {
+				t.Error(err)
+			}
+
+			if err != nil {
+				assert.Contains(t, err.Error(), tc.expectErrorContains)
+			}
+
+			if tc.expectErrorContains != "" && err == nil {
+				t.Error("expected error, got nil")
+			}
+
+			assert.Equal(
+				t,
+				tc.expectResponse(),
+				got,
+			)
+		})
+	}
+}
+
 func TestIntegration_ConditionsGet(t *testing.T) {
-	tester := newTester(t)
+	tester := newTester(t, false, "")
 
 	serverID := uuid.New()
 
@@ -241,7 +430,7 @@ func TestIntegration_ConditionsGet(t *testing.T) {
 }
 
 func TestIntegration_ConditionsList(t *testing.T) {
-	tester := newTester(t)
+	tester := newTester(t, false, "")
 
 	serverID := uuid.New()
 
@@ -394,7 +583,7 @@ func TestIntegration_ConditionsList(t *testing.T) {
 }
 
 func TestIntegration_ConditionsCreate(t *testing.T) {
-	tester := newTester(t)
+	tester := newTester(t, false, "")
 
 	serverID := uuid.New()
 
@@ -516,7 +705,7 @@ func TestIntegration_ConditionsCreate(t *testing.T) {
 }
 
 func TestIntegration_ConditionsUpdate(t *testing.T) {
-	tester := newTester(t)
+	tester := newTester(t, false, "")
 
 	serverID := uuid.New()
 
@@ -640,7 +829,7 @@ func TestIntegration_ConditionsUpdate(t *testing.T) {
 }
 
 func TestIntegration_ConditionsDelete(t *testing.T) {
-	tester := newTester(t)
+	tester := newTester(t, false, "")
 
 	serverID := uuid.New()
 
