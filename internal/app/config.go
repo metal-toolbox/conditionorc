@@ -10,6 +10,7 @@ import (
 	ptypes "github.com/metal-toolbox/conditionorc/pkg/types"
 	"github.com/pkg/errors"
 	"go.hollow.sh/toolbox/events"
+	"go.hollow.sh/toolbox/ginjwt"
 )
 
 var (
@@ -36,6 +37,9 @@ type Configuration struct {
 	// StoreKind indicates the kind of store to store server conditions
 	// supported parameter value - serverservice
 	StoreKind model.StoreKind `mapstructure:"store_kind"`
+
+	// APIServerJWTAuth sets the JWT verification configuration for the conditionorc API service.
+	APIServerJWTAuth *ginjwt.AuthConfig `mapstructure:"ginjwt_auth"`
 
 	// ConditionDefinitions holds one or more condition definitions the conditionorc API, orchestrator support.
 	ConditionDefinitions ptypes.ConditionDefinitions `mapstructure:"conditions"`
@@ -136,6 +140,8 @@ func (a *App) envVarOverrides() error {
 		return errors.Wrap(ErrConfig, "no/unknown store kind parameter")
 	}
 
+	a.apiServerJWTAuthParams()
+
 	return nil
 }
 
@@ -143,6 +149,20 @@ func (a *App) envVarOverrides() error {
 var (
 	defaultNatsConnectTimeout = 100 * time.Millisecond
 )
+
+func (a *App) apiServerJWTAuthParams() {
+	if !a.v.GetBool("api.oidc.enabled") {
+		return
+	}
+
+	a.Config.APIServerJWTAuth = &ginjwt.AuthConfig{
+		Enabled:   true,
+		Audience:  a.v.GetString("api.oidc.audience"),
+		Issuer:    a.v.GetString("api.oidc.issuer"),
+		JWKSURI:   a.v.GetString("api.oidc.jwksuri"),
+		LogFields: a.v.GetStringSlice("api.oidc.log"),
+	}
+}
 
 func (a *App) envVarNatsOverrides() error {
 	if a.v.GetString("nats.url") != "" {
