@@ -107,6 +107,11 @@ func NewRoutes(options ...Option) (*Routes, error) {
 }
 
 func (r *Routes) Routes(g *gin.RouterGroup) {
+	// JWT token verification.
+	if r.authMW != nil {
+		g.Use(r.authMW.AuthRequired())
+	}
+
 	// For now these don't have scopes, since @ozz suggests it'll be handled by the API gateway.
 	servers := g.Group("/servers/:uuid")
 	{
