@@ -82,8 +82,11 @@ func (c *Client) delete(ctx context.Context, path string) (*v1types.ServerRespon
 
 func (c *Client) do(req *http.Request) (*v1types.ServerResponse, error) {
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", fmt.Sprintf("bearer %s", c.authToken))
 	req.Header.Set("User-Agent", fmt.Sprintf("conditionorc-client (%s)", version.Current().String()))
+
+	if c.authToken != "" {
+		req.Header.Set("Authorization", fmt.Sprintf("bearer %s", c.authToken))
+	}
 
 	response, err := c.client.Do(req)
 	if err != nil {
