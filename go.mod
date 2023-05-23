@@ -16,7 +16,7 @@ require (
 	github.com/stretchr/testify v1.8.3
 	github.com/toorop/gin-logrus v0.0.0-20210225092905-2c785434f26f
 	go.hollow.sh/serverservice v0.15.2
-	go.hollow.sh/toolbox v0.5.2-0.20230403084733-0bfb6095e5a5
+	go.hollow.sh/toolbox v0.6.0
 	go.infratographer.com/x v0.0.15
 	go.opentelemetry.io/otel v1.14.0
 	golang.org/x/exp v0.0.0-20230519143937-03e91628a987
@@ -72,7 +72,6 @@ require (
 	github.com/mitchellh/mapstructure v1.5.0 // indirect
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.2 // indirect
-	github.com/nats-io/jwt/v2 v2.3.0 // indirect
 	github.com/nats-io/nats.go v1.25.0 // indirect
 	github.com/nats-io/nkeys v0.4.4 // indirect
 	github.com/nats-io/nuid v1.0.1 // indirect
