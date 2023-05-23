@@ -2,14 +2,13 @@ package orchestrator
 
 import (
 	"context"
-	"encoding/json"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
 
 	"github.com/metal-toolbox/conditionorc/internal/store"
 	v1EventHandlers "github.com/metal-toolbox/conditionorc/pkg/api/v1/events"
-	ptypes "github.com/metal-toolbox/conditionorc/pkg/types"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"go.hollow.sh/toolbox/events"
@@ -22,6 +21,9 @@ var (
 	ErrPublishEvent     = errors.New("error publishing event")
 	ErrInvalidEvent     = errors.New("invalid event message")
 	pkgName             = "internal/orchestrator"
+	serverServiceOrigin = "serverservice"
+	controllersOrigin   = "controllers"
+	defaultOrigin       = "default"
 )
 
 // Orchestrator type holds attributes of the condition orchestrator service
@@ -118,6 +120,9 @@ func (o *Orchestrator) Run(ctx context.Context) {
 			o.pullEvents(ctx)
 
 		// eventsCh receives events from push based subscriptions, in this case serverservice.
+		// XXX: shouldn't this be a work-queue (and hence a pull subscription)? In a pull scenario
+		// a publish is fire-and-forget, meaning server-service could send a request when
+		// condition-orc is unavailable and NATS will drop that message.
 		case msg := <-eventsCh:
 			o.processEvent(ctx, msg)
 		}
@@ -158,39 +163,36 @@ func (o *Orchestrator) pullEvents(ctx context.Context) {
 	}
 }
 
+//nolint:gomnd,gocritic // shut it
+func findSubjectOrigin(subject string) string {
+	// XXX: ContainerOrc subjects from Server-Service follow a subject convention of
+	// "com.hollow.sh.serverservice.events.target.action". For example, a server
+	// inventory request would be 'com.hollow.sh.serverservice.events.server.create'
+	// XXX: ugh, why is inventory 'create'?
+	// Incoming messages from controllers have a subject of 'com.hollow.sh.controllers.responses'
+
+	subjectElements := strings.Split(subject, ".")
+	origin := defaultOrigin
+	if len(subjectElements) > 3 {
+		origin = subjectElements[3]
+	}
+	return origin
+}
+
 func (o *Orchestrator) processEvent(ctx context.Context, event events.Message) {
 	otelCtx, span := otel.Tracer(pkgName).Start(ctx, "processEvent")
 	defer span.End()
 
-	data, err := event.Data()
-	if err != nil {
-		o.ackEvent(event, errors.Wrap(ErrInvalidEvent, "data field error: "+err.Error()))
+	// route the message processing based on the subject
 
-		return
-	}
-
-	urn, err := event.SubjectURN(data)
-	if err != nil {
-		o.ackEvent(event, errors.Wrap(ErrInvalidEvent, "error parsing subject URN in msg: "+err.Error()))
-
-		return
-	}
-
-	if urn.ResourceType != ptypes.ServerResourceType {
-		o.ackEvent(event, errors.Wrap(ErrInvalidEvent, "msg with unknown ResourceType in URN: "+err.Error()))
-
-		return
-	}
-
-	streamEvent := &ptypes.StreamEvent{URN: urn, Event: event, Data: data}
-
-	switch ptypes.EventUrnNamespace(urn.Namespace) {
-	case ptypes.ServerserviceNamespace:
-		o.eventHandler.ServerserviceEvent(otelCtx, streamEvent)
-	case ptypes.ControllerUrnNamespace:
-		o.eventHandler.ControllerEvent(otelCtx, streamEvent)
+	switch findSubjectOrigin(event.Subject()) {
+	case serverServiceOrigin:
+		o.eventHandler.ServerserviceEvent(otelCtx, event)
+	case controllersOrigin:
+		o.eventHandler.ControllerEvent(otelCtx, event)
 	default:
-		o.ackEvent(event, errors.Wrap(ErrInvalidEvent, "msg with unknown URN namespace ignored: "+urn.Namespace))
+		// how did we get a message delivered on a subject that we're not subscribed to?
+		o.ackEvent(event, errors.Wrap(ErrInvalidEvent, "msg with unknown subject-pattern ignored"))
 	}
 }
 
@@ -198,13 +200,7 @@ func (o *Orchestrator) ackEvent(event events.Message, err error) {
 	if err != nil {
 		// attempt to format the event as JSON
 		// so its easier to read in the logs.
-		logFields := logrus.Fields{"err": err}
-		data, err := json.Marshal(event)
-		if err == nil {
-			logFields["event"] = data
-		} else {
-			logFields["event"] = event
-		}
+		logFields := logrus.Fields{"event_subject": event.Subject()}
 
 		// TODO: add metrics for dropped events
 		o.logger.WithError(err).WithFields(logFields).Warn("event with error ack'ed")

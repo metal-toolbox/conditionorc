@@ -10,7 +10,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
-	"go.hollow.sh/toolbox/events"
 	"go.opentelemetry.io/otel"
 
 	"github.com/metal-toolbox/conditionorc/internal/store"
@@ -136,6 +135,10 @@ func (r *Routes) serverConditionUpdate(c *gin.Context) (int, *v1types.ServerResp
 	return http.StatusOK, &v1types.ServerResponse{Message: "condition updated"}
 }
 
+// XXX: This needs to be refactored. In order to specifically compute the NATS subject for
+// the message we need to have some visibility into the actual actions the caller wants us to
+// take. Trying to parse this out of a json.RawMessage in the ConditionCreate is too
+// ambiguous, as RawBytes has no structure aside being well-formed json.
 func (r *Routes) serverConditionCreate(c *gin.Context) (int, *v1types.ServerResponse) {
 	otelCtx, span := otel.Tracer(pkgName).Start(c.Request.Context(), "Routes.serverConditionUpdate")
 	defer span.End()
@@ -250,9 +253,9 @@ func (r *Routes) serverConditionCreate(c *gin.Context) (int, *v1types.ServerResp
 		}
 	}
 
-	// XXX: this operation can't ignore errors
+	// XXX: See comments in re: refactoring. Also, this operation can't ignore errors
 	// publish the condition
-	r.publishCondition(otelCtx, serverID, condition)
+	// r.publishCondition(otelCtx, serverID, condition)
 
 	return http.StatusOK, &v1types.ServerResponse{
 		Message: "condition set",
@@ -295,6 +298,30 @@ func (r *Routes) exclusiveNonFinalConditionExists(ctx context.Context, serverID 
 
 	return nil
 }
+
+/*func (r *Routes) publishCondition(ctx context.Context, serverID uuid.UUID, condition *ptypes.Condition) {
+	otelCtx, span := otel.Tracer(pkgName).Start(ctx, "Routes.publishCondition")
+	defer span.End()
+	if r.streamBroker == nil {
+		r.logger.Warn("Event publish skipped, not connected to stream broker")
+		return
+	}
+
+	if err := r.streamBroker.Publish(
+		otelCtx,
+		events.ResourceType(ptypes.ServerResourceType),
+		events.EventType(condition.Kind.EventType()),
+		serverID.String(),
+		condition,
+	); err != nil {
+		r.logger.WithFields(
+			logrus.Fields{"err": err.Error()},
+		).Error("error publishing condition event")
+	}
+
+	r.logger.WithFields(logrus.Fields{"kind": condition.Kind}).Info("published condition event")
+}
+*/
 
 func (r *Routes) serverConditionDelete(c *gin.Context) (int, *v1types.ServerResponse) {
 	otelCtx, span := otel.Tracer(pkgName).Start(c.Request.Context(), "Routes.serverConditionDelete")
@@ -419,27 +446,4 @@ func (r *Routes) serverConditionGet(c *gin.Context) (int, *v1types.ServerRespons
 			},
 		},
 	}
-}
-
-func (r *Routes) publishCondition(ctx context.Context, serverID uuid.UUID, condition *ptypes.Condition) {
-	otelCtx, span := otel.Tracer(pkgName).Start(ctx, "Routes.publishCondition")
-	defer span.End()
-	if r.streamBroker == nil {
-		r.logger.Warn("Event publish skipped, not connected to stream broker")
-		return
-	}
-
-	if err := r.streamBroker.PublishAsyncWithContext(
-		otelCtx,
-		events.ResourceType(ptypes.ServerResourceType),
-		events.EventType(condition.Kind.EventType()),
-		serverID.String(),
-		condition,
-	); err != nil {
-		r.logger.WithFields(
-			logrus.Fields{"err": err.Error()},
-		).Error("error publishing condition event")
-	}
-
-	r.logger.WithFields(logrus.Fields{"kind": condition.Kind}).Info("published condition event")
 }
