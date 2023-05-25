@@ -30,9 +30,8 @@ const (
 	ServerserviceNamespace EventUrnNamespace = "hollow-serverservice"
 	ControllerUrnNamespace EventUrnNamespace = "hollow-controllers"
 
-	ConditionCreateEvent  events.EventType = "create"
-	ConditionRequestEvent events.EventType = "request"
-	ConditionUpdateEvent  events.EventType = "update"
+	ConditionCreateEvent events.EventType = "create"
+	ConditionUpdateEvent events.EventType = "update"
 
 	// ConditionStructVersion identifies the condition struct revision
 	ConditionStructVersion string = "1"

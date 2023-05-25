@@ -71,10 +71,13 @@ func (h *Handler) ControllerEvent(ctx context.Context, msg events.Message) {
 	//nolint:gomnd // useless, generic optinion
 	frags := strings.SplitN(fragment, ".", 2)
 
-	// XXX: this would be nicer if we could just destructure the output of SplitN,
-	// but golang is why we can't have nice things
-	facility := frags[0]
-	act := frags[1]
+	facility := "no facility"
+	act := "default"
+
+	if len(frags) > 1 {
+		facility = frags[0]
+		act = frags[1]
+	}
 
 	h.logger.WithFields(
 		logrus.Fields{
