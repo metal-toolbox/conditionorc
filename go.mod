@@ -16,7 +16,7 @@ require (
 	github.com/stretchr/testify v1.8.3
 	github.com/toorop/gin-logrus v0.0.0-20210225092905-2c785434f26f
 	go.hollow.sh/serverservice v0.15.3-0.20230519171430-6d4a327f68f3
-	go.hollow.sh/toolbox v0.6.1-0.20230523125520-f9351bc3442b
+	go.hollow.sh/toolbox v0.6.0
 	go.infratographer.com/x v0.0.15
 	go.opentelemetry.io/otel v1.14.0
 	golang.org/x/exp v0.0.0-20230519143937-03e91628a987
