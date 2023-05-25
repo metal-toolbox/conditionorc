@@ -127,6 +127,7 @@ func (r *Routes) Routes(g *gin.RouterGroup) {
 		serverConditionBySlug.GET("/:conditionKind", wrapAPICall(r.serverConditionGet))
 
 		// Create a condition on a server.
+		// XXX: refactor me! see comments
 		serverConditionBySlug.POST("/:conditionKind", wrapAPICall(r.serverConditionCreate))
 
 		// Update an existing condition attributes on a server.

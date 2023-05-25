@@ -6,10 +6,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/pkg/errors"
 	"go.hollow.sh/toolbox/events"
-	"go.infratographer.com/x/pubsubx"
-	"go.infratographer.com/x/urnx"
+
 	"golang.org/x/exp/slices"
 )
 
@@ -32,9 +30,8 @@ const (
 	ServerserviceNamespace EventUrnNamespace = "hollow-serverservice"
 	ControllerUrnNamespace EventUrnNamespace = "hollow-controllers"
 
-	ConditionCreateEvent  events.EventType = "conditionCreate"
-	ConditionRequestEvent events.EventType = "conditionRequest"
-	ConditionUpdateEvent  events.EventType = "conditionUpdate"
+	ConditionCreateEvent events.EventType = "create"
+	ConditionUpdateEvent events.EventType = "update"
 
 	// ConditionStructVersion identifies the condition struct revision
 	ConditionStructVersion string = "1"
@@ -188,6 +185,15 @@ type Fault struct {
 	FailAt string `json:"failAt,omitempty"`
 }
 
+// MustBytes returns an encoded json representation of the condition or panics
+func (c *Condition) MustBytes() []byte {
+	byt, err := json.Marshal(c)
+	if err != nil {
+		panic("encoding condition failed: " + err.Error())
+	}
+	return byt
+}
+
 // StateValid validates the Condition State field.
 func (c *Condition) StateValid() bool {
 	return ConditionStateIsValid(c.State)
@@ -202,33 +208,4 @@ func (c *Condition) IsComplete() bool {
 type ServerConditions struct {
 	ServerID   uuid.UUID
 	Conditions []*Condition
-}
-
-// StreamEvent holds a event message retrieved from the stream.
-type StreamEvent struct {
-	// The event URN attributes
-	URN *urnx.URN
-
-	// The stream event that can be used to follow up with an ack/nak.
-	Event events.Message
-
-	// The data part of the event.
-	//
-	// nolint:staticcheck // yes this is deprecated and will be removed soon.
-	Data *pubsubx.Message
-}
-
-// UnmarshalAdditionalData unpacks the event Data.AdditionalData field into the given target type
-func (s *StreamEvent) UnmarshalAdditionalData(target interface{}) error {
-	value, ok := s.Data.AdditionalData["data"]
-	if !ok {
-		return errors.New("data field missing")
-	}
-
-	cbytes, err := json.Marshal(value)
-	if err != nil {
-		return err
-	}
-
-	return json.Unmarshal(cbytes, target)
 }

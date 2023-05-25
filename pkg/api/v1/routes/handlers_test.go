@@ -99,6 +99,8 @@ func TestServerConditionUpdate(t *testing.T) {
 	}
 
 	updateValid := v1types.ConditionUpdate{
+		ConditionID:     uuid.New(),
+		TargetID:        serverID,
 		State:           ptypes.Active,
 		Status:          []byte(`{"foo": "bar"}`),
 		ResourceVersion: int64(time.Now().Nanosecond()),
@@ -254,6 +256,7 @@ func TestServerConditionUpdate(t *testing.T) {
 						gomock.Eq(ptypes.FirmwareInstallOutofband),
 					).
 					Return(&ptypes.Condition{ // condition present
+						ID:              updateValid.ConditionID,
 						Kind:            ptypes.FirmwareInstallOutofband,
 						State:           updateValid.State,
 						Status:          updateValid.Status,

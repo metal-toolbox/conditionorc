@@ -50,13 +50,22 @@ func (c *ConditionCreate) NewCondition(kind ptypes.ConditionKind) *ptypes.Condit
 
 // ConditionUpdate is the request payload to update an existing condition.
 type ConditionUpdate struct {
-	ID              uuid.UUID             `json:"id"`
+	ConditionID     uuid.UUID             `json:"conditionId"`
+	TargetID        uuid.UUID             `json:"targetId"`
 	State           ptypes.ConditionState `json:"state,omitempty"`
 	Status          json.RawMessage       `json:"status,omitempty"`
 	ResourceVersion int64                 `json:"resourceVersion"`
 }
 
 func (c *ConditionUpdate) Validate() error {
+	if c.ConditionID == uuid.Nil {
+		return errors.Wrap(errUpdatePayload, "ConditionID not set")
+	}
+
+	if c.TargetID == uuid.Nil {
+		return errors.Wrap(errUpdatePayload, "TargetID not set")
+	}
+
 	if c.ResourceVersion == 0 {
 		return errors.Wrap(errUpdatePayload, "ResourceVersion not set")
 	}
@@ -115,7 +124,7 @@ func (c *ConditionUpdate) MergeExisting(existing *ptypes.Condition, compareResou
 		return nil, errBadUpdateTarget
 	}
 
-	if existing.ID != c.ID {
+	if existing.ID != c.ConditionID {
 		// condition identifier must match
 		return nil, errBadUpdateTarget
 	}

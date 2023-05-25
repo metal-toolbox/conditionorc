@@ -89,6 +89,7 @@ func (c *Client) ServerConditionCreate(ctx context.Context, serverID uuid.UUID, 
 	return c.post(ctx, path, conditionCreate)
 }
 
+//nolint:gocritic // 80 bytes for v1types.ConditionUpdate is big, but not *huge*
 func (c *Client) ServerConditionUpdate(ctx context.Context, serverID uuid.UUID, conditionKind ptypes.ConditionKind, conditionUpdate v1types.ConditionUpdate) (*v1types.ServerResponse, error) {
 	path := fmt.Sprintf("servers/%s/condition/%s", serverID.String(), conditionKind)
 

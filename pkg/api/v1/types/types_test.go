@@ -8,6 +8,22 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestValidate(t *testing.T) {
+	update := ConditionUpdate{}
+
+	require.Error(t, update.Validate(), "empty update")
+	update.ConditionID = uuid.New()
+	require.Error(t, update.Validate(), "only ConditionID")
+	update.TargetID = uuid.New()
+	require.Error(t, update.Validate(), "ConditionID and TargetID")
+	update.State = ptypes.Failed
+	require.Error(t, update.Validate(), "ConditionID, TargetID, State")
+	update.Status = []byte(`{"you":"lose"}`)
+	require.Error(t, update.Validate(), "ConditionID, TargetID, State, Status")
+	update.ResourceVersion = int64(5)
+	require.NoError(t, update.Validate(), "should be good")
+}
+
 func TestConditionUpdate_mergeExisting(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -40,7 +56,7 @@ func TestConditionUpdate_mergeExisting(t *testing.T) {
 		{
 			"condition ID mismatch error",
 			&ConditionUpdate{
-				ID:              uuid.New(),
+				ConditionID:     uuid.New(),
 				ResourceVersion: 1,
 				State:           ptypes.Active,
 				Status:          []byte("{'foo': 'bar'}"),
@@ -59,7 +75,8 @@ func TestConditionUpdate_mergeExisting(t *testing.T) {
 		{
 			"existing merged with update",
 			&ConditionUpdate{
-				ID:              uuid.MustParse("48e632e0-d0af-013b-9540-2cde48001122"),
+				ConditionID:     uuid.MustParse("48e632e0-d0af-013b-9540-2cde48001122"),
+				TargetID:        uuid.MustParse("f2cd1ef8-c759-4049-905e-f6fdf61719a9"),
 				ResourceVersion: 1,
 				State:           ptypes.Active,
 				Status:          []byte("{'foo': 'bar'}"),
