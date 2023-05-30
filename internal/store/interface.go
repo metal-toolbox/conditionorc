@@ -49,10 +49,10 @@ var (
 	ErrRepository = errors.New("storage repository error")
 )
 
-func NewStore(_ context.Context, config *app.Configuration, conditionDefs ptypes.ConditionDefinitions, logger *logrus.Logger) (Repository, error) {
+func NewStore(ctx context.Context, config *app.Configuration, conditionDefs ptypes.ConditionDefinitions, logger *logrus.Logger) (Repository, error) {
 	switch config.StoreKind {
 	case model.ServerserviceStore:
-		return newServerserviceStore(&config.ServerserviceOptions, conditionDefs, logger)
+		return newServerserviceStore(ctx, &config.ServerserviceOptions, conditionDefs, logger)
 	default:
 		return nil, errors.Wrap(ErrRepository, "storage kind not implemented: "+string(config.StoreKind))
 	}
