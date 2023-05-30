@@ -103,6 +103,8 @@ func (o *Orchestrator) Run(ctx context.Context) {
 		o.logger.Fatal(err)
 	}
 
+	o.startWorkerLivenessCheckin(ctx)
+
 	o.logger.Info("listening for events ...")
 
 	for {
