@@ -12,6 +12,7 @@ import (
 	"github.com/hashicorp/go-retryablehttp"
 	"github.com/metal-toolbox/conditionorc/internal/app"
 	"github.com/metal-toolbox/conditionorc/internal/metrics"
+	"github.com/metal-toolbox/conditionorc/internal/model"
 	ptypes "github.com/metal-toolbox/conditionorc/pkg/types"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -169,6 +170,34 @@ func (s *Serverservice) Get(ctx context.Context, serverID uuid.UUID,
 
 	// return condition object from attribute
 	return s.conditionFromAttribute(attributes)
+}
+
+// GetServer gets attributes for a server.
+// @serverID: required
+// @conditionKind: required
+func (s *Serverservice) GetServer(ctx context.Context, serverID uuid.UUID) (*model.Server, error) {
+	otelCtx, span := otel.Tracer(pkgName).Start(ctx, "Serverservice.GetServer")
+	defer span.End()
+
+	// list attributes on a server
+	obj, _, err := s.client.Get(otelCtx, serverID)
+	if err != nil {
+		if strings.Contains(err.Error(), "404") {
+			return nil, ErrConditionNotFound
+		}
+
+		s.logger.WithFields(logrus.Fields{
+			"serverID": serverID.String(),
+			"error":    err,
+			"method":   "GetServer",
+		}).Warn("error reaching serverservice")
+
+		serverServiceError()
+
+		return nil, errors.Wrap(ErrServerserviceQuery, err.Error())
+	}
+
+	return &model.Server{ID: obj.UUID, FacilityCode: obj.FacilityCode}, nil
 }
 
 // List all conditions set on a server.

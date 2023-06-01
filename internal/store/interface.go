@@ -22,6 +22,10 @@ type Repository interface {
 	// @conditionKind: required
 	Get(ctx context.Context, serverID uuid.UUID, conditionKind ptypes.ConditionKind) (*ptypes.Condition, error)
 
+	// Get Server attributes.
+	// @serverID: required
+	GetServer(ctx context.Context, serverID uuid.UUID) (*model.Server, error)
+
 	// List all conditions set on a server.
 	// @serverID: required
 	// @conditionState: optional
