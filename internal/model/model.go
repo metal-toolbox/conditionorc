@@ -1,5 +1,7 @@
 package model
 
+import "github.com/google/uuid"
+
 // AppKind defines the types of application this can be.
 type AppKind string
 
@@ -10,6 +12,12 @@ type StoreKind string
 type LogLevel string
 
 type EventBrokerKind string
+
+// Server is a server asset queried from the store.
+type Server struct {
+	ID           uuid.UUID
+	FacilityCode string
+}
 
 const (
 	AppName string = "conditionorc"
