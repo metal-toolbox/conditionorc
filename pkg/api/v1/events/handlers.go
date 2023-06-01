@@ -119,18 +119,18 @@ func (h *Handler) ControllerEvent(ctx context.Context, msg events.Message) {
 func (h *Handler) updateCondition(ctx context.Context, updEvt *v1types.ConditionUpdateEvent) error {
 	if err := updEvt.Validate(); err != nil {
 		h.logger.WithError(err).WithFields(logrus.Fields{
-			"server_id":      updEvt.ConditionUpdate.TargetID,
+			"server_id":      updEvt.ConditionUpdate.ServerID,
 			"condition_kind": updEvt.Kind,
 		}).Error("conditionUpdateEvent validate error")
 		return err
 	}
 
 	// query existing condition
-	existing, err := h.repository.Get(ctx, updEvt.ConditionUpdate.TargetID, updEvt.Kind)
+	existing, err := h.repository.Get(ctx, updEvt.ConditionUpdate.ServerID, updEvt.Kind)
 	if err != nil {
 		if errors.Is(err, store.ErrConditionNotFound) {
 			h.logger.WithFields(logrus.Fields{
-				"serverID":      updEvt.ConditionUpdate.TargetID,
+				"serverID":      updEvt.ConditionUpdate.ServerID,
 				"conditionKind": updEvt.Kind,
 			}).Error("no existing condition found for update")
 			return err
@@ -140,7 +140,7 @@ func (h *Handler) updateCondition(ctx context.Context, updEvt *v1types.Condition
 
 	if existing == nil {
 		h.logger.WithFields(logrus.Fields{
-			"serverID":      updEvt.ConditionUpdate.TargetID,
+			"serverID":      updEvt.ConditionUpdate.ServerID,
 			"conditionKind": updEvt.Kind,
 		}).Error("no existing condition found for update")
 		return errors.New("nil existing condition with no error on retrieve")
@@ -156,7 +156,7 @@ func (h *Handler) updateCondition(ctx context.Context, updEvt *v1types.Condition
 	revisedCondition, err := updEvt.MergeExisting(existing, false)
 	if err != nil {
 		h.logger.WithError(err).WithFields(logrus.Fields{
-			"serverID":         updEvt.ConditionUpdate.TargetID,
+			"serverID":         updEvt.ConditionUpdate.ServerID,
 			"conditionKind":    updEvt.Kind,
 			"incoming_state":   updEvt.State,
 			"incoming_version": updEvt.ResourceVersion,
@@ -169,7 +169,7 @@ func (h *Handler) updateCondition(ctx context.Context, updEvt *v1types.Condition
 	// update
 	if err := h.repository.Update(ctx, updEvt.ConditionUpdate.ConditionID, revisedCondition); err != nil {
 		h.logger.WithError(err).WithFields(logrus.Fields{
-			"serverID":          updEvt.ConditionUpdate.TargetID,
+			"serverID":          updEvt.ConditionUpdate.ServerID,
 			"conditionID":       revisedCondition.ID,
 			"condition_version": revisedCondition.ResourceVersion,
 		}).Info("condition update failed")
