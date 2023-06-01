@@ -2,7 +2,6 @@ package types
 
 import (
 	"encoding/json"
-	"fmt"
 	"time"
 
 	"github.com/google/uuid"
@@ -36,17 +35,6 @@ const (
 	// ConditionStructVersion identifies the condition struct revision
 	ConditionStructVersion string = "1"
 )
-
-func (k ConditionKind) EventType() string {
-	switch k {
-	case FirmwareInstallOutofband:
-		return fmt.Sprintf("firmware.%s", FirmwareInstallOutofband)
-	case InventoryOutofband:
-		return fmt.Sprintf("inventory.%s", InventoryOutofband)
-	default:
-		return string(k)
-	}
-}
 
 // ConditionState defines model for ConditionState.
 type ConditionState string

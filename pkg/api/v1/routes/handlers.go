@@ -341,7 +341,7 @@ func (r *Routes) publishCondition(ctx context.Context, serverID uuid.UUID, facil
 		panic("unable to marshal a condition" + err.Error())
 	}
 
-	subject := fmt.Sprintf("com.hollow.sh.controllers.commands.%s.servers.firmware.outofband", facilityCode)
+	subject := fmt.Sprintf("com.hollow.sh.controllers.commands.%s.servers.%s", facilityCode, condition.Kind)
 	if err := r.streamBroker.Publish(
 		otelCtx,
 		subject,
