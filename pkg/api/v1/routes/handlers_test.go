@@ -34,7 +34,7 @@ func mockserver(t *testing.T, logger *logrus.Logger, repository store.Repository
 		WithStore(repository),
 		WithConditionDefinitions(
 			[]*ptypes.ConditionDefinition{
-				{Kind: ptypes.FirmwareInstallOutofband},
+				{Kind: ptypes.FirmwareInstall},
 			},
 		),
 	}
@@ -166,7 +166,7 @@ func TestServerConditionUpdate(t *testing.T) {
 			"invalid server condition update payload returns error",
 			nil,
 			func(t *testing.T) *http.Request {
-				url := fmt.Sprintf("/api/v1/servers/%s/condition/%s", serverID.String(), ptypes.FirmwareInstallOutofband)
+				url := fmt.Sprintf("/api/v1/servers/%s/condition/%s", serverID.String(), ptypes.FirmwareInstall)
 				request, err := http.NewRequestWithContext(context.TODO(), http.MethodPut, url, bytes.NewReader(payloadInvalid))
 				if err != nil {
 					t.Fatal(err)
@@ -184,7 +184,7 @@ func TestServerConditionUpdate(t *testing.T) {
 			"update with no state returns an error",
 			nil,
 			func(t *testing.T) *http.Request {
-				url := fmt.Sprintf("/api/v1/servers/%s/condition/%s", serverID.String(), ptypes.FirmwareInstallOutofband)
+				url := fmt.Sprintf("/api/v1/servers/%s/condition/%s", serverID.String(), ptypes.FirmwareInstall)
 				request, err := http.NewRequestWithContext(context.TODO(), http.MethodPut, url, bytes.NewReader(updateNoState))
 				if err != nil {
 					t.Fatal(err)
@@ -202,7 +202,7 @@ func TestServerConditionUpdate(t *testing.T) {
 			"update with no status returns an error",
 			nil,
 			func(t *testing.T) *http.Request {
-				url := fmt.Sprintf("/api/v1/servers/%s/condition/%s", serverID.String(), ptypes.FirmwareInstallOutofband)
+				url := fmt.Sprintf("/api/v1/servers/%s/condition/%s", serverID.String(), ptypes.FirmwareInstall)
 				request, err := http.NewRequestWithContext(context.TODO(), http.MethodPut, url, bytes.NewReader(updateNoStatus))
 				if err != nil {
 					t.Fatal(err)
@@ -226,13 +226,13 @@ func TestServerConditionUpdate(t *testing.T) {
 					Get(
 						gomock.Any(),
 						gomock.Eq(serverID),
-						gomock.Eq(ptypes.FirmwareInstallOutofband),
+						gomock.Eq(ptypes.FirmwareInstall),
 					).
 					Return(nil, nil).
 					Times(1)
 			},
 			func(t *testing.T) *http.Request {
-				url := fmt.Sprintf("/api/v1/servers/%s/condition/%s", serverID.String(), ptypes.FirmwareInstallOutofband)
+				url := fmt.Sprintf("/api/v1/servers/%s/condition/%s", serverID.String(), ptypes.FirmwareInstall)
 				request, err := http.NewRequestWithContext(context.TODO(), http.MethodPut, url, bytes.NewReader(payloadValid))
 				if err != nil {
 					t.Fatal(err)
@@ -254,11 +254,11 @@ func TestServerConditionUpdate(t *testing.T) {
 					Get(
 						gomock.Any(),
 						gomock.Eq(serverID),
-						gomock.Eq(ptypes.FirmwareInstallOutofband),
+						gomock.Eq(ptypes.FirmwareInstall),
 					).
 					Return(&ptypes.Condition{ // condition present
 						ID:              updateValid.ConditionID,
-						Kind:            ptypes.FirmwareInstallOutofband,
+						Kind:            ptypes.FirmwareInstall,
 						State:           updateValid.State,
 						Status:          updateValid.Status,
 						ResourceVersion: updateValid.ResourceVersion,
@@ -275,7 +275,7 @@ func TestServerConditionUpdate(t *testing.T) {
 					Times(1)
 			},
 			func(t *testing.T) *http.Request {
-				url := fmt.Sprintf("/api/v1/servers/%s/condition/%s", serverID.String(), ptypes.FirmwareInstallOutofband)
+				url := fmt.Sprintf("/api/v1/servers/%s/condition/%s", serverID.String(), ptypes.FirmwareInstall)
 				request, err := http.NewRequestWithContext(context.TODO(), http.MethodPut, url, bytes.NewReader(payloadValid))
 				if err != nil {
 					t.Fatal(err)
@@ -363,7 +363,7 @@ func TestServerConditionCreate(t *testing.T) {
 			"invalid server condition payload returns error",
 			nil,
 			func(t *testing.T) *http.Request {
-				url := fmt.Sprintf("/api/v1/servers/%s/condition/%s", serverID.String(), ptypes.FirmwareInstallOutofband)
+				url := fmt.Sprintf("/api/v1/servers/%s/condition/%s", serverID.String(), ptypes.FirmwareInstall)
 				request, err := http.NewRequestWithContext(context.TODO(), http.MethodPost, url, bytes.NewReader([]byte(``)))
 				if err != nil {
 					t.Fatal(err)
@@ -385,7 +385,7 @@ func TestServerConditionCreate(t *testing.T) {
 					Get(
 						gomock.Any(),
 						gomock.Eq(serverID),
-						gomock.Eq(ptypes.FirmwareInstallOutofband),
+						gomock.Eq(ptypes.FirmwareInstall),
 					).
 					Return(nil, nil). // no condition exists
 					Times(1)
@@ -417,7 +417,7 @@ func TestServerConditionCreate(t *testing.T) {
 					t.Error()
 				}
 
-				url := fmt.Sprintf("/api/v1/servers/%s/condition/%s", serverID.String(), ptypes.FirmwareInstallOutofband)
+				url := fmt.Sprintf("/api/v1/servers/%s/condition/%s", serverID.String(), ptypes.FirmwareInstall)
 				request, err := http.NewRequestWithContext(context.TODO(), http.MethodPost, url, bytes.NewReader(payload))
 				if err != nil {
 					t.Fatal(err)
@@ -441,7 +441,7 @@ func TestServerConditionCreate(t *testing.T) {
 					Get(
 						gomock.Any(),
 						gomock.Eq(serverID),
-						gomock.Eq(ptypes.FirmwareInstallOutofband),
+						gomock.Eq(ptypes.FirmwareInstall),
 					).
 					Return(nil, nil). // no condition exists
 					Times(1)
@@ -476,7 +476,7 @@ func TestServerConditionCreate(t *testing.T) {
 					).
 					DoAndReturn(func(_ context.Context, _ uuid.UUID, c *ptypes.Condition) error {
 						assert.Equal(t, ptypes.ConditionStructVersion, c.Version, "condition version mismatch")
-						assert.Equal(t, ptypes.FirmwareInstallOutofband, c.Kind, "condition kind mismatch")
+						assert.Equal(t, ptypes.FirmwareInstall, c.Kind, "condition kind mismatch")
 						assert.Equal(t, json.RawMessage(parametersJSON), c.Parameters, "condition parameters mismatch")
 						assert.Equal(t, ptypes.Pending, c.State, "condition state mismatch")
 						return nil
@@ -489,7 +489,7 @@ func TestServerConditionCreate(t *testing.T) {
 					t.Error()
 				}
 
-				url := fmt.Sprintf("/api/v1/servers/%s/condition/%s", serverID.String(), ptypes.FirmwareInstallOutofband)
+				url := fmt.Sprintf("/api/v1/servers/%s/condition/%s", serverID.String(), ptypes.FirmwareInstall)
 				request, err := http.NewRequestWithContext(context.TODO(), http.MethodPost, url, bytes.NewReader(payload))
 				if err != nil {
 					t.Fatal(err)
@@ -511,7 +511,7 @@ func TestServerConditionCreate(t *testing.T) {
 					Get(
 						gomock.Any(),
 						gomock.Eq(serverID),
-						gomock.Eq(ptypes.FirmwareInstallOutofband),
+						gomock.Eq(ptypes.FirmwareInstall),
 					).
 					Return(nil, nil). // no condition exists
 					Times(1)
@@ -558,7 +558,7 @@ func TestServerConditionCreate(t *testing.T) {
 					t.Error(err)
 				}
 
-				url := fmt.Sprintf("/api/v1/servers/%s/condition/%s", serverID.String(), ptypes.FirmwareInstallOutofband)
+				url := fmt.Sprintf("/api/v1/servers/%s/condition/%s", serverID.String(), ptypes.FirmwareInstall)
 				request, err := http.NewRequestWithContext(context.TODO(), http.MethodPost, url, bytes.NewReader(payload))
 				if err != nil {
 					t.Fatal(err)
@@ -585,10 +585,10 @@ func TestServerConditionCreate(t *testing.T) {
 					Get(
 						gomock.Any(),
 						gomock.Eq(serverID),
-						gomock.Eq(ptypes.FirmwareInstallOutofband),
+						gomock.Eq(ptypes.FirmwareInstall),
 					).
 					Return(&ptypes.Condition{
-						Kind:  ptypes.FirmwareInstallOutofband,
+						Kind:  ptypes.FirmwareInstall,
 						State: ptypes.Succeeded,
 					}, nil). // no condition exists
 					Times(1)
@@ -606,7 +606,7 @@ func TestServerConditionCreate(t *testing.T) {
 					Delete(
 						gomock.Any(),
 						gomock.Eq(serverID),
-						gomock.Eq(ptypes.FirmwareInstallOutofband),
+						gomock.Eq(ptypes.FirmwareInstall),
 					).
 					Return(nil).
 					Times(1)
@@ -632,7 +632,7 @@ func TestServerConditionCreate(t *testing.T) {
 					).
 					DoAndReturn(func(_ context.Context, _ uuid.UUID, c *ptypes.Condition) error {
 						assert.Equal(t, ptypes.ConditionStructVersion, c.Version, "condition version mismatch")
-						assert.Equal(t, ptypes.FirmwareInstallOutofband, c.Kind, "condition kind mismatch")
+						assert.Equal(t, ptypes.FirmwareInstall, c.Kind, "condition kind mismatch")
 						assert.Equal(t, json.RawMessage(parametersJSON), c.Parameters, "condition parameters mismatch")
 						assert.Equal(t, ptypes.Pending, c.State, "condition state mismatch")
 						return nil
@@ -645,7 +645,7 @@ func TestServerConditionCreate(t *testing.T) {
 					t.Error()
 				}
 
-				url := fmt.Sprintf("/api/v1/servers/%s/condition/%s", serverID.String(), ptypes.FirmwareInstallOutofband)
+				url := fmt.Sprintf("/api/v1/servers/%s/condition/%s", serverID.String(), ptypes.FirmwareInstall)
 				request, err := http.NewRequestWithContext(context.TODO(), http.MethodPost, url, bytes.NewReader(payload))
 				if err != nil {
 					t.Fatal(err)
@@ -668,17 +668,17 @@ func TestServerConditionCreate(t *testing.T) {
 					Get(
 						gomock.Any(),
 						gomock.Eq(serverID),
-						gomock.Eq(ptypes.FirmwareInstallOutofband),
+						gomock.Eq(ptypes.FirmwareInstall),
 					).
 					Return(&ptypes.Condition{ // condition present
-						Kind:       ptypes.FirmwareInstallOutofband,
+						Kind:       ptypes.FirmwareInstall,
 						State:      ptypes.Pending,
 						Parameters: []byte(`{"hello":"world"}`),
 					}, nil).
 					Times(1)
 			},
 			func(t *testing.T) *http.Request {
-				url := fmt.Sprintf("/api/v1/servers/%s/condition/%s", serverID.String(), ptypes.FirmwareInstallOutofband)
+				url := fmt.Sprintf("/api/v1/servers/%s/condition/%s", serverID.String(), ptypes.FirmwareInstall)
 				request, err := http.NewRequestWithContext(context.TODO(), http.MethodPost, url, bytes.NewReader([]byte(`{"hello":"world"}`)))
 				if err != nil {
 					t.Fatal(err)
@@ -700,7 +700,7 @@ func TestServerConditionCreate(t *testing.T) {
 					Get(
 						gomock.Any(),
 						gomock.Eq(serverID),
-						gomock.Eq(ptypes.FirmwareInstallOutofband),
+						gomock.Eq(ptypes.FirmwareInstall),
 					).
 					Return(nil, nil).
 					Times(1)
@@ -721,7 +721,7 @@ func TestServerConditionCreate(t *testing.T) {
 					Times(1)
 			},
 			func(t *testing.T) *http.Request {
-				url := fmt.Sprintf("/api/v1/servers/%s/condition/%s", serverID.String(), ptypes.FirmwareInstallOutofband)
+				url := fmt.Sprintf("/api/v1/servers/%s/condition/%s", serverID.String(), ptypes.FirmwareInstall)
 				request, err := http.NewRequestWithContext(context.TODO(), http.MethodPost, url, bytes.NewReader([]byte(`{"hello":"world"}`)))
 				if err != nil {
 					t.Fatal(err)
@@ -875,7 +875,7 @@ func TestServerConditionList(t *testing.T) {
 func TestServerConditionGet(t *testing.T) {
 	serverID := uuid.New()
 	condition := &ptypes.Condition{
-		Kind:       ptypes.FirmwareInstallOutofband,
+		Kind:       ptypes.FirmwareInstall,
 		Parameters: json.RawMessage{},
 	}
 
@@ -935,12 +935,12 @@ func TestServerConditionGet(t *testing.T) {
 			// mock repository
 			func(r *store.MockRepository) {
 				r.EXPECT().
-					Get(gomock.Any(), gomock.Eq(serverID), gomock.Eq(ptypes.FirmwareInstallOutofband)).
+					Get(gomock.Any(), gomock.Eq(serverID), gomock.Eq(ptypes.FirmwareInstall)).
 					Times(1).
 					Return(condition, nil)
 			},
 			func(t *testing.T) *http.Request {
-				url := fmt.Sprintf("/api/v1/servers/%s/condition/%s", serverID.String(), ptypes.FirmwareInstallOutofband)
+				url := fmt.Sprintf("/api/v1/servers/%s/condition/%s", serverID.String(), ptypes.FirmwareInstall)
 
 				request, err := http.NewRequestWithContext(context.TODO(), http.MethodGet, url, http.NoBody)
 				if err != nil {
@@ -1042,12 +1042,12 @@ func TestServerConditionDelete(t *testing.T) {
 			// mock repository
 			func(r *store.MockRepository) {
 				r.EXPECT().
-					Delete(gomock.Any(), gomock.Eq(serverID), gomock.Eq(ptypes.FirmwareInstallOutofband)).
+					Delete(gomock.Any(), gomock.Eq(serverID), gomock.Eq(ptypes.FirmwareInstall)).
 					Times(1).
 					Return(nil)
 			},
 			func(t *testing.T) *http.Request {
-				url := fmt.Sprintf("/api/v1/servers/%s/condition/%s", serverID.String(), ptypes.FirmwareInstallOutofband)
+				url := fmt.Sprintf("/api/v1/servers/%s/condition/%s", serverID.String(), ptypes.FirmwareInstall)
 
 				request, err := http.NewRequestWithContext(context.TODO(), http.MethodDelete, url, http.NoBody)
 				if err != nil {

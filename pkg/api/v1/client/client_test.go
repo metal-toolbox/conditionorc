@@ -76,7 +76,7 @@ func newTester(t *testing.T, enableAuth bool, authToken string) *integrationTest
 		server.WithStore(repository),
 		server.WithConditionDefinitions(
 			[]*ptypes.ConditionDefinition{
-				{Kind: ptypes.FirmwareInstallOutofband},
+				{Kind: ptypes.FirmwareInstall},
 			},
 		),
 	}
@@ -129,7 +129,7 @@ func newTester(t *testing.T, enableAuth bool, authToken string) *integrationTest
 	return tester
 }
 
-// Firmware holds parameters for a firmware install and is part of FirmwareInstallOutofbandParameters.
+// Firmware holds parameters for a firmware install and is part of FirmwareInstallParameters.
 //
 // defined here for tests, this will be made available in a shared package at some point.
 type Firmware struct {
@@ -146,7 +146,7 @@ type Firmware struct {
 // firmwareInstallParameters define firmwareInstall condition parameters.
 //
 // defined here for tests, this will be made available in a shared package at some point.
-type FirmwareInstallOutofbandParameters struct {
+type FirmwareInstallParameters struct {
 	InventoryAfterUpdate bool        `json:"inventoryAfterUpdate,omitempty"`
 	ForceInstall         bool        `json:"forceInstall,omitempty"`
 	FirmwareSetID        string      `json:"firmwareSetID,omitempty"`
@@ -187,7 +187,7 @@ func TestIntegration_AuthToken(t *testing.T) {
 	}{
 		{
 			"invalid auth token returns 401",
-			ptypes.FirmwareInstallOutofband,
+			ptypes.FirmwareInstall,
 			newTester(t, true, "asdf"),
 			// mock repository
 			nil,
@@ -201,11 +201,11 @@ func TestIntegration_AuthToken(t *testing.T) {
 		},
 		{
 			"valid auth token works",
-			ptypes.FirmwareInstallOutofband,
+			ptypes.FirmwareInstall,
 			newTester(t, true, testAuthToken(t)),
 			// mock repository
 			func(r *store.MockRepository) {
-				parameters, err := json.Marshal(&FirmwareInstallOutofbandParameters{
+				parameters, err := json.Marshal(&FirmwareInstallParameters{
 					InventoryAfterUpdate: true,
 					ForceInstall:         true,
 					FirmwareSetID:        "fake",
@@ -220,11 +220,11 @@ func TestIntegration_AuthToken(t *testing.T) {
 					Get(
 						gomock.Any(),
 						gomock.Eq(serverID),
-						gomock.Eq(ptypes.FirmwareInstallOutofband),
+						gomock.Eq(ptypes.FirmwareInstall),
 					).
 					Return(
 						&ptypes.Condition{
-							Kind:       ptypes.FirmwareInstallOutofband,
+							Kind:       ptypes.FirmwareInstall,
 							State:      ptypes.Pending,
 							Status:     []byte(`{"hello":"world"}`),
 							Parameters: parameters,
@@ -233,7 +233,7 @@ func TestIntegration_AuthToken(t *testing.T) {
 					Times(1)
 			},
 			func() *v1types.ServerResponse {
-				parameters, err := json.Marshal(&FirmwareInstallOutofbandParameters{
+				parameters, err := json.Marshal(&FirmwareInstallParameters{
 					InventoryAfterUpdate: true,
 					ForceInstall:         true,
 					FirmwareSetID:        "fake",
@@ -249,7 +249,7 @@ func TestIntegration_AuthToken(t *testing.T) {
 						ServerID: serverID,
 						Conditions: []*ptypes.Condition{
 							{
-								Kind:       ptypes.FirmwareInstallOutofband,
+								Kind:       ptypes.FirmwareInstall,
 								State:      ptypes.Pending,
 								Status:     []byte(`{"hello":"world"}`),
 								Parameters: parameters,
@@ -304,10 +304,10 @@ func TestIntegration_ConditionsGet(t *testing.T) {
 	}{
 		{
 			"valid response",
-			ptypes.FirmwareInstallOutofband,
+			ptypes.FirmwareInstall,
 			// mock repository
 			func(r *store.MockRepository) {
-				parameters, err := json.Marshal(&FirmwareInstallOutofbandParameters{
+				parameters, err := json.Marshal(&FirmwareInstallParameters{
 					InventoryAfterUpdate: true,
 					ForceInstall:         true,
 					FirmwareSetID:        "fake",
@@ -322,11 +322,11 @@ func TestIntegration_ConditionsGet(t *testing.T) {
 					Get(
 						gomock.Any(),
 						gomock.Eq(serverID),
-						gomock.Eq(ptypes.FirmwareInstallOutofband),
+						gomock.Eq(ptypes.FirmwareInstall),
 					).
 					Return(
 						&ptypes.Condition{
-							Kind:       ptypes.FirmwareInstallOutofband,
+							Kind:       ptypes.FirmwareInstall,
 							State:      ptypes.Pending,
 							Status:     []byte(`{"hello":"world"}`),
 							Parameters: parameters,
@@ -335,7 +335,7 @@ func TestIntegration_ConditionsGet(t *testing.T) {
 					Times(1)
 			},
 			func() *v1types.ServerResponse {
-				parameters, err := json.Marshal(&FirmwareInstallOutofbandParameters{
+				parameters, err := json.Marshal(&FirmwareInstallParameters{
 					InventoryAfterUpdate: true,
 					ForceInstall:         true,
 					FirmwareSetID:        "fake",
@@ -351,7 +351,7 @@ func TestIntegration_ConditionsGet(t *testing.T) {
 						ServerID: serverID,
 						Conditions: []*ptypes.Condition{
 							{
-								Kind:       ptypes.FirmwareInstallOutofband,
+								Kind:       ptypes.FirmwareInstall,
 								State:      ptypes.Pending,
 								Status:     []byte(`{"hello":"world"}`),
 								Parameters: parameters,
@@ -364,7 +364,7 @@ func TestIntegration_ConditionsGet(t *testing.T) {
 		},
 		{
 			"404 response",
-			ptypes.FirmwareInstallOutofband,
+			ptypes.FirmwareInstall,
 			// mock repository
 			func(r *store.MockRepository) {
 				// lookup existing condition
@@ -372,7 +372,7 @@ func TestIntegration_ConditionsGet(t *testing.T) {
 					Get(
 						gomock.Any(),
 						gomock.Eq(serverID),
-						gomock.Eq(ptypes.FirmwareInstallOutofband),
+						gomock.Eq(ptypes.FirmwareInstall),
 					).
 					Return(
 						nil,
@@ -446,7 +446,7 @@ func TestIntegration_ConditionsList(t *testing.T) {
 			ptypes.Pending,
 			// mock repository
 			func(r *store.MockRepository) {
-				parameters, err := json.Marshal(&FirmwareInstallOutofbandParameters{
+				parameters, err := json.Marshal(&FirmwareInstallParameters{
 					InventoryAfterUpdate: true,
 					ForceInstall:         true,
 					FirmwareSetID:        "fake",
@@ -466,7 +466,7 @@ func TestIntegration_ConditionsList(t *testing.T) {
 					Return(
 						[]*ptypes.Condition{
 							{
-								Kind:       ptypes.FirmwareInstallOutofband,
+								Kind:       ptypes.FirmwareInstall,
 								State:      ptypes.Pending,
 								Status:     []byte(`{"hello":"world"}`),
 								Parameters: parameters,
@@ -482,7 +482,7 @@ func TestIntegration_ConditionsList(t *testing.T) {
 					Times(1)
 			},
 			func() *v1types.ServerResponse {
-				parameters, err := json.Marshal(&FirmwareInstallOutofbandParameters{
+				parameters, err := json.Marshal(&FirmwareInstallParameters{
 					InventoryAfterUpdate: true,
 					ForceInstall:         true,
 					FirmwareSetID:        "fake",
@@ -498,7 +498,7 @@ func TestIntegration_ConditionsList(t *testing.T) {
 						ServerID: serverID,
 						Conditions: []*ptypes.Condition{
 							{
-								Kind:       ptypes.FirmwareInstallOutofband,
+								Kind:       ptypes.FirmwareInstall,
 								State:      ptypes.Pending,
 								Status:     []byte(`{"hello":"world"}`),
 								Parameters: parameters,
@@ -597,7 +597,7 @@ func TestIntegration_ConditionsCreate(t *testing.T) {
 	}{
 		{
 			"valid payload sent",
-			ptypes.FirmwareInstallOutofband,
+			ptypes.FirmwareInstall,
 			v1types.ConditionCreate{Parameters: []byte(`{"hello":"world"}`)},
 			// mock repository
 			func(r *store.MockRepository) {
@@ -605,7 +605,7 @@ func TestIntegration_ConditionsCreate(t *testing.T) {
 					Get(
 						gomock.Any(),
 						gomock.Eq(serverID),
-						gomock.Eq(ptypes.FirmwareInstallOutofband),
+						gomock.Eq(ptypes.FirmwareInstall),
 					).
 					Return(
 						nil,
@@ -630,7 +630,7 @@ func TestIntegration_ConditionsCreate(t *testing.T) {
 					).
 					DoAndReturn(func(_ context.Context, _ uuid.UUID, c *ptypes.Condition) error {
 						assert.Equal(t, ptypes.ConditionStructVersion, c.Version, "condition version mismatch")
-						assert.Equal(t, ptypes.FirmwareInstallOutofband, c.Kind, "condition kind mismatch")
+						assert.Equal(t, ptypes.FirmwareInstall, c.Kind, "condition kind mismatch")
 						assert.Equal(t, json.RawMessage(`{"hello":"world"}`), c.Parameters, "condition parameters mismatch")
 						assert.Equal(t, ptypes.Pending, c.State, "condition state mismatch")
 						return nil
@@ -647,7 +647,7 @@ func TestIntegration_ConditionsCreate(t *testing.T) {
 		},
 		{
 			"400 response",
-			ptypes.FirmwareInstallOutofband,
+			ptypes.FirmwareInstall,
 			v1types.ConditionCreate{Parameters: []byte(`{"hello":"world"}`)},
 			// mock repository
 			func(r *store.MockRepository) {
@@ -656,11 +656,11 @@ func TestIntegration_ConditionsCreate(t *testing.T) {
 					Get(
 						gomock.Any(),
 						gomock.Eq(serverID),
-						gomock.Eq(ptypes.FirmwareInstallOutofband),
+						gomock.Eq(ptypes.FirmwareInstall),
 					).
 					Return(
 						&ptypes.Condition{
-							Kind:  ptypes.FirmwareInstallOutofband,
+							Kind:  ptypes.FirmwareInstall,
 							State: ptypes.Active,
 						},
 						nil).
@@ -719,7 +719,7 @@ func TestIntegration_ConditionsUpdate(t *testing.T) {
 	}{
 		{
 			"valid payload sent",
-			ptypes.FirmwareInstallOutofband,
+			ptypes.FirmwareInstall,
 			v1types.ConditionUpdate{
 				State:           ptypes.Active,
 				Status:          []byte(`{"hello":"world"}`),
@@ -733,10 +733,10 @@ func TestIntegration_ConditionsUpdate(t *testing.T) {
 					Get(
 						gomock.Any(),
 						gomock.Eq(serverID),
-						gomock.Eq(ptypes.FirmwareInstallOutofband),
+						gomock.Eq(ptypes.FirmwareInstall),
 					).
 					Return(&ptypes.Condition{ // condition present
-						Kind:            ptypes.FirmwareInstallOutofband,
+						Kind:            ptypes.FirmwareInstall,
 						State:           ptypes.Pending,
 						Status:          []byte(`{"hello":"world"}`),
 						ResourceVersion: 1,
@@ -762,7 +762,7 @@ func TestIntegration_ConditionsUpdate(t *testing.T) {
 		},
 		{
 			"404 response",
-			ptypes.FirmwareInstallOutofband,
+			ptypes.FirmwareInstall,
 			v1types.ConditionUpdate{
 				State:           ptypes.Active,
 				Status:          []byte(`{"hello":"world"}`),
@@ -776,7 +776,7 @@ func TestIntegration_ConditionsUpdate(t *testing.T) {
 					Get(
 						gomock.Any(),
 						gomock.Eq(serverID),
-						gomock.Eq(ptypes.FirmwareInstallOutofband),
+						gomock.Eq(ptypes.FirmwareInstall),
 					).
 					Return(nil, nil).
 					Times(1)
@@ -842,14 +842,14 @@ func TestIntegration_ConditionsDelete(t *testing.T) {
 	}{
 		{
 			"valid response",
-			ptypes.FirmwareInstallOutofband,
+			ptypes.FirmwareInstall,
 			// mock repository
 			func(r *store.MockRepository) {
 				r.EXPECT().
 					Delete(
 						gomock.Any(),
 						gomock.Eq(serverID),
-						gomock.Eq(ptypes.FirmwareInstallOutofband),
+						gomock.Eq(ptypes.FirmwareInstall),
 					).
 					Return(nil).
 					Times(1)
