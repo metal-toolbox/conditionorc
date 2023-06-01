@@ -10,6 +10,7 @@ import (
 
 	gomock "github.com/golang/mock/gomock"
 	uuid "github.com/google/uuid"
+	model "github.com/metal-toolbox/conditionorc/internal/model"
 	types "github.com/metal-toolbox/conditionorc/pkg/types"
 )
 
@@ -77,6 +78,21 @@ func (m *MockRepository) Get(ctx context.Context, serverID uuid.UUID, conditionK
 func (mr *MockRepositoryMockRecorder) Get(ctx, serverID, conditionKind interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Get", reflect.TypeOf((*MockRepository)(nil).Get), ctx, serverID, conditionKind)
+}
+
+// GetServer mocks base method.
+func (m *MockRepository) GetServer(ctx context.Context, serverID uuid.UUID) (*model.Server, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetServer", ctx, serverID)
+	ret0, _ := ret[0].(*model.Server)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetServer indicates an expected call of GetServer.
+func (mr *MockRepositoryMockRecorder) GetServer(ctx, serverID interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetServer", reflect.TypeOf((*MockRepository)(nil).GetServer), ctx, serverID)
 }
 
 // List mocks base method.
