@@ -63,7 +63,7 @@ func TestConditionUpdate_mergeExisting(t *testing.T) {
 			},
 			&ptypes.Condition{
 				ID:              uuid.New(),
-				Kind:            ptypes.FirmwareInstallOutofband,
+				Kind:            ptypes.FirmwareInstall,
 				Parameters:      nil,
 				ResourceVersion: 1,
 				State:           ptypes.Pending,
@@ -82,7 +82,7 @@ func TestConditionUpdate_mergeExisting(t *testing.T) {
 				Status:          []byte("{'foo': 'bar'}"),
 			},
 			&ptypes.Condition{
-				Kind:            ptypes.FirmwareInstallOutofband,
+				Kind:            ptypes.FirmwareInstall,
 				ID:              uuid.MustParse("48e632e0-d0af-013b-9540-2cde48001122"),
 				Parameters:      nil,
 				ResourceVersion: 1,
@@ -91,7 +91,7 @@ func TestConditionUpdate_mergeExisting(t *testing.T) {
 			},
 			&ptypes.Condition{
 				ID:              uuid.MustParse("48e632e0-d0af-013b-9540-2cde48001122"),
-				Kind:            ptypes.FirmwareInstallOutofband,
+				Kind:            ptypes.FirmwareInstall,
 				Parameters:      nil,
 				ResourceVersion: 1,
 				State:           ptypes.Active,

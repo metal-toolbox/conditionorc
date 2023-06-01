@@ -22,10 +22,10 @@ type ConditionKind string
 type EventUrnNamespace string
 
 const (
-	FirmwareInstallOutofband ConditionKind = "firmwareInstallOutofband"
-	InventoryOutofband       ConditionKind = "inventoryOutofband"
-	ServerResourceType       string        = "servers"
-	ConditionResourceType    string        = "condition"
+	FirmwareInstall       ConditionKind = "firmwareInstall"
+	InventoryOutofband    ConditionKind = "inventoryOutofband"
+	ServerResourceType    string        = "servers"
+	ConditionResourceType string        = "condition"
 
 	ServerserviceNamespace EventUrnNamespace = "hollow-serverservice"
 	ControllerUrnNamespace EventUrnNamespace = "hollow-controllers"
