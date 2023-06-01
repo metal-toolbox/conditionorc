@@ -88,7 +88,7 @@ func TestControllerEvent(t *testing.T) {
 			Kind: ptypes.InventoryOutofband,
 			ConditionUpdate: v1types.ConditionUpdate{
 				ConditionID:     uuid.New(),
-				TargetID:        serverID,
+				ServerID:        serverID,
 				ResourceVersion: int64(1),
 				State:           ptypes.Active,
 				Status:          []byte(`{"some":"update"}`),
@@ -121,7 +121,7 @@ func TestControllerEvent(t *testing.T) {
 			Kind: ptypes.InventoryOutofband,
 			ConditionUpdate: v1types.ConditionUpdate{
 				ConditionID:     uuid.New(),
-				TargetID:        serverID,
+				ServerID:        serverID,
 				ResourceVersion: int64(1),
 				State:           ptypes.Active,
 				Status:          []byte(`{"some":"update"}`),
@@ -154,7 +154,7 @@ func TestControllerEvent(t *testing.T) {
 			Kind: ptypes.InventoryOutofband,
 			ConditionUpdate: v1types.ConditionUpdate{
 				ConditionID:     uuid.New(),
-				TargetID:        serverID,
+				ServerID:        serverID,
 				ResourceVersion: int64(1),
 				State:           ptypes.Active,
 				Status:          []byte(`{"some":"update"}`),
@@ -187,7 +187,7 @@ func TestControllerEvent(t *testing.T) {
 			Kind: ptypes.InventoryOutofband,
 			ConditionUpdate: v1types.ConditionUpdate{
 				ConditionID:     uuid.New(),
-				TargetID:        serverID,
+				ServerID:        serverID,
 				ResourceVersion: int64(1),
 				State:           ptypes.Active,
 				Status:          []byte(`{"some":"update"}`),
@@ -225,7 +225,7 @@ func TestControllerEvent(t *testing.T) {
 			Kind: ptypes.InventoryOutofband,
 			ConditionUpdate: v1types.ConditionUpdate{
 				ConditionID:     uuid.New(),
-				TargetID:        serverID,
+				ServerID:        serverID,
 				ResourceVersion: int64(1),
 				State:           ptypes.Active,
 				Status:          []byte(`{"some":"update"}`),
@@ -264,7 +264,7 @@ func TestControllerEvent(t *testing.T) {
 			Kind: ptypes.InventoryOutofband,
 			ConditionUpdate: v1types.ConditionUpdate{
 				ConditionID:     conditionID,
-				TargetID:        serverID,
+				ServerID:        serverID,
 				ResourceVersion: int64(1),
 				State:           ptypes.Active,
 				Status:          []byte(`{"some":"update"}`),
@@ -305,7 +305,7 @@ func TestControllerEvent(t *testing.T) {
 			Kind: ptypes.InventoryOutofband,
 			ConditionUpdate: v1types.ConditionUpdate{
 				ConditionID:     conditionID,
-				TargetID:        serverID,
+				ServerID:        serverID,
 				ResourceVersion: int64(1),
 				State:           ptypes.Active,
 				Status:          []byte(`{"some":"update"}`),

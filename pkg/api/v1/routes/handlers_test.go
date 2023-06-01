@@ -100,7 +100,7 @@ func TestServerConditionUpdate(t *testing.T) {
 
 	updateValid := v1types.ConditionUpdate{
 		ConditionID:     uuid.New(),
-		TargetID:        serverID,
+		ServerID:        serverID,
 		State:           ptypes.Active,
 		Status:          []byte(`{"foo": "bar"}`),
 		ResourceVersion: int64(time.Now().Nanosecond()),
