@@ -14,6 +14,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/golang/mock/gomock"
 	"github.com/google/uuid"
+	"github.com/metal-toolbox/conditionorc/internal/model"
 	"github.com/metal-toolbox/conditionorc/internal/store"
 	v1types "github.com/metal-toolbox/conditionorc/pkg/api/v1/types"
 	ptypes "github.com/metal-toolbox/conditionorc/pkg/types"
@@ -376,6 +377,60 @@ func TestServerConditionCreate(t *testing.T) {
 			},
 		},
 		{
+			"server with no facility code returns error",
+			// mock repository
+			func(r *store.MockRepository) {
+				// lookup for an existing condition
+				r.EXPECT().
+					Get(
+						gomock.Any(),
+						gomock.Eq(serverID),
+						gomock.Eq(ptypes.FirmwareInstallOutofband),
+					).
+					Return(nil, nil). // no condition exists
+					Times(1)
+
+				r.EXPECT().
+					List(
+						gomock.Any(),
+						gomock.Any(),
+						gomock.Any(),
+					).
+					Return(nil, nil).
+					Times(2)
+
+				// facility code lookup
+				r.EXPECT().
+					GetServer(
+						gomock.Any(),
+						gomock.Eq(serverID),
+					).
+					Return(
+						&model.Server{ID: serverID, FacilityCode: ""},
+						nil,
+					).
+					Times(1)
+			},
+			func(t *testing.T) *http.Request {
+				payload, err := json.Marshal(&v1types.ConditionCreate{Parameters: []byte(`{"some param": "1"}`)})
+				if err != nil {
+					t.Error()
+				}
+
+				url := fmt.Sprintf("/api/v1/servers/%s/condition/%s", serverID.String(), ptypes.FirmwareInstallOutofband)
+				request, err := http.NewRequestWithContext(context.TODO(), http.MethodPost, url, bytes.NewReader(payload))
+				if err != nil {
+					t.Fatal(err)
+				}
+
+				return request
+			},
+			func(t *testing.T, r *httptest.ResponseRecorder) {
+				assert.Equal(t, http.StatusInternalServerError, r.Code)
+				assert.Contains(t, string(asBytes(t, r.Body)), "no facility code")
+			},
+		},
+		{
 			"valid server condition created",
 			// mock repository
 			func(r *store.MockRepository) {
@@ -399,6 +454,18 @@ func TestServerConditionCreate(t *testing.T) {
 					).
 					Return(nil, nil).
 					Times(2)
+
+				// facility code lookup
+				r.EXPECT().
+					GetServer(
+						gomock.Any(),
+						gomock.Eq(serverID),
+					).
+					Return(
+						&model.Server{ID: serverID, FacilityCode: "foo-42"},
+						nil,
+					).
+					Times(1)
 
 				// create condition query
 				r.EXPECT().
@@ -457,6 +524,18 @@ func TestServerConditionCreate(t *testing.T) {
 					).
 					Return(nil, nil).
 					Times(2)
+
+				// facility code lookup
+				r.EXPECT().
+					GetServer(
+						gomock.Any(),
+						gomock.Eq(serverID),
+					).
+					Return(
+						&model.Server{ID: serverID, FacilityCode: "foo-42"},
+						nil,
+					).
+					Times(1)
 
 				// create condition query
 				r.EXPECT().
@@ -531,6 +610,19 @@ func TestServerConditionCreate(t *testing.T) {
 					).
 					Return(nil).
 					Times(1)
+
+				// facility code lookup
+				r.EXPECT().
+					GetServer(
+						gomock.Any(),
+						gomock.Eq(serverID),
+					).
+					Return(
+						&model.Server{ID: serverID, FacilityCode: "foo-42"},
+						nil,
+					).
+					Times(1)
+
 				// create condition query
 				r.EXPECT().
 					Create(

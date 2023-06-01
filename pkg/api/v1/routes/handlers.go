@@ -3,6 +3,7 @@ package routes
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 
@@ -241,6 +242,13 @@ func (r *Routes) serverConditionCreate(c *gin.Context) (int, *v1types.ServerResp
 		}
 	}
 
+	facilityCode, err := r.serverFacilityCode(otelCtx, serverID)
+	if err != nil {
+		return http.StatusInternalServerError, &v1types.ServerResponse{
+			Message: err.Error(),
+		}
+	}
+
 	// Create the new condition
 	err = r.repository.Create(otelCtx, serverID, condition)
 	if err != nil {
@@ -253,13 +261,34 @@ func (r *Routes) serverConditionCreate(c *gin.Context) (int, *v1types.ServerResp
 		}
 	}
 
-	// XXX: See comments in re: refactoring. Also, this operation can't ignore errors
+	// XXX: this operation can't ignore errors
 	// publish the condition
-	// r.publishCondition(otelCtx, serverID, condition)
+	r.publishCondition(otelCtx, serverID, facilityCode, condition)
 
 	return http.StatusOK, &v1types.ServerResponse{
 		Message: "condition set",
 	}
+}
+
+// look up server for facility code
+func (r *Routes) serverFacilityCode(ctx context.Context, serverID uuid.UUID) (string, error) {
+	server, err := r.repository.GetServer(ctx, serverID)
+	if err != nil {
+		r.logger.WithFields(logrus.Fields{
+			"error": err,
+		}).Info("condition create failed, error in server lookup")
+
+		return "", err
+	}
+
+	if server.FacilityCode == "" {
+		msg := "condition create failed, Server has no facility code assigned"
+		r.logger.Error(msg)
+
+		return "", errors.New(msg)
+	}
+
+	return server.FacilityCode, nil
 }
 
 func (r *Routes) exclusiveNonFinalConditionExists(ctx context.Context, serverID uuid.UUID) error {
@@ -299,7 +328,7 @@ func (r *Routes) exclusiveNonFinalConditionExists(ctx context.Context, serverID 
 	return nil
 }
 
-/*func (r *Routes) publishCondition(ctx context.Context, serverID uuid.UUID, condition *ptypes.Condition) {
+func (r *Routes) publishCondition(ctx context.Context, serverID uuid.UUID, facilityCode string, condition *ptypes.Condition) {
 	otelCtx, span := otel.Tracer(pkgName).Start(ctx, "Routes.publishCondition")
 	defer span.End()
 	if r.streamBroker == nil {
@@ -307,21 +336,30 @@ func (r *Routes) exclusiveNonFinalConditionExists(ctx context.Context, serverID 
 		return
 	}
 
-	if err := r.streamBroker.Publish(
-		otelCtx,
-		events.ResourceType(ptypes.ServerResourceType),
-		events.EventType(condition.Kind.EventType()),
-		serverID.String(),
-		condition,
-	); err != nil {
-		r.logger.WithFields(
-			logrus.Fields{"err": err.Error()},
-		).Error("error publishing condition event")
+	byt, err := json.Marshal(condition)
+	if err != nil {
+		panic("unable to marshal a condition" + err.Error())
 	}
 
-	r.logger.WithFields(logrus.Fields{"kind": condition.Kind}).Info("published condition event")
+	subject := fmt.Sprintf("com.hollow.sh.controllers.commands.%s.servers.firmware.outofband", facilityCode)
+	if err := r.streamBroker.Publish(
+		otelCtx,
+		subject,
+		byt,
+	); err != nil {
+		r.logger.WithError(err).Error("error publishing condition")
+
+		return
+	}
+
+	r.logger.WithFields(
+		logrus.Fields{
+			"serverID":     serverID,
+			"facilityCode": facilityCode,
+			"conditionID":  condition.ID,
+		},
+	).Trace("condition published")
 }
-*/
 
 func (r *Routes) serverConditionDelete(c *gin.Context) (int, *v1types.ServerResponse) {
 	otelCtx, span := otel.Tracer(pkgName).Start(c.Request.Context(), "Routes.serverConditionDelete")
