@@ -32,7 +32,7 @@ type ConditionsResponse struct {
 type ConditionCreate struct {
 	Exclusive  bool            `json:"exclusive"`
 	Parameters json.RawMessage `json:"parameters"`
-	Fault      *ptypes.Fault   `json:"Fault,omitempty"`
+	Fault      *ptypes.Fault   `json:"fault,omitempty"`
 }
 
 // NewCondition returns a new Condition type.
@@ -50,8 +50,8 @@ func (c *ConditionCreate) NewCondition(kind ptypes.ConditionKind) *ptypes.Condit
 
 // ConditionUpdate is the request payload to update an existing condition.
 type ConditionUpdate struct {
-	ConditionID     uuid.UUID             `json:"conditionId"`
-	TargetID        uuid.UUID             `json:"targetId"`
+	ConditionID     uuid.UUID             `json:"conditionID"`
+	ServerID        uuid.UUID             `json:"serverID"`
 	State           ptypes.ConditionState `json:"state,omitempty"`
 	Status          json.RawMessage       `json:"status,omitempty"`
 	ResourceVersion int64                 `json:"resourceVersion"`
@@ -62,8 +62,8 @@ func (c *ConditionUpdate) Validate() error {
 		return errors.Wrap(errUpdatePayload, "ConditionID not set")
 	}
 
-	if c.TargetID == uuid.Nil {
-		return errors.Wrap(errUpdatePayload, "TargetID not set")
+	if c.ServerID == uuid.Nil {
+		return errors.Wrap(errUpdatePayload, "ServerID not set")
 	}
 
 	if c.ResourceVersion == 0 {
