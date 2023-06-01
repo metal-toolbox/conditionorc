@@ -173,6 +173,14 @@ func (a *App) envVarNatsOverrides() error {
 		return errors.New("missing parameter: nats.url")
 	}
 
+	if a.v.GetString("nats.publisherSubjectPrefix") != "" {
+		a.Config.NatsOptions.PublisherSubjectPrefix = a.v.GetString("nats.publisherSubjectPrefix")
+	}
+
+	if a.Config.NatsOptions.PublisherSubjectPrefix == "" {
+		return errors.New("missing parameter: nats.publisherSubjectPrefix")
+	}
+
 	if a.v.GetString("nats.stream.user") != "" {
 		a.Config.NatsOptions.StreamUser = a.v.GetString("nats.stream.user")
 	}
@@ -187,6 +195,10 @@ func (a *App) envVarNatsOverrides() error {
 
 	if a.v.GetString("nats.stream.name") != "" {
 		a.Config.NatsOptions.Stream.Name = a.v.GetString("nats.stream.name")
+	}
+
+	if a.v.GetDuration("nats.connect.timeout") != 0 {
+		a.Config.NatsOptions.ConnectTimeout = a.v.GetDuration("nats.connect.timeout")
 	}
 
 	if a.Config.NatsOptions.ConnectTimeout == 0 {
