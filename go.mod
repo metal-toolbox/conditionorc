@@ -21,7 +21,7 @@ require (
 	go.hollow.sh/serverservice v0.15.3-0.20230519171430-6d4a327f68f3
 	go.hollow.sh/toolbox v0.6.1-0.20230523125520-f9351bc3442b
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.40.0
-	go.opentelemetry.io/otel v1.14.0
+	go.opentelemetry.io/otel v1.16.0
 	golang.org/x/exp v0.0.0-20230519143937-03e91628a987
 	golang.org/x/oauth2 v0.8.0
 	gopkg.in/square/go-jose.v2 v2.6.0
