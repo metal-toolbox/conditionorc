@@ -10,6 +10,7 @@ require (
 	github.com/golang/mock v1.6.0
 	github.com/google/uuid v1.3.0
 	github.com/hashicorp/go-retryablehttp v0.7.1
+	github.com/nats-io/nats.go v1.25.0
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.15.1
 	github.com/sirupsen/logrus v1.9.2
@@ -20,8 +21,8 @@ require (
 	github.com/volatiletech/null/v8 v8.1.2
 	go.hollow.sh/serverservice v0.15.3-0.20230519171430-6d4a327f68f3
 	go.hollow.sh/toolbox v0.6.1-0.20230523125520-f9351bc3442b
-	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.40.0
-	go.opentelemetry.io/otel v1.14.0
+	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.42.0
+	go.opentelemetry.io/otel v1.16.0
 	golang.org/x/exp v0.0.0-20230519143937-03e91628a987
 	golang.org/x/oauth2 v0.8.0
 	gopkg.in/square/go-jose.v2 v2.6.0
@@ -78,7 +79,6 @@ require (
 	github.com/mitchellh/mapstructure v1.5.0 // indirect
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.2 // indirect
-	github.com/nats-io/nats.go v1.25.0 // indirect
 	github.com/nats-io/nkeys v0.4.4 // indirect
 	github.com/nats-io/nuid v1.0.1 // indirect
 	github.com/pelletier/go-toml/v2 v2.0.7 // indirect
@@ -105,9 +105,9 @@ require (
 	go.opentelemetry.io/otel/exporters/otlp/internal/retry v1.14.0 // indirect
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace v1.14.0 // indirect
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc v1.14.0 // indirect
-	go.opentelemetry.io/otel/metric v0.37.0 // indirect
+	go.opentelemetry.io/otel/metric v1.16.0 // indirect
 	go.opentelemetry.io/otel/sdk v1.14.0 // indirect
-	go.opentelemetry.io/otel/trace v1.14.0 // indirect
+	go.opentelemetry.io/otel/trace v1.16.0 // indirect
 	go.opentelemetry.io/proto/otlp v0.19.0 // indirect
 	go.uber.org/atomic v1.10.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
