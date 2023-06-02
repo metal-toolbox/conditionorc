@@ -331,7 +331,6 @@ func (s *Serverservice) ListServersWithCondition(ctx context.Context,
 	otelCtx, span := otel.Tracer(pkgName).Start(ctx, "Serverservice.ListServersWithCondition")
 	defer span.End()
 	params := &sservice.ServerListParams{
-		FacilityCode: s.config.FacilityCode,
 		AttributeListParams: []sservice.AttributeListParams{
 			{
 				Namespace: s.conditionNS(conditionKind),
