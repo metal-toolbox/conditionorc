@@ -1,6 +1,7 @@
 package routes
 
 import (
+	"fmt"
 	"strings"
 	"time"
 
@@ -20,6 +21,9 @@ const (
 )
 
 var pkgName = "pkg/api/v1/routes"
+
+var ginNoOp = func(_ *gin.Context) {
+}
 
 // Routes type sets up the conditionorc API  router routes.
 type Routes struct {
@@ -106,34 +110,86 @@ func NewRoutes(options ...Option) (*Routes, error) {
 	return routes, nil
 }
 
+func (r *Routes) composeAuthHandler(scopes []string) gin.HandlerFunc {
+	if r.authMW == nil {
+		return ginNoOp
+	}
+	return r.authMW.RequiredScopes(scopes)
+}
+
 func (r *Routes) Routes(g *gin.RouterGroup) {
 	// JWT token verification.
 	if r.authMW != nil {
 		g.Use(r.authMW.AuthRequired())
 	}
 
-	// For now these don't have scopes, since @ozz suggests it'll be handled by the API gateway.
 	servers := g.Group("/servers/:uuid")
 	{
 		// /servers/:uuid/state/:conditionState
 		serverCondition := servers.Group("/state")
 
-		serverCondition.GET("/:conditionState", wrapAPICall(r.serverConditionList))
+		serverCondition.GET("/:conditionState",
+			r.composeAuthHandler(readScopes("server", "condition")),
+			wrapAPICall(r.serverConditionList))
 
 		// /servers/:uuid/condition/:conditionKind
 		serverConditionBySlug := servers.Group("/condition")
 
 		// List condition on a server.
-		serverConditionBySlug.GET("/:conditionKind", wrapAPICall(r.serverConditionGet))
+		serverConditionBySlug.GET("/:conditionKind",
+			r.composeAuthHandler(readScopes("condition")),
+			wrapAPICall(r.serverConditionGet))
 
 		// Create a condition on a server.
 		// XXX: refactor me! see comments
-		serverConditionBySlug.POST("/:conditionKind", wrapAPICall(r.serverConditionCreate))
+		serverConditionBySlug.POST("/:conditionKind",
+			r.composeAuthHandler(createScopes("condition")),
+			wrapAPICall(r.serverConditionCreate))
 
 		// Update an existing condition attributes on a server.
-		serverConditionBySlug.PUT("/:conditionKind", wrapAPICall(r.serverConditionUpdate))
+		serverConditionBySlug.PUT("/:conditionKind",
+			r.composeAuthHandler(updateScopes("condition")),
+			wrapAPICall(r.serverConditionUpdate))
 
 		// Remove a condition from a server.
-		serverConditionBySlug.DELETE("/:conditionKind", wrapAPICall(r.serverConditionDelete))
+		serverConditionBySlug.DELETE("/:conditionKind",
+			r.composeAuthHandler(deleteScopes("condition")),
+			wrapAPICall(r.serverConditionDelete))
 	}
+}
+
+func createScopes(items ...string) []string {
+	s := []string{"write", "create"}
+	for _, i := range items {
+		s = append(s, fmt.Sprintf("create:%s", i))
+	}
+
+	return s
+}
+
+func readScopes(items ...string) []string {
+	s := []string{"read"}
+	for _, i := range items {
+		s = append(s, fmt.Sprintf("read:%s", i))
+	}
+
+	return s
+}
+
+func updateScopes(items ...string) []string {
+	s := []string{"write", "update"}
+	for _, i := range items {
+		s = append(s, fmt.Sprintf("update:%s", i))
+	}
+
+	return s
+}
+
+func deleteScopes(items ...string) []string {
+	s := []string{"write", "delete"}
+	for _, i := range items {
+		s = append(s, fmt.Sprintf("delete:%s", i))
+	}
+
+	return s
 }
