@@ -70,7 +70,7 @@ signs:
       - "--output-signature=${signature}"
       - "${artifact}"
       - "--yes" # required on cosign 2.0.0+
- /   artifacts: all
+    artifacts: all
     output: true
 
 docker_signs:
