@@ -7,6 +7,7 @@ import (
 	"github.com/equinix-labs/otel-init-go/otelinit"
 
 	"github.com/metal-toolbox/conditionorc/internal/app"
+	"github.com/metal-toolbox/conditionorc/internal/metrics"
 	"github.com/metal-toolbox/conditionorc/internal/model"
 	"github.com/metal-toolbox/conditionorc/internal/orchestrator"
 	"github.com/metal-toolbox/conditionorc/internal/store"
@@ -26,6 +27,9 @@ var cmdOrchestrator = &cobra.Command{
 
 		_, otelShutdown := otelinit.InitOpenTelemetry(cmd.Context(), "conditionorc-orchestrator")
 		defer otelShutdown(cmd.Context())
+
+		// serve metrics
+		metrics.ListenAndServe()
 
 		// setup cancel context with cancel func
 		ctx, cancelFunc := context.WithCancel(cmd.Context())
