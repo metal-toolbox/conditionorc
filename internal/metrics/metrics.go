@@ -3,11 +3,14 @@
 package metrics
 
 import (
+	"log"
+	"net/http"
 	"strconv"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 var (
@@ -40,6 +43,24 @@ func init() {
 			"response_code",
 		},
 	)
+}
+
+// ListenAndServeMetrics exposes prometheus metrics as /metrics on port 9090
+func ListenAndServe() {
+	endpoint := "0.0.0.0:9090"
+
+	go func() {
+		http.Handle("/metrics", promhttp.Handler())
+
+		server := &http.Server{
+			Addr:              endpoint,
+			ReadHeaderTimeout: 2 * time.Second,
+		}
+
+		if err := server.ListenAndServe(); err != nil {
+			log.Println(err)
+		}
+	}()
 }
 
 // DependencyError provides a convenience method to hide some prometheus implementation
