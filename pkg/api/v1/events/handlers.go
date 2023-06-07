@@ -31,6 +31,12 @@ var (
 	controllerResponsePrefix = "com.hollow.sh.controllers.responses."
 
 	serverCreate = "server.create"
+
+	firmwareInstallUpdateSuffix = fmt.Sprintf(
+		"servers.%s.%s",
+		ptypes.FirmwareInstall,
+		ptypes.ConditionUpdateEvent,
+	)
 )
 
 //nolint:unused // we'll use this in the very near future
@@ -87,14 +93,8 @@ func (h *Handler) ControllerEvent(ctx context.Context, msg events.Message) {
 		},
 	).Debug("received controller event")
 
-	firmwareInstallUpdateEvt := fmt.Sprintf(
-		"servers.%s.%s",
-		ptypes.FirmwareInstall,
-		ptypes.ConditionUpdateEvent,
-	)
-
 	switch act {
-	case string(firmwareInstallUpdateEvt):
+	case string(firmwareInstallUpdateSuffix):
 		var updateEvt v1types.ConditionUpdateEvent
 		if err := json.Unmarshal(msg.Data(), &updateEvt); err != nil {
 			h.logger.WithError(err).Warn("bogus condition update message")
