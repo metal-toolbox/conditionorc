@@ -87,8 +87,14 @@ func (h *Handler) ControllerEvent(ctx context.Context, msg events.Message) {
 		},
 	).Debug("received controller event")
 
+	firmwareInstallUpdateEvt := fmt.Sprintf(
+		"servers.%s.%s",
+		ptypes.FirmwareInstall,
+		ptypes.ConditionUpdateEvent,
+	)
+
 	switch act {
-	case string(ptypes.ConditionUpdateEvent):
+	case string(firmwareInstallUpdateEvt):
 		var updateEvt v1types.ConditionUpdateEvent
 		if err := json.Unmarshal(msg.Data(), &updateEvt); err != nil {
 			h.logger.WithError(err).Warn("bogus condition update message")
