@@ -549,14 +549,14 @@ func TestServerConditionCreate(t *testing.T) {
 						gomock.Any(),
 					).
 					DoAndReturn(func(_ context.Context, _ uuid.UUID, c *ptypes.Condition) error {
-						expect := &ptypes.Fault{Panic: true, ExecuteWithDelay: 10 * time.Second, FailAt: "foobar"}
+						expect := &ptypes.Fault{Panic: true, DelayDuration: "10s", FailAt: "foobar"}
 						assert.Equal(t, c.Fault, expect)
 						return nil
 					}).
 					Times(1)
 			},
 			func(t *testing.T) *http.Request {
-				fault := ptypes.Fault{Panic: true, ExecuteWithDelay: 10 * time.Second, FailAt: "foobar"}
+				fault := ptypes.Fault{Panic: true, DelayDuration: "10s", FailAt: "foobar"}
 				payload, err := json.Marshal(&v1types.ConditionCreate{Parameters: []byte(`{"some param": "1"}`), Fault: &fault})
 				if err != nil {
 					t.Error(err)
