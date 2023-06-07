@@ -173,7 +173,7 @@ func (h *Handler) updateCondition(ctx context.Context, updEvt *v1types.Condition
 	}
 
 	// update
-	if err := h.repository.Update(ctx, updEvt.ConditionUpdate.ConditionID, revisedCondition); err != nil {
+	if err := h.repository.Update(ctx, updEvt.ServerID, revisedCondition); err != nil {
 		h.logger.WithError(err).WithFields(logrus.Fields{
 			"serverID":          updEvt.ConditionUpdate.ServerID,
 			"conditionID":       revisedCondition.ID,
