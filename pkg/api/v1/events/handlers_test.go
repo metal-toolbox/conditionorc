@@ -21,6 +21,10 @@ import (
 	mock_events "go.hollow.sh/toolbox/events/mock"
 )
 
+var (
+	subject = "com.hollow.sh.controllers.responses.fc13." + firmwareInstallUpdateSuffix
+)
+
 func TestControllerEvent(t *testing.T) {
 	t.Parallel()
 	t.Run("bogus controller message", func(t *testing.T) {
@@ -50,7 +54,7 @@ func TestControllerEvent(t *testing.T) {
 
 		handler := NewHandler(repo, stream, logrus.New())
 		gomock.InOrder(
-			msg.EXPECT().Subject().Times(1).Return("com.hollow.sh.controllers.responses.fc13.update"),
+			msg.EXPECT().Subject().Times(1).Return(subject),
 			msg.EXPECT().Data().Times(1).Return([]byte("garbage")),
 			msg.EXPECT().Ack().Times(1).Return(nil),
 		)
@@ -67,7 +71,7 @@ func TestControllerEvent(t *testing.T) {
 
 		handler := NewHandler(repo, stream, logrus.New())
 		gomock.InOrder(
-			msg.EXPECT().Subject().Times(1).Return("com.hollow.sh.controllers.responses.fc13.update"),
+			msg.EXPECT().Subject().Times(1).Return(subject),
 			// This is a valid JSON message that results in a zero-value (and thus invalid) update message
 			msg.EXPECT().Data().Times(1).Return([]byte(`{"garbage": "true"}`)),
 			msg.EXPECT().Ack().Times(1).Return(nil),
@@ -99,7 +103,7 @@ func TestControllerEvent(t *testing.T) {
 
 		handler := NewHandler(repo, stream, logrus.New())
 		gomock.InOrder(
-			msg.EXPECT().Subject().Times(1).Return("com.hollow.sh.controllers.responses.fc13.update"),
+			msg.EXPECT().Subject().Times(1).Return(subject),
 			msg.EXPECT().Data().Times(1).Return(contentsBytes),
 			repo.EXPECT().Get(gomock.Any(), serverID, ptypes.InventoryOutofband).
 				Return(nil, errors.New("your princess is in another castle")),
@@ -132,7 +136,7 @@ func TestControllerEvent(t *testing.T) {
 
 		handler := NewHandler(repo, stream, logrus.New())
 		gomock.InOrder(
-			msg.EXPECT().Subject().Times(1).Return("com.hollow.sh.controllers.responses.fc13.update"),
+			msg.EXPECT().Subject().Times(1).Return(subject),
 			msg.EXPECT().Data().Times(1).Return(contentsBytes),
 			repo.EXPECT().Get(gomock.Any(), serverID, ptypes.InventoryOutofband).
 				Return(nil, store.ErrConditionNotFound),
@@ -165,7 +169,7 @@ func TestControllerEvent(t *testing.T) {
 
 		handler := NewHandler(repo, stream, logrus.New())
 		gomock.InOrder(
-			msg.EXPECT().Subject().Times(1).Return("com.hollow.sh.controllers.responses.fc13.update"),
+			msg.EXPECT().Subject().Times(1).Return(subject),
 			msg.EXPECT().Data().Times(1).Return(contentsBytes),
 			repo.EXPECT().Get(gomock.Any(), serverID, ptypes.InventoryOutofband).
 				Return(nil, nil),
@@ -203,7 +207,7 @@ func TestControllerEvent(t *testing.T) {
 
 		handler := NewHandler(repo, stream, logrus.New())
 		gomock.InOrder(
-			msg.EXPECT().Subject().Times(1).Return("com.hollow.sh.controllers.responses.fc13.update"),
+			msg.EXPECT().Subject().Times(1).Return(subject),
 			msg.EXPECT().Data().Times(1).Return(contentsBytes),
 			repo.EXPECT().Get(gomock.Any(), serverID, ptypes.InventoryOutofband).
 				Return(existingCondition, nil),
@@ -241,7 +245,7 @@ func TestControllerEvent(t *testing.T) {
 
 		handler := NewHandler(repo, stream, logrus.New())
 		gomock.InOrder(
-			msg.EXPECT().Subject().Times(1).Return("com.hollow.sh.controllers.responses.fc13.update"),
+			msg.EXPECT().Subject().Times(1).Return(subject),
 			msg.EXPECT().Data().Times(1).Return(contentsBytes),
 			repo.EXPECT().Get(gomock.Any(), serverID, ptypes.InventoryOutofband).
 				Return(existingCondition, nil),
@@ -281,11 +285,11 @@ func TestControllerEvent(t *testing.T) {
 
 		handler := NewHandler(repo, stream, logrus.New())
 		gomock.InOrder(
-			msg.EXPECT().Subject().Times(1).Return("com.hollow.sh.controllers.responses.fc13.update"),
+			msg.EXPECT().Subject().Times(1).Return(subject),
 			msg.EXPECT().Data().Times(1).Return(contentsBytes),
 			repo.EXPECT().Get(gomock.Any(), serverID, ptypes.InventoryOutofband).
 				Times(1).Return(existingCondition, nil),
-			repo.EXPECT().Update(gomock.Any(), conditionID, gomock.Any()).Times(1).Return(errors.New("pound sand")),
+			repo.EXPECT().Update(gomock.Any(), serverID, gomock.Any()).Times(1).Return(errors.New("pound sand")),
 			msg.EXPECT().Nak().Times(1).Return(nil),
 		)
 		handler.ControllerEvent(context.TODO(), msg)
@@ -322,11 +326,11 @@ func TestControllerEvent(t *testing.T) {
 
 		handler := NewHandler(repo, stream, logrus.New())
 		gomock.InOrder(
-			msg.EXPECT().Subject().Times(1).Return("com.hollow.sh.controllers.responses.fc13.update"),
+			msg.EXPECT().Subject().Times(1).Return(subject),
 			msg.EXPECT().Data().Times(1).Return(contentsBytes),
 			repo.EXPECT().Get(gomock.Any(), serverID, ptypes.InventoryOutofband).
 				Times(1).Return(existingCondition, nil),
-			repo.EXPECT().Update(gomock.Any(), conditionID, gomock.Any()).Times(1).Return(nil),
+			repo.EXPECT().Update(gomock.Any(), serverID, gomock.Any()).Times(1).Return(nil),
 			msg.EXPECT().Ack().Times(1).Return(nil),
 		)
 		handler.ControllerEvent(context.TODO(), msg)
