@@ -499,7 +499,11 @@ func TestServerConditionCreate(t *testing.T) {
 			},
 			func(t *testing.T, r *httptest.ResponseRecorder) {
 				assert.Equal(t, http.StatusOK, r.Code)
-				assert.Equal(t, asJSONBytes(t, &v1types.ServerResponse{Message: "condition set"}), asBytes(t, r.Body))
+				var resp v1types.ServerResponse
+				err := json.Unmarshal(r.Body.Bytes(), &resp)
+				assert.NoError(t, err, "malformed response body")
+				assert.Equal(t, "condition set", resp.Message)
+				assert.Equal(t, 1, len(resp.Records.Conditions), "bad length of return conditions")
 			},
 		},
 		{
@@ -568,7 +572,11 @@ func TestServerConditionCreate(t *testing.T) {
 			},
 			func(t *testing.T, r *httptest.ResponseRecorder) {
 				assert.Equal(t, http.StatusOK, r.Code)
-				assert.Equal(t, asJSONBytes(t, &v1types.ServerResponse{Message: "condition set"}), asBytes(t, r.Body))
+				var resp v1types.ServerResponse
+				err := json.Unmarshal(r.Body.Bytes(), &resp)
+				assert.NoError(t, err, "malformed response body")
+				assert.Equal(t, "condition set", resp.Message)
+				assert.Equal(t, 1, len(resp.Records.Conditions), "bad length of return conditions")
 			},
 		},
 		{
@@ -655,7 +663,11 @@ func TestServerConditionCreate(t *testing.T) {
 			},
 			func(t *testing.T, r *httptest.ResponseRecorder) {
 				assert.Equal(t, http.StatusOK, r.Code)
-				assert.Equal(t, asJSONBytes(t, &v1types.ServerResponse{Message: "condition set"}), asBytes(t, r.Body))
+				var resp v1types.ServerResponse
+				err := json.Unmarshal(r.Body.Bytes(), &resp)
+				assert.NoError(t, err, "malformed response body")
+				assert.Equal(t, "condition set", resp.Message)
+				assert.Equal(t, 1, len(resp.Records.Conditions), "bad length of return conditions")
 			},
 		},
 

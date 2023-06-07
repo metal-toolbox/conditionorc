@@ -267,6 +267,12 @@ func (r *Routes) serverConditionCreate(c *gin.Context) (int, *v1types.ServerResp
 
 	return http.StatusOK, &v1types.ServerResponse{
 		Message: "condition set",
+		Records: &v1types.ConditionsResponse{
+			ServerID: serverID,
+			Conditions: []*ptypes.Condition{
+				condition,
+			},
+		},
 	}
 }
 
