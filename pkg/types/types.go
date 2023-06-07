@@ -164,7 +164,9 @@ type Fault struct {
 	Panic bool `json:"panic"`
 
 	// Introduce specified delay in execution of the condition on the controller.
-	ExecuteWithDelay time.Duration `json:"executionWithDelay,omitempty"`
+	//
+	// accepts the string format of time.Duration - 5s, 5m, 5h
+	DelayDuration string `json:"delayDuration,omitempty"`
 
 	// FailAt is a controller specific task/stage that the condition should fail in execution.
 	//
