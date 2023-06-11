@@ -15,6 +15,8 @@ import (
 	"go.hollow.sh/toolbox/events"
 )
 
+var useStatusKV bool
+
 // install orchestrator command
 var cmdOrchestrator = &cobra.Command{
 	Use:   "orchestrator",
@@ -62,6 +64,10 @@ var cmdOrchestrator = &cobra.Command{
 			orchestrator.WithStreamBroker(streamBroker),
 		}
 
+		if useStatusKV {
+			options = append(options, orchestrator.WithStatusKV())
+		}
+
 		orc := orchestrator.New(options...)
 		orc.Run(ctx)
 	},
@@ -69,5 +75,8 @@ var cmdOrchestrator = &cobra.Command{
 
 // install command flags
 func init() {
+	cmdOrchestrator.PersistentFlags().BoolVarP(&useStatusKV, "use-kv", "k", false,
+		"when this is true, orchestrator will listen to a NATS status KV store instead of an update subject")
+
 	rootCmd.AddCommand(cmdOrchestrator)
 }

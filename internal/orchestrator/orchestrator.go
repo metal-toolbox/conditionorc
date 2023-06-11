@@ -34,6 +34,7 @@ type Orchestrator struct {
 	repository    store.Repository
 	streamBroker  events.Stream
 	eventHandler  *v1EventHandlers.Handler
+	statusKV      bool
 }
 
 // Option type sets a parameter on the Orchestrator type.
@@ -71,6 +72,14 @@ func WithListenAddress(addr string) Option {
 func WithConcurrency(c int) Option {
 	return func(o *Orchestrator) {
 		o.concurrency = c
+	}
+}
+
+// WithStatusKV sets the Orchestrator to use a KV status update mechanism instead of
+// subscribing to update channels
+func WithStatusKV() Option {
+	return func(o *Orchestrator) {
+		o.statusKV = true
 	}
 }
 
