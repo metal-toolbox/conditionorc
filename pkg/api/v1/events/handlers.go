@@ -101,7 +101,7 @@ func (h *Handler) ControllerEvent(ctx context.Context, msg events.Message) {
 			h.ackEvent(msg)
 			return
 		}
-		err := h.updateCondition(ctx, &updateEvt)
+		err := h.UpdateCondition(ctx, &updateEvt)
 		switch {
 		case errors.Is(err, errRetryThis):
 			h.nakEvent(msg)
@@ -122,7 +122,8 @@ func (h *Handler) ControllerEvent(ctx context.Context, msg events.Message) {
 	}
 }
 
-func (h *Handler) updateCondition(ctx context.Context, updEvt *v1types.ConditionUpdateEvent) error {
+// UpdateCondition sanity checks the incoming condition update, merges it and applies the result to serverservice
+func (h *Handler) UpdateCondition(ctx context.Context, updEvt *v1types.ConditionUpdateEvent) error {
 	if err := updEvt.Validate(); err != nil {
 		h.logger.WithError(err).WithFields(logrus.Fields{
 			"server_id":      updEvt.ConditionUpdate.ServerID,

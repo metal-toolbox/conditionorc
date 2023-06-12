@@ -15,19 +15,11 @@ import (
 // ConditionKind defines model for ConditionKind.
 type ConditionKind string
 
-// EventUrnNamespace is the namespace value set on a stream event.
-//
-// TODO: move into hollow-toolbox/events package.
-type EventUrnNamespace string
-
 const (
 	FirmwareInstall       ConditionKind = "firmwareInstall"
 	InventoryOutofband    ConditionKind = "inventoryOutofband"
 	ServerResourceType    string        = "servers"
 	ConditionResourceType string        = "condition"
-
-	ServerserviceNamespace EventUrnNamespace = "hollow-serverservice"
-	ControllerUrnNamespace EventUrnNamespace = "hollow-controllers"
 
 	ConditionCreateEvent events.EventType = "create"
 	ConditionUpdateEvent events.EventType = "update"
