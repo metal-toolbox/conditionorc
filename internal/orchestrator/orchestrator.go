@@ -159,9 +159,3 @@ func (o *Orchestrator) ackEvent(event events.Message, err error) {
 		o.logger.WithError(err).Warn("error Ack'ing event")
 	}
 }
-
-func (o *Orchestrator) eventNak(event events.Message) {
-	if err := event.Nak(); err != nil {
-		o.logger.WithError(err).Warn("error Nack'ing event")
-	}
-}

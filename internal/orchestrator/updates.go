@@ -67,7 +67,7 @@ func (o *Orchestrator) statusKVListener(ctx context.Context) {
 			}
 			evt, err := installEventFromKV(kv)
 			if err == nil {
-				o.eventHandler.UpdateCondition(ctx, evt)
+				_ = o.eventHandler.UpdateCondition(ctx, evt)
 			} else {
 				o.logger.WithError(err).Warn("error creating install condition event")
 			}
@@ -120,6 +120,7 @@ func installEventFromKV(kv nats.KeyValueEntry) (*v1types.ConditionUpdateEvent, e
 
 	byt := kv.Value()
 	sv := ftypes.StatusValue{}
+	//nolint:govet // you and gocritic can argue about it outside.
 	if err := json.Unmarshal(byt, &sv); err != nil {
 		return nil, err
 	}

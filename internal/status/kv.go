@@ -41,12 +41,11 @@ func ConnectToKVStores(s events.Stream, log *logrus.Logger, opts ...kv.Option) {
 	if err != nil {
 		log.WithError(err).Fatal("unable to initialize NATS KV for firmware install")
 	}
-
-	/* inventoryKV, err := kv.CreateOrBindKV(js, string(ptypes.FirmwareInstall), opts...)
+	//nolint:gocritic // shut up I know it's commented out.
+	/* inventoryKV, err := kv.CreateOrBindKV(js, string(ptypes.InventoryOutofband), opts...)
 		if err != nil {
 		log.WithErr(err).Fatal("unable to initialize NATS KV for inventory")
 	}*/
-
 }
 
 // WatchFirmwareInstallStatus specializes some generic NATS functionality, mainly to keep
