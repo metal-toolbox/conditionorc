@@ -12,7 +12,6 @@ import (
 	"github.com/metal-toolbox/conditionorc/internal/status"
 	v1types "github.com/metal-toolbox/conditionorc/pkg/api/v1/types"
 	ptypes "github.com/metal-toolbox/conditionorc/pkg/types"
-	ftypes "github.com/metal-toolbox/flasher/types"
 
 	"github.com/nats-io/nats.go"
 	"github.com/pkg/errors"
@@ -99,14 +98,28 @@ func parseStatusKVKey(key string) (*statusKey, error) {
 		return nil, errKeyFormat
 	}
 	elements := strings.Split(key, ".")
+
 	conditionID, err := uuid.Parse(elements[1])
 	if err != nil {
 		return nil, errConditionID
 	}
+
 	return &statusKey{
 		facility:    elements[0],
 		conditionID: conditionID,
 	}, nil
+}
+
+// XXX: This is a temporary copy of the StatusValue from Flasher. The structs shared by
+// controllers and ConditionOrc will be moved to a separate "API repo" so we can break
+// the direct dependencies of the apps on each other.
+type flasherStatus struct {
+	UpdatedAt  time.Time       `json:"updated"`
+	WorkerID   string          `json:"worker"`
+	Target     string          `json:"target"`
+	State      string          `json:"state"`
+	Status     json.RawMessage `json:"status"`
+	MsgVersion int32           `json:"msgVersion"`
 }
 
 // installEventFromKV converts the Flasher-native StatusValue (the value from the KV) to a
@@ -119,21 +132,21 @@ func installEventFromKV(kv nats.KeyValueEntry) (*v1types.ConditionUpdateEvent, e
 	}
 
 	byt := kv.Value()
-	sv := ftypes.StatusValue{}
+	fs := flasherStatus{}
 	//nolint:govet // you and gocritic can argue about it outside.
-	if err := json.Unmarshal(byt, &sv); err != nil {
+	if err := json.Unmarshal(byt, &fs); err != nil {
 		return nil, err
 	}
 
 	// validate the contents
-	serverID, err := uuid.Parse(sv.Target)
+	serverID, err := uuid.Parse(fs.Target)
 	if err != nil {
 		return nil, errors.Wrap(err, "parsing target id")
 	}
 
-	convState := ptypes.ConditionState(sv.State)
+	convState := ptypes.ConditionState(fs.State)
 	if !ptypes.ConditionStateIsValid(convState) {
-		return nil, errors.Wrap(errors.New("invalid condition state"), sv.State)
+		return nil, errors.Wrap(errors.New("invalid condition state"), fs.State)
 	}
 
 	updEvent := &v1types.ConditionUpdateEvent{
@@ -141,7 +154,7 @@ func installEventFromKV(kv nats.KeyValueEntry) (*v1types.ConditionUpdateEvent, e
 			ConditionID: parsedKey.conditionID,
 			ServerID:    serverID,
 			State:       convState,
-			Status:      sv.Status,
+			Status:      fs.Status,
 		},
 		Kind: ptypes.FirmwareInstall,
 	}
