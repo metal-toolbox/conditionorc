@@ -4,8 +4,6 @@ import (
 	"context"
 	"strings"
 	"sync"
-	"sync/atomic"
-	"time"
 
 	"github.com/metal-toolbox/conditionorc/internal/store"
 	v1EventHandlers "github.com/metal-toolbox/conditionorc/pkg/api/v1/events"
@@ -17,7 +15,6 @@ import (
 
 var (
 	concurrency         = 10
-	fetchEventsInterval = 1 * time.Second
 	ErrPublishEvent     = errors.New("error publishing event")
 	ErrInvalidEvent     = errors.New("invalid event message")
 	pkgName             = "internal/orchestrator"
@@ -37,6 +34,7 @@ type Orchestrator struct {
 	repository    store.Repository
 	streamBroker  events.Stream
 	eventHandler  *v1EventHandlers.Handler
+	statusKV      bool
 }
 
 // Option type sets a parameter on the Orchestrator type.
@@ -77,6 +75,14 @@ func WithConcurrency(c int) Option {
 	}
 }
 
+// WithStatusKV sets the Orchestrator to use a KV status update mechanism instead of
+// subscribing to update channels
+func WithStatusKV() Option {
+	return func(o *Orchestrator) {
+		o.statusKV = true
+	}
+}
+
 // New returns a new orchestrator service with the given options set.
 func New(opts ...Option) *Orchestrator {
 	o := &Orchestrator{concurrency: concurrency, syncWG: &sync.WaitGroup{}}
@@ -96,73 +102,14 @@ func New(opts ...Option) *Orchestrator {
 
 // Run runs the orchestrator which listens for events to action.
 func (o *Orchestrator) Run(ctx context.Context) {
-	tickerFetchEvents := time.NewTicker(fetchEventsInterval).C
-
-	eventsCh, err := o.streamBroker.Subscribe(ctx)
-	if err != nil {
-		o.logger.Fatal(err)
-	}
-
+	o.logger.Info("running orchestrator")
 	o.startWorkerLivenessCheckin(ctx)
+	o.startUpdateListener(ctx)
+	o.startEventListener(ctx)
 
-	o.logger.Info("listening for events ...")
-
-	for {
-		select {
-		case <-ctx.Done():
-			o.streamBroker.Close()
-			return
-
-		// retrieve and process events sent by controllers.
-		case <-tickerFetchEvents:
-			if o.concurrencyLimit() {
-				continue
-			}
-
-			o.pullEvents(ctx)
-
-		// eventsCh receives events from push based subscriptions, in this case serverservice.
-		// XXX: shouldn't this be a work-queue (and hence a pull subscription)? In a pull scenario
-		// a publish is fire-and-forget, meaning server-service could send a request when
-		// condition-orc is unavailable and NATS will drop that message.
-		case msg := <-eventsCh:
-			o.processEvent(ctx, msg)
-		}
-	}
-}
-
-func (o *Orchestrator) concurrencyLimit() bool {
-	return int(o.dispatched) >= o.concurrency
-}
-
-func (o *Orchestrator) pullEvents(ctx context.Context) {
-	// XXX: consider having a separate context for message retrieval
-	msgs, err := o.streamBroker.PullMsg(ctx, 1)
-	if err != nil {
-		o.logger.WithFields(
-			logrus.Fields{"err": err.Error()},
-		).Trace("error fetching work")
-	}
-
-	for _, msg := range msgs {
-		if ctx.Err() != nil || o.concurrencyLimit() {
-			o.eventNak(msg)
-
-			return
-		}
-
-		// spawn msg process handler
-		o.syncWG.Add(1)
-
-		go func(msg events.Message) {
-			defer o.syncWG.Done()
-
-			atomic.AddInt32(&o.dispatched, 1)
-			defer atomic.AddInt32(&o.dispatched, -1)
-
-			o.processEvent(ctx, msg)
-		}(msg)
-	}
+	<-ctx.Done()
+	o.streamBroker.Close()
+	o.logger.Info("orchestrator shut down")
 }
 
 //nolint:gomnd,gocritic // shut it
@@ -210,11 +157,5 @@ func (o *Orchestrator) ackEvent(event events.Message, err error) {
 
 	if err := event.Ack(); err != nil {
 		o.logger.WithError(err).Warn("error Ack'ing event")
-	}
-}
-
-func (o *Orchestrator) eventNak(event events.Message) {
-	if err := event.Nak(); err != nil {
-		o.logger.WithError(err).Warn("error Nack'ing event")
 	}
 }

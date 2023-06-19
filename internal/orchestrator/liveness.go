@@ -12,13 +12,13 @@ import (
 )
 
 var (
-	once           sync.Once
+	livOnce        sync.Once
 	checkinCadence = 30 * time.Second
 )
 
 // This starts a go-routine to peridocally check in with the NATS kv
 func (o *Orchestrator) startWorkerLivenessCheckin(ctx context.Context) {
-	once.Do(func() {
+	livOnce.Do(func() {
 		natsJS, ok := o.streamBroker.(*events.NatsJetstream)
 		if !ok {
 			o.logger.Error("Non-NATS stores are not supported for worker-liveness")
