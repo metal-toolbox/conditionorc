@@ -35,6 +35,7 @@ type Orchestrator struct {
 	streamBroker  events.Stream
 	eventHandler  *v1EventHandlers.Handler
 	statusKV      bool
+	replicaCount  int
 }
 
 // Option type sets a parameter on the Orchestrator type.
@@ -80,6 +81,15 @@ func WithConcurrency(c int) Option {
 func WithStatusKV() Option {
 	return func(o *Orchestrator) {
 		o.statusKV = true
+	}
+}
+
+// WithReplicas sets the number of replicas we'll use when instaintiating the NATS
+// liveness and status KV buckets. This is only used in the rare case when the buckets
+// do no already exist (e.g. when operating in the sandbox environment).
+func WithReplicas(c int) Option {
+	return func(o *Orchestrator) {
+		o.replicaCount = c
 	}
 }
 

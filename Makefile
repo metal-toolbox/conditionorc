@@ -63,8 +63,8 @@ build-image: build-linux
 							 --label org.label-schema.vcs-ref=$(GIT_COMMIT_FULL) \
 							 --label org.label-schema.vcs-url=$(REPO)
 
-## build devel docker image
-build-image-devel: build-image
+## build and push devel docker image to KIND image repo
+push-image-devel: build-image
 	docker tag ${DOCKER_IMAGE}:latest localhost:5001/conditionorc:latest
 	docker push localhost:5001/conditionorc:latest
 	kind load docker-image localhost:5001/conditionorc:latest
