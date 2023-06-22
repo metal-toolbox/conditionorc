@@ -65,9 +65,9 @@ build-image: build-linux
 
 ## build devel docker image
 build-image-devel: build-image
-	docker tag ${DOCKER_IMAGE}:latest localhost:5000/conditionorc:latest
-	docker push localhost:5000/conditionorc:latest
-	kind load docker-image localhost:5000/conditionorc:latest
+	docker tag ${DOCKER_IMAGE}:latest localhost:5001/conditionorc:latest
+	docker push localhost:5001/conditionorc:latest
+	kind load docker-image localhost:5001/conditionorc:latest
 
 ## push docker image
 push-image:
