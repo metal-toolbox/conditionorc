@@ -17,6 +17,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"go.hollow.sh/toolbox/events"
+	"go.hollow.sh/toolbox/events/pkg/kv"
 )
 
 var (
@@ -29,12 +30,19 @@ var (
 
 func (o *Orchestrator) startUpdateListener(ctx context.Context) {
 	updOnce.Do(func() {
+		o.logger.Info("one-time update configuration")
 		if err := ctx.Err(); err != nil {
 			o.logger.WithError(err).Info("bypassing update listener start on context error")
 			return
 		}
 		if o.statusKV {
-			status.ConnectToKVStores(o.streamBroker, o.logger)
+			// XXX: this is a little split up, conditionally setting the replicas here while
+			// we set the TTL in the status module. This should ge refactored after MVP.
+			opts := []kv.Option{}
+			if o.replicaCount > 1 {
+				opts = append(opts, kv.WithReplicas(o.replicaCount))
+			}
+			status.ConnectToKVStores(o.streamBroker, o.logger, opts...)
 			go o.statusKVListener(ctx)
 		} else {
 			go o.updateListener(ctx)
@@ -56,15 +64,15 @@ func (o *Orchestrator) statusKVListener(ctx context.Context) {
 			o.logger.Info("stopping KV update listener")
 			return
 			// retrieve and process events sent by controllers.
-		case kv := <-installWatcher.Updates():
+		case entry := <-installWatcher.Updates():
 			if o.concurrencyLimit() {
 				continue
 			}
-			if kv == nil {
+			if entry == nil {
 				o.logger.Debug("nil kv entry")
 				continue
 			}
-			evt, err := installEventFromKV(kv)
+			evt, err := installEventFromKV(entry)
 			if err == nil {
 				_ = o.eventHandler.UpdateCondition(ctx, evt)
 			} else {
@@ -72,11 +80,11 @@ func (o *Orchestrator) statusKVListener(ctx context.Context) {
 			}
 
 			/* XXX: Uncomment this for out-of-band inventory support
-			case kv := <-inventoryWatcher.Updates():
+			case entry := <-inventoryWatcher.Updates():
 				if o.concurrencyLimit() {
 					continue
 				}
-				evt, err := inventoryEventFromKV(kv)
+				evt, err := inventoryEventFromKV(entry)
 				if err == nil {
 				o.eventHandler.UpdateCondition(ctx, evt)
 			} else {
@@ -125,13 +133,13 @@ type flasherStatus struct {
 // installEventFromKV converts the Flasher-native StatusValue (the value from the KV) to a
 // ConditionOrchestrator-native type that ConditionOrc can more-easily use for its
 // own purposes.
-func installEventFromKV(kv nats.KeyValueEntry) (*v1types.ConditionUpdateEvent, error) {
-	parsedKey, err := parseStatusKVKey(kv.Key())
+func installEventFromKV(kve nats.KeyValueEntry) (*v1types.ConditionUpdateEvent, error) {
+	parsedKey, err := parseStatusKVKey(kve.Key())
 	if err != nil {
 		return nil, err
 	}
 
-	byt := kv.Value()
+	byt := kve.Value()
 	fs := flasherStatus{}
 	//nolint:govet // you and gocritic can argue about it outside.
 	if err := json.Unmarshal(byt, &fs); err != nil {

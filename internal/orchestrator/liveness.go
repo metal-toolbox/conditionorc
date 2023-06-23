@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"go.hollow.sh/toolbox/events"
+	"go.hollow.sh/toolbox/events/pkg/kv"
 	"go.hollow.sh/toolbox/events/registry"
 
 	"github.com/nats-io/nats.go"
@@ -14,6 +15,7 @@ import (
 var (
 	livOnce        sync.Once
 	checkinCadence = 30 * time.Second
+	livenessTTL    = 3 * time.Minute
 )
 
 // This starts a go-routine to peridocally check in with the NATS kv
@@ -25,7 +27,16 @@ func (o *Orchestrator) startWorkerLivenessCheckin(ctx context.Context) {
 			return
 		}
 
-		if err := registry.InitializeActiveControllerRegistry(natsJS); err != nil {
+		opts := []kv.Option{
+			kv.WithTTL(livenessTTL),
+		}
+
+		// only set replicas if we need them
+		if o.replicaCount > 1 {
+			opts = append(opts, kv.WithReplicas(o.replicaCount))
+		}
+
+		if err := registry.InitializeRegistryWithOptions(natsJS, opts...); err != nil {
 			o.logger.WithError(err).Error("unable to initialize active worker registry")
 			return
 		}

@@ -14,7 +14,6 @@ import (
 
 var (
 	statusTTL         = 10 * 24 * time.Hour // expire status information in 10 days
-	statusReplicas    = 3
 	firmwareInstallKV nats.KeyValue
 )
 
@@ -27,17 +26,16 @@ func ConnectToKVStores(s events.Stream, log *logrus.Logger, opts ...kv.Option) {
 		log.Fatal("status via KV updates is only supported on NATS")
 	}
 
-	defaultOpts := []kv.Option{
+	statusOpts := []kv.Option{
 		kv.WithTTL(statusTTL),
-		kv.WithReplicas(statusReplicas),
 	}
 
-	if len(opts) == 0 {
-		opts = defaultOpts
+	if len(opts) > 0 {
+		statusOpts = append(statusOpts, opts...)
 	}
 
 	var err error
-	firmwareInstallKV, err = kv.CreateOrBindKVBucket(js, string(ptypes.FirmwareInstall), opts...)
+	firmwareInstallKV, err = kv.CreateOrBindKVBucket(js, string(ptypes.FirmwareInstall), statusOpts...)
 	if err != nil {
 		log.WithError(err).Fatal("unable to initialize NATS KV for firmware install")
 	}

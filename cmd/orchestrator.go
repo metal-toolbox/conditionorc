@@ -15,7 +15,10 @@ import (
 	"go.hollow.sh/toolbox/events"
 )
 
-var useStatusKV bool
+var (
+	useStatusKV  bool
+	replicaCount int
+)
 
 // install orchestrator command
 var cmdOrchestrator = &cobra.Command{
@@ -65,7 +68,9 @@ var cmdOrchestrator = &cobra.Command{
 		}
 
 		if useStatusKV {
-			options = append(options, orchestrator.WithStatusKV())
+			app.Logger.Info("configuring status KV support")
+			options = append(options, orchestrator.WithStatusKV(),
+				orchestrator.WithReplicas(replicaCount))
 		}
 
 		orc := orchestrator.New(options...)
@@ -77,6 +82,8 @@ var cmdOrchestrator = &cobra.Command{
 func init() {
 	cmdOrchestrator.PersistentFlags().BoolVarP(&useStatusKV, "use-kv", "k", false,
 		"when this is true, orchestrator will listen to a NATS status KV store instead of an update subject")
+	cmdOrchestrator.PersistentFlags().IntVarP(&replicaCount, "replica-count", "r", 3,
+		"the number of replicas to configure for the NATS status KV store")
 
 	rootCmd.AddCommand(cmdOrchestrator)
 }
