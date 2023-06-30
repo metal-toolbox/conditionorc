@@ -1489,8 +1489,6 @@ github.com/matttproud/golang_protobuf_extensions v1.0.2/go.mod h1:BSXmuO+STAnVfr
 github.com/matttproud/golang_protobuf_extensions v1.0.4 h1:mmDVorXM7PCGKw94cs5zkfA9PSy5pEvNWRP0ET0TIVo=
 github.com/matttproud/golang_protobuf_extensions v1.0.4/go.mod h1:BSXmuO+STAnVfrANrmjBb36TMTDstsz7MSK+HVaYKv4=
 github.com/maxbrunsfeld/counterfeiter/v6 v6.2.2/go.mod h1:eD9eIE7cdwcMi9rYluz88Jz2VyhSmden33/aXg4oVIY=
-github.com/metal-toolbox/flasher v0.0.3 h1:aSYtjcbuMTecI0sPRsKt6iJ/C7BmTaD/qNlX3WyaRWM=
-github.com/metal-toolbox/flasher v0.0.3/go.mod h1:GidIMuvug3p5cQnnBjergjrIc7YqMWv+JBtGo2D4HO8=
 github.com/microsoft/ApplicationInsights-Go v0.4.4/go.mod h1:fKRUseBqkw6bDiXTs3ESTiU/4YTIHsQS4W3fP2ieF4U=
 github.com/microsoft/go-mssqldb v0.17.0/go.mod h1:OkoNGhGEs8EZqchVTtochlXruEhEOaO4S0d2sB5aeGQ=
 github.com/microsoft/go-mssqldb v0.18.0/go.mod h1:ukJCBnnzLzpVF0qYRT+eg1e+eSwjeQ7IvenUv8QPook=
@@ -1955,8 +1953,8 @@ go.etcd.io/etcd/raft/v3 v3.5.0/go.mod h1:UFOHSIvO/nKwd4lhkwabrTD3cqW5yVyYYf/KlD0
 go.etcd.io/etcd/server/v3 v3.5.0/go.mod h1:3Ah5ruV+M+7RZr0+Y/5mNLwC+eQlni+mQmOVdCRJoS4=
 go.hollow.sh/serverservice v0.15.3-0.20230519171430-6d4a327f68f3 h1:zzgo+C4dSSKt21oCh/diESfTNc3xpEoJ0mDPlHtsY3w=
 go.hollow.sh/serverservice v0.15.3-0.20230519171430-6d4a327f68f3/go.mod h1:d72epi3tZIqXgHoWp9EmlJPpNvwbMQS/BdSU7gLEMVs=
-go.hollow.sh/toolbox v0.6.1-0.20230523125520-f9351bc3442b h1:MCd9Va/ucafaqhhd+erZdd6w2V6XD3jyIx1g++vqDwY=
-go.hollow.sh/toolbox v0.6.1-0.20230523125520-f9351bc3442b/go.mod h1:Em+bNrPm4jPGkA1xRJC5bD1gOKVxM0wbD1hYYhvnDWs=
+go.hollow.sh/toolbox v0.6.1-0.20230629125041-f32670307308 h1:HLnKsGwkKkmKFNcvWIhGzLwLBkK1UHk0fgo7Q0Z5gBM=
+go.hollow.sh/toolbox v0.6.1-0.20230629125041-f32670307308/go.mod h1:nl+5RDDyYY/+wukOUzHHX2mOyWKRjlTOXUcGxny+tns=
 go.infratographer.com/x v0.0.15 h1:swN19UZt7OR192ZKeNIyPUGoC9DWbwluT5kvZ9/Yqek=
 go.infratographer.com/x v0.0.15/go.mod h1:nsF/EbfcFnKPbTrkARjRrvFKy1w4Vr9cd6jAMDyUaXI=
 go.mongodb.org/mongo-driver v1.7.3/go.mod h1:NqaYOwnXWr5Pm7AOpO5QFxKJ503nbMse/R79oO62zWg=
