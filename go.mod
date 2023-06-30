@@ -10,7 +10,6 @@ require (
 	github.com/golang/mock v1.6.0
 	github.com/google/uuid v1.3.0
 	github.com/hashicorp/go-retryablehttp v0.7.2
-	github.com/metal-toolbox/flasher v0.0.3
 	github.com/nats-io/nats-server/v2 v2.9.15
 	github.com/nats-io/nats.go v1.25.0
 	github.com/pkg/errors v0.9.1
@@ -22,9 +21,10 @@ require (
 	github.com/toorop/gin-logrus v0.0.0-20210225092905-2c785434f26f
 	github.com/volatiletech/null/v8 v8.1.2
 	go.hollow.sh/serverservice v0.15.3-0.20230519171430-6d4a327f68f3
-	go.hollow.sh/toolbox v0.6.1-0.20230523125520-f9351bc3442b
+	go.hollow.sh/toolbox v0.6.1-0.20230629125041-f32670307308
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.42.0
 	go.opentelemetry.io/otel v1.16.0
+	go.opentelemetry.io/otel/trace v1.16.0
 	golang.org/x/exp v0.0.0-20230519143937-03e91628a987
 	golang.org/x/oauth2 v0.8.0
 	gopkg.in/square/go-jose.v2 v2.6.0
@@ -113,7 +113,6 @@ require (
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc v1.14.0 // indirect
 	go.opentelemetry.io/otel/metric v1.16.0 // indirect
 	go.opentelemetry.io/otel/sdk v1.16.0 // indirect
-	go.opentelemetry.io/otel/trace v1.16.0 // indirect
 	go.opentelemetry.io/proto/otlp v0.19.0 // indirect
 	go.uber.org/atomic v1.10.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
