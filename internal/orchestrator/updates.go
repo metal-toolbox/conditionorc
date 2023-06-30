@@ -12,6 +12,8 @@ import (
 	"github.com/metal-toolbox/conditionorc/internal/status"
 	v1types "github.com/metal-toolbox/conditionorc/pkg/api/v1/types"
 	ptypes "github.com/metal-toolbox/conditionorc/pkg/types"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/trace"
 
 	"github.com/nats-io/nats.go"
 	"github.com/pkg/errors"
@@ -30,6 +32,10 @@ var (
 
 func (o *Orchestrator) startUpdateListener(ctx context.Context) {
 	updOnce.Do(func() {
+		var span trace.Span
+		ctx, span = otel.Tracer(pkgName).Start(ctx, "startUpdateListener")
+		defer span.End()
+
 		o.logger.Info("one-time update configuration")
 		if err := ctx.Err(); err != nil {
 			o.logger.WithError(err).Info("bypassing update listener start on context error")
@@ -72,7 +78,7 @@ func (o *Orchestrator) statusKVListener(ctx context.Context) {
 				o.logger.Debug("nil kv entry")
 				continue
 			}
-			evt, err := installEventFromKV(entry)
+			evt, err := installEventFromKV(ctx, entry)
 			if err == nil {
 				_ = o.eventHandler.UpdateCondition(ctx, evt)
 			} else {
@@ -124,16 +130,33 @@ func parseStatusKVKey(key string) (*statusKey, error) {
 type flasherStatus struct {
 	UpdatedAt  time.Time       `json:"updated"`
 	WorkerID   string          `json:"worker"`
+	TraceID    string          `json:"traceID"`
+	SpanID     string          `json:"spanID"`
 	Target     string          `json:"target"`
 	State      string          `json:"state"`
 	Status     json.RawMessage `json:"status"`
 	MsgVersion int32           `json:"msgVersion"`
 }
 
+const (
+	Version int32 = 1
+)
+
+// MustBytes sets the version field of the StatusValue so any callers don't have
+// to deal with it. It will panic if we cannot serialize to JSON for some reason.
+func (v *flasherStatus) MustBytes() []byte {
+	v.MsgVersion = Version
+	byt, err := json.Marshal(v)
+	if err != nil {
+		panic("unable to serialize status value: " + err.Error())
+	}
+	return byt
+}
+
 // installEventFromKV converts the Flasher-native StatusValue (the value from the KV) to a
 // ConditionOrchestrator-native type that ConditionOrc can more-easily use for its
 // own purposes.
-func installEventFromKV(kve nats.KeyValueEntry) (*v1types.ConditionUpdateEvent, error) {
+func installEventFromKV(ctx context.Context, kve nats.KeyValueEntry) (*v1types.ConditionUpdateEvent, error) {
 	parsedKey, err := parseStatusKVKey(kve.Key())
 	if err != nil {
 		return nil, err
@@ -144,6 +167,25 @@ func installEventFromKV(kve nats.KeyValueEntry) (*v1types.ConditionUpdateEvent, 
 	//nolint:govet // you and gocritic can argue about it outside.
 	if err := json.Unmarshal(byt, &fs); err != nil {
 		return nil, err
+	}
+
+	// extract traceID and spanID
+	traceID, _ := trace.TraceIDFromHex(fs.TraceID)
+	spanID, _ := trace.SpanIDFromHex(fs.SpanID)
+
+	// add a trace span
+	if traceID.IsValid() && spanID.IsValid() {
+		remoteSpan := trace.NewSpanContext(trace.SpanContextConfig{
+			TraceID:    traceID,
+			SpanID:     spanID,
+			TraceFlags: trace.FlagsSampled,
+		})
+
+		_, span := otel.Tracer(pkgName).Start(
+			trace.ContextWithRemoteSpanContext(ctx, remoteSpan),
+			"installEventFromKV",
+		)
+		defer span.End()
 	}
 
 	// validate the contents
@@ -166,6 +208,7 @@ func installEventFromKV(kve nats.KeyValueEntry) (*v1types.ConditionUpdateEvent, 
 		},
 		Kind: ptypes.FirmwareInstall,
 	}
+
 	return updEvent, nil
 }
 

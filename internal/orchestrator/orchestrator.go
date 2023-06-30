@@ -139,6 +139,8 @@ func findSubjectOrigin(subject string) string {
 }
 
 func (o *Orchestrator) processEvent(ctx context.Context, event events.Message) {
+	// extract parent trace context from the event if any.
+	ctx = event.ExtractOtelTraceContext(ctx)
 	otelCtx, span := otel.Tracer(pkgName).Start(ctx, "processEvent")
 	defer span.End()
 
