@@ -12,7 +12,10 @@ import (
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 
+	"github.com/metal-toolbox/conditionorc/internal/metrics"
 	"github.com/metal-toolbox/conditionorc/internal/store"
 	v1types "github.com/metal-toolbox/conditionorc/pkg/api/v1/types"
 	ptypes "github.com/metal-toolbox/conditionorc/pkg/types"
@@ -141,8 +144,9 @@ func (r *Routes) serverConditionUpdate(c *gin.Context) (int, *v1types.ServerResp
 // take. Trying to parse this out of a json.RawMessage in the ConditionCreate is too
 // ambiguous, as RawBytes has no structure aside being well-formed json.
 func (r *Routes) serverConditionCreate(c *gin.Context) (int, *v1types.ServerResponse) {
-	otelCtx, span := otel.Tracer(pkgName).Start(c.Request.Context(), "Routes.serverConditionUpdate")
+	otelCtx, span := otel.Tracer(pkgName).Start(c.Request.Context(), "Routes.serverConditionCreate")
 	defer span.End()
+
 	serverID, err := uuid.Parse(c.Param("uuid"))
 	if err != nil {
 		r.logger.WithFields(logrus.Fields{
@@ -334,9 +338,30 @@ func (r *Routes) exclusiveNonFinalConditionExists(ctx context.Context, serverID 
 	return nil
 }
 
+func RegisterSpanEvent(span trace.Span, serverID, conditionID, conditionKind, event string) {
+	span.AddEvent(event, trace.WithAttributes(
+		attribute.String("serverID", serverID),
+		attribute.String("conditionID", conditionID),
+		attribute.String("conditionKind", conditionKind),
+	))
+}
+
 func (r *Routes) publishCondition(ctx context.Context, serverID uuid.UUID, facilityCode string, condition *ptypes.Condition) {
-	otelCtx, span := otel.Tracer(pkgName).Start(ctx, "Routes.publishCondition")
+	otelCtx, span := otel.Tracer(pkgName).Start(
+		ctx,
+		"Routes.publishCondition",
+		trace.WithSpanKind(trace.SpanKindProducer),
+	)
 	defer span.End()
+
+	metrics.RegisterSpanEvent(
+		span,
+		serverID.String(),
+		condition.ID.String(),
+		string(condition.Kind),
+		"publishCondition",
+	)
+
 	if r.streamBroker == nil {
 		r.logger.Warn("Event publish skipped, not connected to stream broker")
 		return

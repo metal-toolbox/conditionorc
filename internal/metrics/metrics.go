@@ -11,6 +11,8 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 )
 
 var (
@@ -74,4 +76,15 @@ func APICallEpilog(start time.Time, endpoint string, responseCode int) {
 	code := strconv.Itoa(responseCode)
 	elapsed := time.Since(start).Seconds()
 	apiLatencySeconds.WithLabelValues(endpoint, code).Observe(elapsed)
+}
+
+// RegisterSpanEvent adds a span event along with the given attributes.
+//
+// event here is arbitrary and can be in the form of strings like - publishCondition, updateCondition etc
+func RegisterSpanEvent(span trace.Span, serverID, conditionID, conditionKind, event string) {
+	span.AddEvent(event, trace.WithAttributes(
+		attribute.String("serverID", serverID),
+		attribute.String("conditionID", conditionID),
+		attribute.String("conditionKind", conditionKind),
+	))
 }

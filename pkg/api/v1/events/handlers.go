@@ -69,7 +69,7 @@ func (h *Handler) nakEvent(m events.Message) {
 
 // ControllerEvent handles events from controllers
 func (h *Handler) ControllerEvent(ctx context.Context, msg events.Message) {
-	_, span := otel.Tracer(pkgName).Start(ctx, "ControllerEvent")
+	_, span := otel.Tracer(pkgName).Start(ctx, "events.ControllerEvent")
 	defer span.End()
 
 	subject := msg.Subject()
@@ -101,6 +101,7 @@ func (h *Handler) ControllerEvent(ctx context.Context, msg events.Message) {
 			h.ackEvent(msg)
 			return
 		}
+
 		err := h.UpdateCondition(ctx, &updateEvt)
 		switch {
 		case errors.Is(err, errRetryThis):
@@ -124,6 +125,17 @@ func (h *Handler) ControllerEvent(ctx context.Context, msg events.Message) {
 
 // UpdateCondition sanity checks the incoming condition update, merges it and applies the result to serverservice
 func (h *Handler) UpdateCondition(ctx context.Context, updEvt *v1types.ConditionUpdateEvent) error {
+	_, span := otel.Tracer(pkgName).Start(ctx, "events.UpdateCondition")
+	defer span.End()
+
+	metrics.RegisterSpanEvent(
+		span,
+		updEvt.ServerID.String(),
+		updEvt.ConditionID.String(),
+		string(updEvt.Kind),
+		"updateCondition",
+	)
+
 	if err := updEvt.Validate(); err != nil {
 		h.logger.WithError(err).WithFields(logrus.Fields{
 			"server_id":      updEvt.ConditionUpdate.ServerID,
