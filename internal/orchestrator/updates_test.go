@@ -11,7 +11,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/metal-toolbox/conditionorc/internal/status"
 	ptypes "github.com/metal-toolbox/conditionorc/pkg/types"
-	ftypes "github.com/metal-toolbox/flasher/types"
 	"github.com/nats-io/nats-server/v2/server"
 	srvtest "github.com/nats-io/nats-server/v2/test"
 	"github.com/nats-io/nats.go"
@@ -97,7 +96,7 @@ func TestInstallEventFromKV(t *testing.T) {
 	defer watcher.Stop()
 
 	// add some KVs
-	sv1 := ftypes.StatusValue{
+	sv1 := flasherStatus{
 		Target: uuid.New().String(),
 		State:  "pending",
 		Status: json.RawMessage(`{"msg":"some-status"}`),
@@ -126,7 +125,7 @@ func TestInstallEventFromKV(t *testing.T) {
 	t.Logf("got %d values from the KV", count)
 	cancel()
 
-	upd1, err := installEventFromKV(entry)
+	upd1, err := installEventFromKV(context.Background(), entry)
 	require.NoError(t, err)
 	require.Equal(t, condID, upd1.ConditionUpdate.ConditionID)
 	require.Equal(t, ptypes.Pending, upd1.ConditionUpdate.State)
