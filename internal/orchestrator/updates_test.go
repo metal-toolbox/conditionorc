@@ -18,6 +18,8 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.hollow.sh/toolbox/events"
 	"go.hollow.sh/toolbox/events/pkg/kv"
+
+	ftypes "github.com/metal-toolbox/flasher/types"
 )
 
 func init() {
@@ -96,7 +98,7 @@ func TestInstallEventFromKV(t *testing.T) {
 	defer watcher.Stop()
 
 	// add some KVs
-	sv1 := flasherStatus{
+	sv1 := ftypes.StatusValue{
 		Target: uuid.New().String(),
 		State:  "pending",
 		Status: json.RawMessage(`{"msg":"some-status"}`),

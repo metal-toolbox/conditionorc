@@ -138,21 +138,6 @@ type flasherStatus struct {
 	MsgVersion int32           `json:"msgVersion"`
 }
 
-const (
-	Version int32 = 1
-)
-
-// MustBytes sets the version field of the StatusValue so any callers don't have
-// to deal with it. It will panic if we cannot serialize to JSON for some reason.
-func (v *flasherStatus) MustBytes() []byte {
-	v.MsgVersion = Version
-	byt, err := json.Marshal(v)
-	if err != nil {
-		panic("unable to serialize status value: " + err.Error())
-	}
-	return byt
-}
-
 // installEventFromKV converts the Flasher-native StatusValue (the value from the KV) to a
 // ConditionOrchestrator-native type that ConditionOrc can more-easily use for its
 // own purposes.
