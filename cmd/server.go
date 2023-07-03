@@ -10,6 +10,7 @@ import (
 	"github.com/equinix-labs/otel-init-go/otelinit"
 
 	"github.com/metal-toolbox/conditionorc/internal/app"
+	"github.com/metal-toolbox/conditionorc/internal/metrics"
 	"github.com/metal-toolbox/conditionorc/internal/model"
 	"github.com/metal-toolbox/conditionorc/internal/server"
 	"github.com/metal-toolbox/conditionorc/internal/store"
@@ -44,6 +45,9 @@ var cmdServer = &cobra.Command{
 		if err := streamBroker.Open(); err != nil {
 			app.Logger.Fatal(err)
 		}
+
+		// serve metrics on port 9090
+		metrics.ListenAndServe()
 
 		// the ignored parameter here is a context annotated with otel-init-go configuration
 		_, otelShutdown := otelinit.InitOpenTelemetry(cmd.Context(), "conditionorc-api-server")
