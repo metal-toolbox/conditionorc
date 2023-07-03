@@ -18,6 +18,10 @@ import (
 var (
 	apiLatencySeconds    *prometheus.HistogramVec
 	dependencyErrorCount *prometheus.CounterVec
+
+	ConditionQueued    *prometheus.CounterVec
+	ConditionCompleted *prometheus.CounterVec
+	PublishErrors      *prometheus.CounterVec
 )
 
 func init() {
@@ -44,6 +48,30 @@ func init() {
 			"endpoint",
 			"response_code",
 		},
+	)
+
+	ConditionQueued = promauto.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "conditionorc_condition_queued",
+			Help: "A counter metric to measure the total count of conditions queued",
+		},
+		[]string{"conditionKind"},
+	)
+
+	ConditionCompleted = promauto.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "conditionorc_condition_completed",
+			Help: "A counter metric to measure the total count of conditions completed",
+		},
+		[]string{"conditionKind", "state"},
+	)
+
+	PublishErrors = promauto.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "conditionorc_publish_errors",
+			Help: "A counter metric to measure the total count of condition publish errors",
+		},
+		[]string{"conditionKind"},
 	)
 }
 

@@ -10,6 +10,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/sirupsen/logrus"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
@@ -136,6 +137,15 @@ func (r *Routes) serverConditionUpdate(c *gin.Context) (int, *v1types.ServerResp
 		}
 	}
 
+	if ptypes.ConditionStateIsComplete(update.State) {
+		metrics.ConditionCompleted.With(
+			prometheus.Labels{
+				"conditionKind": string(update.Kind),
+				"state":         string(update.State),
+			},
+		).Inc()
+	}
+
 	return http.StatusOK, &v1types.ServerResponse{Message: "condition updated"}
 }
 
@@ -143,6 +153,8 @@ func (r *Routes) serverConditionUpdate(c *gin.Context) (int, *v1types.ServerResp
 // the message we need to have some visibility into the actual actions the caller wants us to
 // take. Trying to parse this out of a json.RawMessage in the ConditionCreate is too
 // ambiguous, as RawBytes has no structure aside being well-formed json.
+//
+// nolint:gocyclo //TODO: break up this method
 func (r *Routes) serverConditionCreate(c *gin.Context) (int, *v1types.ServerResponse) {
 	otelCtx, span := otel.Tracer(pkgName).Start(c.Request.Context(), "Routes.serverConditionCreate")
 	defer span.End()
@@ -266,8 +278,23 @@ func (r *Routes) serverConditionCreate(c *gin.Context) (int, *v1types.ServerResp
 	}
 
 	// XXX: this operation can't ignore errors
+	// - if this method fails, should the condition be deleted?
+	//
 	// publish the condition
-	r.publishCondition(otelCtx, serverID, facilityCode, condition)
+	err = r.publishCondition(otelCtx, serverID, facilityCode, condition)
+	if err != nil {
+		r.logger.WithFields(logrus.Fields{
+			"error": err,
+		}).Info("condition create failed")
+
+		metrics.PublishErrors.With(
+			prometheus.Labels{"conditionKind": string(condition.Kind)},
+		).Inc()
+	}
+
+	metrics.ConditionQueued.With(
+		prometheus.Labels{"conditionKind": string(condition.Kind)},
+	)
 
 	return http.StatusOK, &v1types.ServerResponse{
 		Message: "condition set",
@@ -346,7 +373,9 @@ func RegisterSpanEvent(span trace.Span, serverID, conditionID, conditionKind, ev
 	))
 }
 
-func (r *Routes) publishCondition(ctx context.Context, serverID uuid.UUID, facilityCode string, condition *ptypes.Condition) {
+func (r *Routes) publishCondition(ctx context.Context, serverID uuid.UUID, facilityCode string, condition *ptypes.Condition) error {
+	errPublish := errors.New("error publishing condition")
+
 	otelCtx, span := otel.Tracer(pkgName).Start(
 		ctx,
 		"Routes.publishCondition",
@@ -363,13 +392,12 @@ func (r *Routes) publishCondition(ctx context.Context, serverID uuid.UUID, facil
 	)
 
 	if r.streamBroker == nil {
-		r.logger.Warn("Event publish skipped, not connected to stream broker")
-		return
+		return errors.Wrap(errPublish, "not connected to stream broker")
 	}
 
 	byt, err := json.Marshal(condition)
 	if err != nil {
-		panic("unable to marshal a condition" + err.Error())
+		return errors.Wrap(errPublish, "condition marshal error: "+err.Error())
 	}
 
 	subjectSuffix := fmt.Sprintf("%s.servers.%s", facilityCode, condition.Kind)
@@ -378,9 +406,7 @@ func (r *Routes) publishCondition(ctx context.Context, serverID uuid.UUID, facil
 		subjectSuffix,
 		byt,
 	); err != nil {
-		r.logger.WithError(err).Error("error publishing condition")
-
-		return
+		return errors.Wrap(errPublish, err.Error())
 	}
 
 	r.logger.WithFields(
@@ -390,6 +416,8 @@ func (r *Routes) publishCondition(ctx context.Context, serverID uuid.UUID, facil
 			"conditionID":  condition.ID,
 		},
 	).Trace("condition published")
+
+	return nil
 }
 
 func (r *Routes) serverConditionDelete(c *gin.Context) (int, *v1types.ServerResponse) {
