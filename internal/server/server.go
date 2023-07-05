@@ -10,7 +10,6 @@ import (
 	ptypes "github.com/metal-toolbox/conditionorc/pkg/types"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
-	ginlogrus "github.com/toorop/gin-logrus"
 	"go.hollow.sh/toolbox/events"
 	"go.hollow.sh/toolbox/ginjwt"
 )
@@ -88,7 +87,7 @@ func New(opts ...Option) *http.Server {
 	}
 
 	g := gin.New()
-	g.Use(ginlogrus.Logger(s.logger), gin.Recovery())
+	g.Use(loggerMiddleware(s.logger), gin.Recovery())
 
 	g.GET("/healthz/readiness", s.ping)
 
