@@ -129,7 +129,7 @@ func (r *Routes) Routes(g *gin.RouterGroup) {
 		serverCondition := servers.Group("/state")
 
 		serverCondition.GET("/:conditionState",
-			r.composeAuthHandler(readScopes("server", "condition")),
+			r.composeAuthHandler(readScopes("condition")),
 			wrapAPICall(r.serverConditionList))
 
 		// /servers/:uuid/condition/:conditionKind
