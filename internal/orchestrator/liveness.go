@@ -2,6 +2,7 @@ package orchestrator
 
 import (
 	"context"
+	"errors"
 	"sync"
 	"time"
 
@@ -61,22 +62,27 @@ func (o *Orchestrator) checkinRoutine(ctx context.Context) {
 		select {
 		case <-tick.C:
 			err := registry.ControllerCheckin(me)
-			switch err {
-			case nil:
-			case nats.ErrKeyNotFound: // generally means NATS reaped our entry on TTL
-				if err = registry.RegisterController(me); err != nil {
-					o.logger.WithError(err).
-						WithField("id", me.String()).
-						Warn("unable to re-register worker")
+			if err != nil {
+				o.logger.WithError(err).WithField("id", me.String()).Warn("worker checkin failed")
+				// try to refresh our token, maybe this is a NATS hiccup
+				err = refreshWorkerToken(me)
+				if err != nil {
+					// couldn't refresh our liveness token, time to bail out
+					o.logger.WithError(err).WithField("id", me.String()).Fatal("reregister this worker")
 				}
-			default:
-				o.logger.WithError(err).
-					WithField("id", me.String()).
-					Warn("worker checkin failed")
 			}
 		case <-ctx.Done():
 			o.logger.Info("liveness check-in stopping on done context")
 			stop = true
 		}
 	}
+}
+
+// try to de-register/re-register this id.
+func refreshWorkerToken(id registry.ControllerID) error {
+	err := registry.DeregisterController(id)
+	if err != nil && !errors.Is(err, nats.ErrKeyNotFound) {
+		return err
+	}
+	return registry.RegisterController(id)
 }
