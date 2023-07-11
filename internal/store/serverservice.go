@@ -50,8 +50,8 @@ var (
 	connectionTimeout = 30 * time.Second
 )
 
-func serverServiceError() {
-	metrics.DependencyError("serverservice")
+func serverServiceError(operation string) {
+	metrics.DependencyError("serverservice", operation)
 }
 
 func newServerserviceStore(ctx context.Context, config *app.ServerserviceOptions, conditionDefs ptypes.ConditionDefinitions, logger *logrus.Logger) (Repository, error) {
@@ -154,7 +154,7 @@ func (s *Serverservice) Get(ctx context.Context, serverID uuid.UUID,
 			"error":    err,
 			"method":   "Get",
 		}).Warn("error reaching serverservice")
-		serverServiceError()
+		serverServiceError("get-attributes")
 		return nil, errors.Wrap(ErrServerserviceQuery, err.Error())
 	}
 
@@ -164,7 +164,6 @@ func (s *Serverservice) Get(ctx context.Context, serverID uuid.UUID,
 			"serverID": serverID.String(),
 			"kind":     conditionKind,
 		}).Warn("malformed condition data")
-		serverServiceError()
 		return nil, ErrMalformedCondition
 	}
 
@@ -192,7 +191,7 @@ func (s *Serverservice) GetServer(ctx context.Context, serverID uuid.UUID) (*mod
 			"method":   "GetServer",
 		}).Warn("error reaching serverservice")
 
-		serverServiceError()
+		serverServiceError("get-server")
 
 		return nil, errors.Wrap(ErrServerserviceQuery, err.Error())
 	}
@@ -221,7 +220,7 @@ func (s *Serverservice) List(ctx context.Context, serverID uuid.UUID,
 				"error":    err,
 				"method":   "List",
 			}).Warn("error reaching serverservice")
-			serverServiceError()
+			serverServiceError("list-conditions")
 			return nil, errors.Wrap(ErrServerserviceQuery, err.Error())
 		}
 
@@ -259,7 +258,7 @@ func (s *Serverservice) Create(ctx context.Context, serverID uuid.UUID, conditio
 			"kind":     condition.Kind,
 			"error":    err,
 		}).Warn("error creating condition")
-		serverServiceError()
+		serverServiceError("create-condition")
 	}
 	return err
 }
@@ -294,7 +293,7 @@ func (s *Serverservice) Update(ctx context.Context, serverID uuid.UUID, conditio
 			"kind":     condition.Kind,
 			"error":    err,
 		}).Warn("error updating condition")
-		serverServiceError()
+		serverServiceError("update-condition")
 	}
 	return err
 }
@@ -320,7 +319,7 @@ func (s *Serverservice) Delete(ctx context.Context, serverID uuid.UUID, conditio
 			"kind":     conditionKind,
 			"error":    err,
 		}).Warn("error deleting condition")
-		serverServiceError()
+		serverServiceError("delete-condition")
 	}
 	return err
 }
@@ -348,7 +347,7 @@ func (s *Serverservice) ListServersWithCondition(ctx context.Context,
 			"state": conditionState,
 			"error": err,
 		}).Warn("error listing servers")
-		serverServiceError()
+		serverServiceError("list-servers-with-condition")
 		return nil, err
 	}
 

@@ -10,6 +10,7 @@ import (
 	"go.hollow.sh/toolbox/events/pkg/kv"
 	"go.hollow.sh/toolbox/events/registry"
 
+	"github.com/metal-toolbox/conditionorc/internal/metrics"
 	"github.com/nats-io/nats.go"
 )
 
@@ -50,6 +51,7 @@ func (o *Orchestrator) checkinRoutine(ctx context.Context) {
 	me := registry.GetID("condition-orchestrator")
 	o.logger.WithField("id", me.String()).Info("worker id assigned")
 	if err := registry.RegisterController(me); err != nil {
+		metrics.DependencyError("liveness", "register")
 		o.logger.WithError(err).WithField("id", me.String()).
 			Warn("unable to do initial worker liveness registration")
 	}
@@ -63,6 +65,7 @@ func (o *Orchestrator) checkinRoutine(ctx context.Context) {
 		case <-tick.C:
 			err := registry.ControllerCheckin(me)
 			if err != nil {
+				metrics.DependencyError("liveness", "check-in")
 				o.logger.WithError(err).WithField("id", me.String()).Warn("worker checkin failed")
 				// try to refresh our token, maybe this is a NATS hiccup
 				err = refreshWorkerToken(me)
@@ -82,7 +85,13 @@ func (o *Orchestrator) checkinRoutine(ctx context.Context) {
 func refreshWorkerToken(id registry.ControllerID) error {
 	err := registry.DeregisterController(id)
 	if err != nil && !errors.Is(err, nats.ErrKeyNotFound) {
+		metrics.DependencyError("liveness", "de-register")
 		return err
 	}
-	return registry.RegisterController(id)
+	err = registry.RegisterController(id)
+	if err != nil {
+		metrics.DependencyError("liveness", "register")
+		return err
+	}
+	return nil
 }
