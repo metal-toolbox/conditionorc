@@ -2,6 +2,7 @@ package orchestrator
 
 import (
 	"context"
+	"errors"
 	"sync"
 	"time"
 
@@ -9,6 +10,7 @@ import (
 	"go.hollow.sh/toolbox/events/pkg/kv"
 	"go.hollow.sh/toolbox/events/registry"
 
+	"github.com/metal-toolbox/conditionorc/internal/metrics"
 	"github.com/nats-io/nats.go"
 )
 
@@ -49,6 +51,7 @@ func (o *Orchestrator) checkinRoutine(ctx context.Context) {
 	me := registry.GetID("condition-orchestrator")
 	o.logger.WithField("id", me.String()).Info("worker id assigned")
 	if err := registry.RegisterController(me); err != nil {
+		metrics.DependencyError("liveness", "register")
 		o.logger.WithError(err).WithField("id", me.String()).
 			Warn("unable to do initial worker liveness registration")
 	}
@@ -61,22 +64,34 @@ func (o *Orchestrator) checkinRoutine(ctx context.Context) {
 		select {
 		case <-tick.C:
 			err := registry.ControllerCheckin(me)
-			switch err {
-			case nil:
-			case nats.ErrKeyNotFound: // generally means NATS reaped our entry on TTL
-				if err = registry.RegisterController(me); err != nil {
-					o.logger.WithError(err).
-						WithField("id", me.String()).
-						Warn("unable to re-register worker")
+			if err != nil {
+				metrics.DependencyError("liveness", "check-in")
+				o.logger.WithError(err).WithField("id", me.String()).Warn("worker checkin failed")
+				// try to refresh our token, maybe this is a NATS hiccup
+				err = refreshWorkerToken(me)
+				if err != nil {
+					// couldn't refresh our liveness token, time to bail out
+					o.logger.WithError(err).WithField("id", me.String()).Fatal("reregister this worker")
 				}
-			default:
-				o.logger.WithError(err).
-					WithField("id", me.String()).
-					Warn("worker checkin failed")
 			}
 		case <-ctx.Done():
 			o.logger.Info("liveness check-in stopping on done context")
 			stop = true
 		}
 	}
+}
+
+// try to de-register/re-register this id.
+func refreshWorkerToken(id registry.ControllerID) error {
+	err := registry.DeregisterController(id)
+	if err != nil && !errors.Is(err, nats.ErrKeyNotFound) {
+		metrics.DependencyError("liveness", "de-register")
+		return err
+	}
+	err = registry.RegisterController(id)
+	if err != nil {
+		metrics.DependencyError("liveness", "register")
+		return err
+	}
+	return nil
 }

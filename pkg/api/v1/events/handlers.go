@@ -40,8 +40,8 @@ var (
 )
 
 //nolint:unused // we'll use this in the very near future
-func eventsError() {
-	metrics.DependencyError("events")
+func eventsError(operation string) {
+	metrics.DependencyError("events", operation)
 }
 
 // Handler holds methods to handle events.

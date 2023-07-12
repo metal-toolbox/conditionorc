@@ -33,6 +33,7 @@ func init() {
 			Help:      "a count of all errors attempting to reach conditionorc dependencies",
 		}, []string{
 			"dependency_name",
+			"operation",
 		},
 	)
 	apiLatencySeconds = promauto.NewHistogramVec(
@@ -95,8 +96,8 @@ func ListenAndServe() {
 
 // DependencyError provides a convenience method to hide some prometheus implementation
 // details.
-func DependencyError(name string) {
-	dependencyErrorCount.WithLabelValues(name).Inc()
+func DependencyError(name, operation string) {
+	dependencyErrorCount.WithLabelValues(name, operation).Inc()
 }
 
 // APICallEpilog observes the results and latency of an API call
