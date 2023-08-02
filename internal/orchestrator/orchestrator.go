@@ -6,6 +6,7 @@ import (
 	"sync"
 
 	"github.com/metal-toolbox/conditionorc/internal/store"
+	"github.com/metal-toolbox/conditionorc/internal/version"
 	v1EventHandlers "github.com/metal-toolbox/conditionorc/pkg/api/v1/events"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -101,7 +102,12 @@ func New(opts ...Option) *Orchestrator {
 
 // Run runs the orchestrator which listens for events to action.
 func (o *Orchestrator) Run(ctx context.Context) {
-	o.logger.Info("running orchestrator")
+	v := version.Current()
+	o.logger.WithFields(logrus.Fields{
+		"GitCommit":  v.GitCommit,
+		"GitBranch":  v.GitBranch,
+		"AppVersion": v.AppVersion,
+	}).Info("running orchestrator")
 	o.startWorkerLivenessCheckin(ctx)
 	o.startUpdateListener(ctx)
 	o.startEventListener(ctx)
