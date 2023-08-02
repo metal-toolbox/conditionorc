@@ -16,7 +16,6 @@ import (
 )
 
 var (
-	useStatusKV  bool
 	replicaCount int
 )
 
@@ -67,11 +66,8 @@ var cmdOrchestrator = &cobra.Command{
 			orchestrator.WithStreamBroker(streamBroker),
 		}
 
-		if useStatusKV {
-			app.Logger.Info("configuring status KV support")
-			options = append(options, orchestrator.WithStatusKV(),
-				orchestrator.WithReplicas(replicaCount))
-		}
+		app.Logger.Info("configuring status KV support")
+		options = append(options, orchestrator.WithReplicas(replicaCount))
 
 		orc := orchestrator.New(options...)
 		orc.Run(ctx)
@@ -80,8 +76,6 @@ var cmdOrchestrator = &cobra.Command{
 
 // install command flags
 func init() {
-	cmdOrchestrator.PersistentFlags().BoolVarP(&useStatusKV, "use-kv", "k", false,
-		"when this is true, orchestrator will listen to a NATS status KV store instead of an update subject")
 	cmdOrchestrator.PersistentFlags().IntVarP(&replicaCount, "replica-count", "r", 3,
 		"the number of replicas to configure for the NATS status KV store")
 

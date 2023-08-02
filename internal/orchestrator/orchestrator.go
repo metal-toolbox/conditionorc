@@ -19,7 +19,6 @@ var (
 	ErrInvalidEvent     = errors.New("invalid event message")
 	pkgName             = "internal/orchestrator"
 	serverServiceOrigin = "serverservice"
-	controllersOrigin   = "controllers"
 	defaultOrigin       = "default"
 )
 
@@ -29,12 +28,10 @@ type Orchestrator struct {
 	logger        *logrus.Logger
 	syncWG        *sync.WaitGroup
 	listenAddress string
-	dispatched    int32
 	concurrency   int
 	repository    store.Repository
 	streamBroker  events.Stream
 	eventHandler  *v1EventHandlers.Handler
-	statusKV      bool
 	replicaCount  int
 }
 
@@ -76,17 +73,9 @@ func WithConcurrency(c int) Option {
 	}
 }
 
-// WithStatusKV sets the Orchestrator to use a KV status update mechanism instead of
-// subscribing to update channels
-func WithStatusKV() Option {
-	return func(o *Orchestrator) {
-		o.statusKV = true
-	}
-}
-
 // WithReplicas sets the number of replicas we'll use when instaintiating the NATS
 // liveness and status KV buckets. This is only used in the rare case when the buckets
-// do no already exist (e.g. when operating in the sandbox environment).
+// do not already exist (e.g. when operating in the sandbox environment).
 func WithReplicas(c int) Option {
 	return func(o *Orchestrator) {
 		o.replicaCount = c
@@ -128,7 +117,6 @@ func findSubjectOrigin(subject string) string {
 	// "com.hollow.sh.serverservice.events.target.action". For example, a server
 	// inventory request would be 'com.hollow.sh.serverservice.events.server.create'
 	// XXX: ugh, why is inventory 'create'?
-	// Incoming messages from controllers have a subject of 'com.hollow.sh.controllers.responses'
 
 	subjectElements := strings.Split(subject, ".")
 	origin := defaultOrigin
@@ -149,8 +137,6 @@ func (o *Orchestrator) processEvent(ctx context.Context, event events.Message) {
 	switch findSubjectOrigin(event.Subject()) {
 	case serverServiceOrigin:
 		o.eventHandler.ServerserviceEvent(otelCtx, event)
-	case controllersOrigin:
-		o.eventHandler.ControllerEvent(otelCtx, event)
 	default:
 		// how did we get a message delivered on a subject that we're not subscribed to?
 		o.ackEvent(event, errors.Wrap(ErrInvalidEvent, "msg with unknown subject-pattern ignored"))

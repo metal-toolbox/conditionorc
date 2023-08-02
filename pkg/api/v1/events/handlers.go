@@ -28,15 +28,8 @@ var (
 	errRetryThis = errors.New("retry this operation")
 
 	serverServiceEventPrefix = "com.hollow.sh.serverservice.events."
-	controllerResponsePrefix = "com.hollow.sh.controllers.responses."
 
 	serverCreate = "server.create"
-
-	firmwareInstallUpdateSuffix = fmt.Sprintf(
-		"servers.%s.%s",
-		ptypes.FirmwareInstall,
-		ptypes.ConditionUpdateEvent,
-	)
 )
 
 //nolint:unused // we'll use this in the very near future
@@ -64,62 +57,6 @@ func (h *Handler) ackEvent(m events.Message) {
 func (h *Handler) nakEvent(m events.Message) {
 	if err := m.Nak(); err != nil {
 		h.logger.WithError(err).Warn("event nak error")
-	}
-}
-
-// ControllerEvent handles events from controllers
-func (h *Handler) ControllerEvent(ctx context.Context, msg events.Message) {
-	_, span := otel.Tracer(pkgName).Start(ctx, "events.ControllerEvent")
-	defer span.End()
-
-	subject := msg.Subject()
-	fragment := strings.TrimPrefix(subject, controllerResponsePrefix)
-	//nolint:gomnd // useless, generic optinion
-	frags := strings.SplitN(fragment, ".", 2)
-
-	facility := "no facility"
-	act := "default"
-
-	if len(frags) > 1 {
-		facility = frags[0]
-		act = frags[1]
-	}
-
-	h.logger.WithFields(
-		logrus.Fields{
-			"sub":      subject,
-			"facility": facility,
-			"act":      act,
-		},
-	).Debug("received controller event")
-
-	switch act {
-	case string(firmwareInstallUpdateSuffix):
-		var updateEvt v1types.ConditionUpdateEvent
-		if err := json.Unmarshal(msg.Data(), &updateEvt); err != nil {
-			h.logger.WithError(err).Warn("bogus condition update message")
-			h.ackEvent(msg)
-			return
-		}
-
-		err := h.UpdateCondition(ctx, &updateEvt)
-		switch {
-		case errors.Is(err, errRetryThis):
-			h.nakEvent(msg)
-		default:
-			h.ackEvent(msg)
-		}
-
-	default:
-		h.logger.WithFields(
-			logrus.Fields{
-				"subject":  subject,
-				"facility": facility,
-				"act":      act,
-			},
-		).Warn("msg with unsupported EventType ignored")
-		h.ackEvent(msg)
-		return
 	}
 }
 
