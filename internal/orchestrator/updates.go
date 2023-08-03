@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"strings"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/google/uuid"
@@ -17,17 +16,14 @@ import (
 
 	"github.com/nats-io/nats.go"
 	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
-	"go.hollow.sh/toolbox/events"
 	"go.hollow.sh/toolbox/events/pkg/kv"
 )
 
 var (
-	updOnce             sync.Once
-	fetchEventsInterval = 1 * time.Second
-	expectedDots        = 1 // we expect keys for KV-based status updates to be facilityCode.conditionID
-	errKeyFormat        = errors.New("malformed update key")
-	errConditionID      = errors.New("bad condition uuid")
+	updOnce        sync.Once
+	expectedDots   = 1 // we expect keys for KV-based status updates to be facilityCode.conditionID
+	errKeyFormat   = errors.New("malformed update key")
+	errConditionID = errors.New("bad condition uuid")
 )
 
 func (o *Orchestrator) startUpdateListener(ctx context.Context) {
@@ -41,18 +37,14 @@ func (o *Orchestrator) startUpdateListener(ctx context.Context) {
 			o.logger.WithError(err).Info("bypassing update listener start on context error")
 			return
 		}
-		if o.statusKV {
-			// XXX: this is a little split up, conditionally setting the replicas here while
-			// we set the TTL in the status module. This should ge refactored after MVP.
-			opts := []kv.Option{}
-			if o.replicaCount > 1 {
-				opts = append(opts, kv.WithReplicas(o.replicaCount))
-			}
-			status.ConnectToKVStores(o.streamBroker, o.logger, opts...)
-			go o.statusKVListener(ctx)
-		} else {
-			go o.updateListener(ctx)
+		// XXX: this is a little split up, conditionally setting the replicas here while
+		// we set the TTL in the status module. This should ge refactored after MVP.
+		opts := []kv.Option{}
+		if o.replicaCount > 1 {
+			opts = append(opts, kv.WithReplicas(o.replicaCount))
 		}
+		status.ConnectToKVStores(o.streamBroker, o.logger, opts...)
+		go o.statusKVListener(ctx)
 	})
 }
 
@@ -71,9 +63,6 @@ func (o *Orchestrator) statusKVListener(ctx context.Context) {
 			return
 			// retrieve and process events sent by controllers.
 		case entry := <-installWatcher.Updates():
-			if o.concurrencyLimit() {
-				continue
-			}
 			if entry == nil {
 				o.logger.Debug("nil kv entry")
 				continue
@@ -195,54 +184,4 @@ func installEventFromKV(ctx context.Context, kve nats.KeyValueEntry) (*v1types.C
 	}
 
 	return updEvent, nil
-}
-
-func (o *Orchestrator) updateListener(ctx context.Context) {
-	o.logger.Info("listening for updates")
-	tickerFetchEvents := time.NewTicker(fetchEventsInterval).C
-	for {
-		select {
-		case <-ctx.Done():
-			o.logger.Info("stopping update listener")
-			return
-		// retrieve and process events sent by controllers.
-		case <-tickerFetchEvents:
-			if o.concurrencyLimit() {
-				continue
-			}
-			o.pullEvents(ctx)
-		}
-	}
-}
-
-func (o *Orchestrator) concurrencyLimit() bool {
-	return int(o.dispatched) >= o.concurrency
-}
-
-func (o *Orchestrator) pullEvents(ctx context.Context) {
-	if err := ctx.Err(); err != nil {
-		o.logger.WithError(err).Info("exit on context error")
-		return
-	}
-	// XXX: consider having a separate context for message retrieval
-	msgs, err := o.streamBroker.PullMsg(ctx, 1)
-	if err != nil {
-		o.logger.WithFields(
-			logrus.Fields{"err": err.Error()},
-		).Trace("error fetching work")
-	}
-
-	for _, msg := range msgs {
-		// spawn msg process handler
-		o.syncWG.Add(1)
-
-		go func(msg events.Message) {
-			defer o.syncWG.Done()
-
-			atomic.AddInt32(&o.dispatched, 1)
-			defer atomic.AddInt32(&o.dispatched, -1)
-
-			o.processEvent(ctx, msg)
-		}(msg)
-	}
 }
