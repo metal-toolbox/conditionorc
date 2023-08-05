@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/metal-toolbox/conditionorc/internal/model"
+	"github.com/metal-toolbox/conditionorc/internal/orchestrator/notify"
 	ptypes "github.com/metal-toolbox/conditionorc/pkg/types"
 	"github.com/pkg/errors"
 	"go.hollow.sh/toolbox/events"
@@ -61,6 +62,9 @@ type Configuration struct {
 	//
 	// This parameter is required when EventsBrokerKind is set to nats.
 	NatsOptions events.NatsOptions `mapstructure:"nats"`
+
+	//Notifications defines the properties for alerting external parties
+	Notifications notify.Configuration `mapstructure:"notifications"`
 }
 
 // APIOIDCOptions defines configuration to handle OIDC authn/authz for conditions API clients.
@@ -141,6 +145,11 @@ func (a *App) envVarOverrides() error {
 		if err := a.envVarNatsOverrides(); err != nil {
 			return err
 		}
+	}
+
+	if a.Config.Notifications.Enabled {
+		// load the token from the environment b/c it's a secret
+		a.Config.Notifications.Token = a.v.GetString("notifications.token")
 	}
 
 	switch a.Config.StoreKind {

@@ -5,6 +5,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/metal-toolbox/conditionorc/internal/orchestrator/notify"
 	"github.com/metal-toolbox/conditionorc/internal/store"
 	"github.com/metal-toolbox/conditionorc/internal/version"
 	v1EventHandlers "github.com/metal-toolbox/conditionorc/pkg/api/v1/events"
@@ -34,6 +35,7 @@ type Orchestrator struct {
 	streamBroker  events.Stream
 	eventHandler  *v1EventHandlers.Handler
 	replicaCount  int
+	notifier      notify.Sender
 }
 
 // Option type sets a parameter on the Orchestrator type.
@@ -80,6 +82,13 @@ func WithConcurrency(c int) Option {
 func WithReplicas(c int) Option {
 	return func(o *Orchestrator) {
 		o.replicaCount = c
+	}
+}
+
+// WithNotifier sets a notifier for condition state transition updates
+func WithNotifier(s notify.Sender) Option {
+	return func(o *Orchestrator) {
+		o.notifier = s
 	}
 }
 

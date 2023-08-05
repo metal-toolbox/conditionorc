@@ -10,6 +10,7 @@ import (
 	"github.com/metal-toolbox/conditionorc/internal/metrics"
 	"github.com/metal-toolbox/conditionorc/internal/model"
 	"github.com/metal-toolbox/conditionorc/internal/orchestrator"
+	"github.com/metal-toolbox/conditionorc/internal/orchestrator/notify"
 	"github.com/metal-toolbox/conditionorc/internal/store"
 	"github.com/spf13/cobra"
 	"go.hollow.sh/toolbox/events"
@@ -59,11 +60,14 @@ var cmdOrchestrator = &cobra.Command{
 			app.Logger.Fatal(err)
 		}
 
+		notifier := notify.New(app.Logger, app.Config.Notifications)
+
 		options := []orchestrator.Option{
 			orchestrator.WithLogger(app.Logger),
 			orchestrator.WithListenAddress(app.Config.ListenAddress),
 			orchestrator.WithStore(repository),
 			orchestrator.WithStreamBroker(streamBroker),
+			orchestrator.WithNotifier(notifier),
 		}
 
 		app.Logger.Info("configuring status KV support")
