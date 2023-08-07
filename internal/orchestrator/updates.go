@@ -11,6 +11,7 @@ import (
 	"github.com/metal-toolbox/conditionorc/internal/status"
 	v1types "github.com/metal-toolbox/conditionorc/pkg/api/v1/types"
 	ptypes "github.com/metal-toolbox/conditionorc/pkg/types"
+	"github.com/sirupsen/logrus"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/trace"
 
@@ -57,6 +58,8 @@ func (o *Orchestrator) statusKVListener(ctx context.Context) {
 	// XXX: Alloy OOB support inventoryWatcher := status.WatchInventoryStatus(ctx)
 	o.logger.Info("listening for KV updates")
 	for {
+		var evt *v1types.ConditionUpdateEvent
+		var err error
 		select {
 		case <-ctx.Done():
 			o.logger.Info("stopping KV update listener")
@@ -67,24 +70,32 @@ func (o *Orchestrator) statusKVListener(ctx context.Context) {
 				o.logger.Debug("nil kv entry")
 				continue
 			}
-			evt, err := installEventFromKV(ctx, entry)
-			if err == nil {
-				_ = o.eventHandler.UpdateCondition(ctx, evt)
-			} else {
+			evt, err = installEventFromKV(ctx, entry)
+			if err != nil {
 				o.logger.WithError(err).Warn("error creating install condition event")
 			}
 
 			/* XXX: Uncomment this for out-of-band inventory support
 			case entry := <-inventoryWatcher.Updates():
-				if o.concurrencyLimit() {
-					continue
-				}
 				evt, err := inventoryEventFromKV(entry)
-				if err == nil {
-				o.eventHandler.UpdateCondition(ctx, evt)
-			} else {
-				o.logger.WithError(err).Warn("error creating inventory condition event")
-			} */
+				if err != nil {
+					o.logger.WithError(err).Warn("error creating inventory condition event")
+				} */
+		}
+		if evt != nil {
+			le := o.logger.WithFields(logrus.Fields{
+				"conditionID":    evt.ConditionUpdate.ConditionID.String(),
+				"conditionState": string(evt.ConditionUpdate.State),
+				"kind":           string(evt.Kind),
+			})
+
+			if err := o.eventHandler.UpdateCondition(ctx, evt); err != nil {
+				le.WithError(err).Warn("updating condition")
+			}
+
+			if err := o.notifier.Send(evt); err != nil {
+				le.WithError(err).Warn("sending notification")
+			}
 		}
 	}
 }
