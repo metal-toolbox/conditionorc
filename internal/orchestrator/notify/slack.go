@@ -37,17 +37,26 @@ type slackSender struct {
 }
 
 func (ss *slackSender) Send(upd *v1types.ConditionUpdateEvent) error {
-	ss.log.WithFields(logrus.Fields{
+	le := ss.log.WithFields(logrus.Fields{
 		"channel":     ss.ch,
 		"state":       upd.ConditionUpdate.State,
 		"conditionID": upd.ConditionUpdate.ConditionID.String(),
-	}).Debug("sending slack notification")
+	})
+
+	le.Debug("sending slack notification")
 
 	// cap the time we're willing to wait for Slack
 	ctx, cancel := context.WithTimeout(context.Background(), postTimeout)
 	defer cancel()
 
 	entry := ss.trk[upd.ConditionID]
+
+	if entry.ConditionState == string(upd.ConditionUpdate.State) &&
+		entry.ConditionStatus == string(upd.ConditionUpdate.Status) {
+		le.Info("skipping notification on duplicate state and status")
+		return nil
+	}
+
 	msgOpts := ss.optionsFromUpdate(&upd.ConditionUpdate, string(upd.Kind))
 
 	if entry.MsgTimestamp != "" {
@@ -80,7 +89,14 @@ func (ss *slackSender) Send(upd *v1types.ConditionUpdateEvent) error {
 
 func (ss *slackSender) optionsFromUpdate(upd *v1types.ConditionUpdate, kind string) []slack.MsgOption {
 	hdrStr := fmt.Sprintf("Condition: %s", upd.ConditionID.String())
-	stateStr := fmt.Sprintf("Type: _%s_\nState: *%s*", kind, string(upd.State))
+	var emojiStr string
+	switch upd.State {
+	case ptypes.Succeeded:
+		emojiStr = ":white_check_mark:"
+	case ptypes.Failed:
+		emojiStr = ":exclamation:"
+	}
+	stateStr := fmt.Sprintf("Type: _%s_\nState: *%s* %s", kind, string(upd.State), emojiStr)
 
 	marshaledStatus, err := json.Marshal(upd.Status)
 	if err != nil {

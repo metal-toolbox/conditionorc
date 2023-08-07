@@ -14,7 +14,6 @@ type NotificationType string
 
 const (
 	Slack NotificationType = "slack"
-	Log   NotificationType = "log"
 	Null  NotificationType = "null"
 )
 
@@ -44,8 +43,6 @@ func New(l *logrus.Logger, cfg Configuration) Sender {
 
 	switch cfg.NotificationType {
 	case Null:
-	case Log:
-		//notifier = newLogNotifier(l)
 	case Slack:
 		notifier = newSlackSender(l, cfg)
 	default:

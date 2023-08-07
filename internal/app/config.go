@@ -63,7 +63,7 @@ type Configuration struct {
 	// This parameter is required when EventsBrokerKind is set to nats.
 	NatsOptions events.NatsOptions `mapstructure:"nats"`
 
-	//Notifications defines the properties for alerting external parties
+	// Notifications defines the properties for alerting external parties
 	Notifications notify.Configuration `mapstructure:"notifications"`
 }
 

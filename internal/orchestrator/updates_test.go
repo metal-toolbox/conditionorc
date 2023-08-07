@@ -93,42 +93,56 @@ func TestInstallEventFromKV(t *testing.T) {
 	writeHandle, err := events.AsNatsJetStreamContext(evJS).KeyValue(string(ptypes.FirmwareInstall))
 	require.NoError(t, err, "write handle")
 
-	watcher, err := status.WatchFirmwareInstallStatus(context.TODO())
-	require.NoError(t, err, "watcher")
-	defer watcher.Stop()
-
 	// add some KVs
 	sv1 := ftypes.StatusValue{
 		Target: uuid.New().String(),
 		State:  "pending",
 		Status: json.RawMessage(`{"msg":"some-status"}`),
 	}
+	bogus := ftypes.StatusValue{
+		Target: uuid.New().String(),
+		State:  "bogus",
+		Status: json.RawMessage(`{"msg":"some-status"}`),
+	}
+	stale := ftypes.StatusValue{
+		Target:    uuid.New().String(),
+		State:     "failed",
+		Status:    json.RawMessage(`{"msg":"some-status"}`),
+		UpdatedAt: time.Now().Add(-90 * time.Minute),
+	}
+
 	condID := uuid.New()
 	k1 := fmt.Sprintf("fc13.%s", condID)
+	k2 := fmt.Sprintf("fc13.%s", uuid.New())
+	k3 := fmt.Sprintf("fc13.%s", uuid.New())
 
 	_, err = writeHandle.Put(k1, sv1.MustBytes())
 	require.NoError(t, err)
 
-	toCtx, cancel := context.WithTimeout(context.Background(), 20*time.Millisecond)
-	var entry nats.KeyValueEntry
-	var stop bool
-	var count int
-	for !stop {
-		select {
-		case entry = <-watcher.Updates():
-			count += 1
-			if entry != nil {
-				stop = true
-			}
-		case <-toCtx.Done():
-			t.Fatal("timeout fetching from KV")
-		}
-	}
-	t.Logf("got %d values from the KV", count)
-	cancel()
+	_, err = writeHandle.Put(k2, bogus.MustBytes())
+	require.NoError(t, err)
+
+	_, err = writeHandle.Put(k3, stale.MustBytes())
+	require.NoError(t, err)
+
+	// test the expected good KV entry
+	entry, err := writeHandle.Get(k1)
+	require.NoError(t, err)
 
 	upd1, err := installEventFromKV(context.Background(), entry)
 	require.NoError(t, err)
 	require.Equal(t, condID, upd1.ConditionUpdate.ConditionID)
 	require.Equal(t, ptypes.Pending, upd1.ConditionUpdate.State)
+
+	// bogus state should error
+	entry, err = writeHandle.Get(k2)
+	require.NoError(t, err)
+	_, err = installEventFromKV(context.Background(), entry)
+	require.ErrorIs(t, errInvalidState, err)
+
+	// stale event should error as well
+	entry, err = writeHandle.Get(k3)
+	require.NoError(t, err)
+	_, err = installEventFromKV(context.Background(), entry)
+	require.ErrorIs(t, errStaleEvent, err)
 }
