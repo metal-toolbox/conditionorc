@@ -21,10 +21,13 @@ import (
 )
 
 var (
-	updOnce        sync.Once
-	expectedDots   = 1 // we expect keys for KV-based status updates to be facilityCode.conditionID
-	errKeyFormat   = errors.New("malformed update key")
-	errConditionID = errors.New("bad condition uuid")
+	updOnce             sync.Once
+	expectedDots        = 1 // we expect keys for KV-based status updates to be facilityCode.conditionID
+	errKeyFormat        = errors.New("malformed update key")
+	errConditionID      = errors.New("bad condition uuid")
+	errInvalidState     = errors.New("invalid condition state")
+	errStaleEvent       = errors.New("event is stale")
+	staleEventThreshold = 30 * time.Minute
 )
 
 func (o *Orchestrator) startUpdateListener(ctx context.Context) {
@@ -73,6 +76,7 @@ func (o *Orchestrator) statusKVListener(ctx context.Context) {
 			evt, err = installEventFromKV(ctx, entry)
 			if err != nil {
 				o.logger.WithError(err).Warn("error creating install condition event")
+				continue
 			}
 
 			/* XXX: Uncomment this for out-of-band inventory support
@@ -82,20 +86,18 @@ func (o *Orchestrator) statusKVListener(ctx context.Context) {
 					o.logger.WithError(err).Warn("error creating inventory condition event")
 				} */
 		}
-		if evt != nil {
-			le := o.logger.WithFields(logrus.Fields{
-				"conditionID":    evt.ConditionUpdate.ConditionID.String(),
-				"conditionState": string(evt.ConditionUpdate.State),
-				"kind":           string(evt.Kind),
-			})
+		le := o.logger.WithFields(logrus.Fields{
+			"conditionID":    evt.ConditionUpdate.ConditionID.String(),
+			"conditionState": string(evt.ConditionUpdate.State),
+			"kind":           string(evt.Kind),
+		})
 
-			if err := o.eventHandler.UpdateCondition(ctx, evt); err != nil {
-				le.WithError(err).Warn("updating condition")
-			}
+		if err := o.eventHandler.UpdateCondition(ctx, evt); err != nil {
+			le.WithError(err).Warn("updating condition")
+		}
 
-			if err := o.notifier.Send(evt); err != nil {
-				le.WithError(err).Warn("sending notification")
-			}
+		if err := o.notifier.Send(evt); err != nil {
+			le.WithError(err).Warn("sending notification")
 		}
 	}
 }
@@ -152,6 +154,17 @@ func installEventFromKV(ctx context.Context, kve nats.KeyValueEntry) (*v1types.C
 	//nolint:govet // you and gocritic can argue about it outside.
 	if err := json.Unmarshal(byt, &fs); err != nil {
 		return nil, err
+	}
+
+	if !ptypes.ConditionStateIsValid(ptypes.ConditionState(fs.State)) {
+		return nil, errInvalidState
+	}
+
+	// skip processing any records where we're in a final state and it's older than
+	// our threshold
+	if ptypes.ConditionStateIsComplete(ptypes.ConditionState(fs.State)) &&
+		time.Since(fs.UpdatedAt) > staleEventThreshold {
+		return nil, errStaleEvent
 	}
 
 	// extract traceID and spanID
