@@ -17,7 +17,7 @@ import (
 	"github.com/slack-go/slack"
 )
 
-var postTimeout = 5 * time.Second
+var postTimeout = 800 * time.Millisecond
 
 // this is the value associated with notificiations for a condition-execution
 // the key is the tuple of facility and condition ID (just like the status KV)
@@ -73,16 +73,14 @@ func (ss *slackSender) Send(upd *v1types.ConditionUpdateEvent) error {
 		return err
 	}
 
-	if err == nil {
-		entry.ConditionState = string(upd.State)
-		entry.ConditionStatus = string(upd.Status)
-		// we only need the timestamp for making threaded replies
-		// from the initial message
-		if entry.MsgTimestamp == "" {
-			entry.MsgTimestamp = ts
-		}
-		ss.trk[upd.ConditionID] = entry
+	entry.ConditionState = string(upd.State)
+	entry.ConditionStatus = string(upd.Status)
+	// we only need the timestamp for making threaded replies
+	// from the initial message
+	if entry.MsgTimestamp == "" {
+		entry.MsgTimestamp = ts
 	}
+	ss.trk[upd.ConditionID] = entry
 
 	return err
 }
