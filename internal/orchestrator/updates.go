@@ -11,6 +11,7 @@ import (
 	"github.com/metal-toolbox/conditionorc/internal/status"
 	v1types "github.com/metal-toolbox/conditionorc/pkg/api/v1/types"
 	ptypes "github.com/metal-toolbox/conditionorc/pkg/types"
+	"github.com/sirupsen/logrus"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/trace"
 
@@ -20,10 +21,13 @@ import (
 )
 
 var (
-	updOnce        sync.Once
-	expectedDots   = 1 // we expect keys for KV-based status updates to be facilityCode.conditionID
-	errKeyFormat   = errors.New("malformed update key")
-	errConditionID = errors.New("bad condition uuid")
+	updOnce             sync.Once
+	expectedDots        = 1 // we expect keys for KV-based status updates to be facilityCode.conditionID
+	errKeyFormat        = errors.New("malformed update key")
+	errConditionID      = errors.New("bad condition uuid")
+	errInvalidState     = errors.New("invalid condition state")
+	errStaleEvent       = errors.New("event is stale")
+	staleEventThreshold = 30 * time.Minute
 )
 
 func (o *Orchestrator) startUpdateListener(ctx context.Context) {
@@ -57,6 +61,8 @@ func (o *Orchestrator) statusKVListener(ctx context.Context) {
 	// XXX: Alloy OOB support inventoryWatcher := status.WatchInventoryStatus(ctx)
 	o.logger.Info("listening for KV updates")
 	for {
+		var evt *v1types.ConditionUpdateEvent
+		var err error
 		select {
 		case <-ctx.Done():
 			o.logger.Info("stopping KV update listener")
@@ -67,24 +73,31 @@ func (o *Orchestrator) statusKVListener(ctx context.Context) {
 				o.logger.Debug("nil kv entry")
 				continue
 			}
-			evt, err := installEventFromKV(ctx, entry)
-			if err == nil {
-				_ = o.eventHandler.UpdateCondition(ctx, evt)
-			} else {
+			evt, err = installEventFromKV(ctx, entry)
+			if err != nil {
 				o.logger.WithError(err).Warn("error creating install condition event")
+				continue
 			}
 
 			/* XXX: Uncomment this for out-of-band inventory support
 			case entry := <-inventoryWatcher.Updates():
-				if o.concurrencyLimit() {
-					continue
-				}
 				evt, err := inventoryEventFromKV(entry)
-				if err == nil {
-				o.eventHandler.UpdateCondition(ctx, evt)
-			} else {
-				o.logger.WithError(err).Warn("error creating inventory condition event")
-			} */
+				if err != nil {
+					o.logger.WithError(err).Warn("error creating inventory condition event")
+				} */
+		}
+		le := o.logger.WithFields(logrus.Fields{
+			"conditionID":    evt.ConditionUpdate.ConditionID.String(),
+			"conditionState": string(evt.ConditionUpdate.State),
+			"kind":           string(evt.Kind),
+		})
+
+		if err := o.eventHandler.UpdateCondition(ctx, evt); err != nil {
+			le.WithError(err).Warn("updating condition")
+		}
+
+		if err := o.notifier.Send(evt); err != nil {
+			le.WithError(err).Warn("sending notification")
 		}
 	}
 }
@@ -141,6 +154,17 @@ func installEventFromKV(ctx context.Context, kve nats.KeyValueEntry) (*v1types.C
 	//nolint:govet // you and gocritic can argue about it outside.
 	if err := json.Unmarshal(byt, &fs); err != nil {
 		return nil, err
+	}
+
+	if !ptypes.ConditionStateIsValid(ptypes.ConditionState(fs.State)) {
+		return nil, errInvalidState
+	}
+
+	// skip processing any records where we're in a final state and it's older than
+	// our threshold
+	if ptypes.ConditionStateIsComplete(ptypes.ConditionState(fs.State)) &&
+		time.Since(fs.UpdatedAt) > staleEventThreshold {
+		return nil, errStaleEvent
 	}
 
 	// extract traceID and spanID
