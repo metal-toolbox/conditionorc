@@ -277,10 +277,7 @@ func (r *Routes) serverConditionCreate(c *gin.Context) (int, *v1types.ServerResp
 		}
 	}
 
-	// XXX: this operation can't ignore errors
-	// - if this method fails, should the condition be deleted?
-	//
-	// publish the condition
+	// publish the condition and in case of publish failure - revert.
 	err = r.publishCondition(otelCtx, serverID, facilityCode, condition)
 	if err != nil {
 		r.logger.WithFields(logrus.Fields{
@@ -290,6 +287,21 @@ func (r *Routes) serverConditionCreate(c *gin.Context) (int, *v1types.ServerResp
 		metrics.PublishErrors.With(
 			prometheus.Labels{"conditionKind": string(condition.Kind)},
 		).Inc()
+
+		deleteErr := r.repository.Delete(otelCtx, serverID, condition.Kind)
+		if deleteErr != nil {
+			r.logger.WithFields(logrus.Fields{
+				"error": deleteErr,
+			}).Info("condition deletion failed")
+
+			return http.StatusInternalServerError, &v1types.ServerResponse{
+				Message: deleteErr.Error(),
+			}
+		}
+
+		return http.StatusInternalServerError, &v1types.ServerResponse{
+			Message: "condition create failed: " + err.Error(),
+		}
 	}
 
 	metrics.ConditionQueued.With(

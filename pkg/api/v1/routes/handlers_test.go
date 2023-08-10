@@ -18,11 +18,14 @@ import (
 	"github.com/metal-toolbox/conditionorc/internal/store"
 	v1types "github.com/metal-toolbox/conditionorc/pkg/api/v1/types"
 	ptypes "github.com/metal-toolbox/conditionorc/pkg/types"
+	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
+	"go.hollow.sh/toolbox/events"
+	mockevents "go.hollow.sh/toolbox/events/mock"
 )
 
-func mockserver(t *testing.T, logger *logrus.Logger, repository store.Repository) (*gin.Engine, error) {
+func mockserver(t *testing.T, logger *logrus.Logger, repository store.Repository, stream events.Stream) (*gin.Engine, error) {
 	t.Helper()
 
 	gin.SetMode(gin.ReleaseMode)
@@ -37,6 +40,10 @@ func mockserver(t *testing.T, logger *logrus.Logger, repository store.Repository
 				{Kind: ptypes.FirmwareInstall},
 			},
 		),
+	}
+
+	if stream != nil {
+		options = append(options, WithStreamBroker(stream))
 	}
 
 	v1Router, err := NewRoutes(options...)
@@ -117,7 +124,7 @@ func TestServerConditionUpdate(t *testing.T) {
 
 	repository := store.NewMockRepository(ctrl)
 
-	server, err := mockserver(t, logrus.New(), repository)
+	server, err := mockserver(t, logrus.New(), repository, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -307,6 +314,7 @@ func TestServerConditionUpdate(t *testing.T) {
 // nolint:gocyclo // cyclomatic tests are cyclomatic
 func TestServerConditionCreate(t *testing.T) {
 	serverID := uuid.New()
+	facilityCode := "foo-42"
 
 	// mock repository
 	ctrl := gomock.NewController(t)
@@ -314,7 +322,12 @@ func TestServerConditionCreate(t *testing.T) {
 
 	repository := store.NewMockRepository(ctrl)
 
-	server, err := mockserver(t, logrus.New(), repository)
+	streamCtrl := gomock.NewController(t)
+	defer streamCtrl.Finish()
+
+	stream := mockevents.NewMockStream(streamCtrl)
+
+	server, err := mockserver(t, logrus.New(), repository, stream)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -322,11 +335,13 @@ func TestServerConditionCreate(t *testing.T) {
 	testcases := []struct {
 		name           string
 		mockStore      func(r *store.MockRepository)
+		mockStream     func(r *mockevents.MockStream)
 		request        func(t *testing.T) *http.Request
 		assertResponse func(t *testing.T, r *httptest.ResponseRecorder)
 	}{
 		{
 			"invalid server ID error",
+			nil,
 			nil,
 			func(t *testing.T) *http.Request {
 				url := fmt.Sprintf("/api/v1/servers/%s/condition/%s", "123", "invalid")
@@ -345,6 +360,7 @@ func TestServerConditionCreate(t *testing.T) {
 		{
 			"invalid server condition state",
 			nil,
+			nil,
 			func(t *testing.T) *http.Request {
 				url := fmt.Sprintf("/api/v1/servers/%s/condition/%s", uuid.New().String(), "asdasd")
 				request, err := http.NewRequestWithContext(context.TODO(), http.MethodPost, url, http.NoBody)
@@ -361,6 +377,7 @@ func TestServerConditionCreate(t *testing.T) {
 		},
 		{
 			"invalid server condition payload returns error",
+			nil,
 			nil,
 			func(t *testing.T) *http.Request {
 				url := fmt.Sprintf("/api/v1/servers/%s/condition/%s", serverID.String(), ptypes.FirmwareInstall)
@@ -411,6 +428,7 @@ func TestServerConditionCreate(t *testing.T) {
 					).
 					Times(1)
 			},
+			nil,
 			func(t *testing.T) *http.Request {
 				payload, err := json.Marshal(&v1types.ConditionCreate{Parameters: []byte(`{"some param": "1"}`)})
 				if err != nil {
@@ -462,7 +480,7 @@ func TestServerConditionCreate(t *testing.T) {
 						gomock.Eq(serverID),
 					).
 					Return(
-						&model.Server{ID: serverID, FacilityCode: "foo-42"},
+						&model.Server{ID: serverID, FacilityCode: facilityCode},
 						nil,
 					).
 					Times(1)
@@ -481,6 +499,16 @@ func TestServerConditionCreate(t *testing.T) {
 						assert.Equal(t, ptypes.Pending, c.State, "condition state mismatch")
 						return nil
 					}).
+					Times(1)
+			},
+			func(r *mockevents.MockStream) {
+				r.EXPECT().
+					Publish(
+						gomock.Any(),
+						gomock.Eq(fmt.Sprintf("%s.servers.%s", facilityCode, ptypes.FirmwareInstall)),
+						gomock.Any(),
+					).
+					Return(nil).
 					Times(1)
 			},
 			func(t *testing.T) *http.Request {
@@ -536,7 +564,7 @@ func TestServerConditionCreate(t *testing.T) {
 						gomock.Eq(serverID),
 					).
 					Return(
-						&model.Server{ID: serverID, FacilityCode: "foo-42"},
+						&model.Server{ID: serverID, FacilityCode: facilityCode},
 						nil,
 					).
 					Times(1)
@@ -553,6 +581,16 @@ func TestServerConditionCreate(t *testing.T) {
 						assert.Equal(t, c.Fault, expect)
 						return nil
 					}).
+					Times(1)
+			},
+			func(r *mockevents.MockStream) {
+				r.EXPECT().
+					Publish(
+						gomock.Any(),
+						gomock.Eq(fmt.Sprintf("%s.servers.%s", facilityCode, ptypes.FirmwareInstall)),
+						gomock.Any(),
+					).
+					Return(nil).
 					Times(1)
 			},
 			func(t *testing.T) *http.Request {
@@ -626,7 +664,7 @@ func TestServerConditionCreate(t *testing.T) {
 						gomock.Eq(serverID),
 					).
 					Return(
-						&model.Server{ID: serverID, FacilityCode: "foo-42"},
+						&model.Server{ID: serverID, FacilityCode: facilityCode},
 						nil,
 					).
 					Times(1)
@@ -645,6 +683,16 @@ func TestServerConditionCreate(t *testing.T) {
 						assert.Equal(t, ptypes.Pending, c.State, "condition state mismatch")
 						return nil
 					}).
+					Times(1)
+			},
+			func(r *mockevents.MockStream) {
+				r.EXPECT().
+					Publish(
+						gomock.Any(),
+						gomock.Eq(fmt.Sprintf("%s.servers.%s", facilityCode, ptypes.FirmwareInstall)),
+						gomock.Any(),
+					).
+					Return(nil).
 					Times(1)
 			},
 			func(t *testing.T) *http.Request {
@@ -689,6 +737,8 @@ func TestServerConditionCreate(t *testing.T) {
 					}, nil).
 					Times(1)
 			},
+			func(r *mockevents.MockStream) {
+			},
 			func(t *testing.T) *http.Request {
 				url := fmt.Sprintf("/api/v1/servers/%s/condition/%s", serverID.String(), ptypes.FirmwareInstall)
 				request, err := http.NewRequestWithContext(context.TODO(), http.MethodPost, url, bytes.NewReader([]byte(`{"hello":"world"}`)))
@@ -732,6 +782,8 @@ func TestServerConditionCreate(t *testing.T) {
 					}, nil).
 					Times(1)
 			},
+			func(r *mockevents.MockStream) {
+			},
 			func(t *testing.T) *http.Request {
 				url := fmt.Sprintf("/api/v1/servers/%s/condition/%s", serverID.String(), ptypes.FirmwareInstall)
 				request, err := http.NewRequestWithContext(context.TODO(), http.MethodPost, url, bytes.NewReader([]byte(`{"hello":"world"}`)))
@@ -746,12 +798,108 @@ func TestServerConditionCreate(t *testing.T) {
 				assert.Contains(t, string(asBytes(t, r.Body)), "exclusive condition present")
 			},
 		},
+		{
+			"server condition publish failure results in created condition deletion",
+			// mock repository
+			func(r *store.MockRepository) {
+				parametersJSON, _ := json.Marshal(json.RawMessage(`{"some param": "1"}`))
+
+				// lookup for an existing condition
+				r.EXPECT().
+					Get(
+						gomock.Any(),
+						gomock.Eq(serverID),
+						gomock.Eq(ptypes.FirmwareInstall),
+					).
+					Return(nil, nil). // no condition exists
+					Times(1)
+
+				r.EXPECT().
+					List(
+						gomock.Any(),
+						gomock.Any(),
+						gomock.Any(),
+					).
+					Return(nil, nil).
+					Times(2)
+
+				// facility code lookup
+				r.EXPECT().
+					GetServer(
+						gomock.Any(),
+						gomock.Eq(serverID),
+					).
+					Return(
+						&model.Server{ID: serverID, FacilityCode: facilityCode},
+						nil,
+					).
+					Times(1)
+
+				// create condition query
+				r.EXPECT().
+					Create(
+						gomock.Any(),
+						gomock.Eq(serverID),
+						gomock.Any(),
+					).
+					DoAndReturn(func(_ context.Context, _ uuid.UUID, c *ptypes.Condition) error {
+						assert.Equal(t, ptypes.ConditionStructVersion, c.Version, "condition version mismatch")
+						assert.Equal(t, ptypes.FirmwareInstall, c.Kind, "condition kind mismatch")
+						assert.Equal(t, json.RawMessage(parametersJSON), c.Parameters, "condition parameters mismatch")
+						assert.Equal(t, ptypes.Pending, c.State, "condition state mismatch")
+						return nil
+					}).
+					Times(1)
+
+				// condition deletion due to publish failure
+				r.EXPECT().
+					Delete(gomock.Any(), gomock.Eq(serverID), gomock.Eq(ptypes.FirmwareInstall)).
+					Times(1).
+					Return(nil)
+
+			},
+			func(r *mockevents.MockStream) {
+				r.EXPECT().
+					Publish(
+						gomock.Any(),
+						gomock.Eq(fmt.Sprintf("%s.servers.%s", facilityCode, ptypes.FirmwareInstall)),
+						gomock.Any(),
+					).
+					Return(errors.New("gremlins in the pipes")).
+					Times(1)
+			},
+			func(t *testing.T) *http.Request {
+				payload, err := json.Marshal(&v1types.ConditionCreate{Parameters: []byte(`{"some param": "1"}`)})
+				if err != nil {
+					t.Error()
+				}
+
+				url := fmt.Sprintf("/api/v1/servers/%s/condition/%s", serverID.String(), ptypes.FirmwareInstall)
+				request, err := http.NewRequestWithContext(context.TODO(), http.MethodPost, url, bytes.NewReader(payload))
+				if err != nil {
+					t.Fatal(err)
+				}
+
+				return request
+			},
+			func(t *testing.T, r *httptest.ResponseRecorder) {
+				assert.Equal(t, http.StatusInternalServerError, r.Code)
+				var resp v1types.ServerResponse
+				err = json.Unmarshal(r.Body.Bytes(), &resp)
+				assert.Nil(t, err)
+				assert.Contains(t, resp.Message, "gremlins")
+			},
+		},
 	}
 
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
 			if tc.mockStore != nil {
 				tc.mockStore(repository)
+			}
+
+			if tc.mockStream != nil {
+				tc.mockStream(stream)
 			}
 
 			recorder := httptest.NewRecorder()
@@ -788,7 +936,7 @@ func TestServerConditionList(t *testing.T) {
 
 	repository := store.NewMockRepository(ctrl)
 
-	server, err := mockserver(t, logrus.New(), repository)
+	server, err := mockserver(t, logrus.New(), repository, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -897,7 +1045,7 @@ func TestServerConditionGet(t *testing.T) {
 
 	repository := store.NewMockRepository(ctrl)
 
-	server, err := mockserver(t, logrus.New(), repository)
+	server, err := mockserver(t, logrus.New(), repository, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1004,7 +1152,7 @@ func TestServerConditionDelete(t *testing.T) {
 
 	repository := store.NewMockRepository(ctrl)
 
-	server, err := mockserver(t, logrus.New(), repository)
+	server, err := mockserver(t, logrus.New(), repository, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
