@@ -18,6 +18,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 	"go.opentelemetry.io/otel"
+	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/clientcredentials"
 
 	sservice "go.hollow.sh/serverservice/pkg/api/v1"
@@ -111,6 +112,8 @@ func newClientWithOAuth(ctx context.Context, cfg *app.ServerserviceOptions, logg
 		TokenURL:       provider.Endpoint().TokenURL,
 		Scopes:         cfg.OidcClientScopes,
 		EndpointParams: url.Values{"audience": []string{cfg.OidcAudienceEndpoint}},
+		// with this the oauth client spends less time identifying the client grant mechanism.
+		AuthStyle: oauth2.AuthStyleInParams,
 	}
 
 	// wrap OAuth transport, cookie jar in the retryable client
