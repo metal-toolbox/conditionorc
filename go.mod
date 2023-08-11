@@ -9,17 +9,17 @@ require (
 	github.com/gin-gonic/gin v1.9.1
 	github.com/golang/mock v1.6.0
 	github.com/google/uuid v1.3.0
-	github.com/hashicorp/go-retryablehttp v0.7.2
+	github.com/hashicorp/go-retryablehttp v0.7.4
 	github.com/metal-toolbox/flasher v0.0.5
 	github.com/nats-io/nats-server/v2 v2.9.15
 	github.com/nats-io/nats.go v1.25.0
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.15.1
 	github.com/sirupsen/logrus v1.9.2
+	github.com/slack-go/slack v0.12.2
 	github.com/spf13/cobra v1.7.0
 	github.com/spf13/viper v1.16.0
 	github.com/stretchr/testify v1.8.4
-	github.com/toorop/gin-logrus v0.0.0-20210225092905-2c785434f26f
 	github.com/volatiletech/null/v8 v8.1.2
 	go.hollow.sh/serverservice v0.15.3-0.20230519171430-6d4a327f68f3
 	go.hollow.sh/toolbox v0.6.1-0.20230629125041-f32670307308
@@ -95,7 +95,6 @@ require (
 	github.com/prometheus/client_model v0.3.0 // indirect
 	github.com/prometheus/common v0.42.0 // indirect
 	github.com/prometheus/procfs v0.9.0 // indirect
-	github.com/slack-go/slack v0.12.2 // indirect
 	github.com/spf13/afero v1.9.5 // indirect
 	github.com/spf13/cast v1.5.1 // indirect
 	github.com/spf13/jwalterweatherman v1.1.0 // indirect
