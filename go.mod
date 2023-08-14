@@ -21,9 +21,8 @@ require (
 	github.com/spf13/viper v1.16.0
 	github.com/stretchr/testify v1.8.4
 	github.com/volatiletech/null/v8 v8.1.2
-	github.com/volatiletech/null/v9 v9.0.0
 	go.hollow.sh/serverservice v0.15.3-0.20230519171430-6d4a327f68f3
-	go.hollow.sh/toolbox v0.6.1-0.20230629125041-f32670307308
+	go.hollow.sh/toolbox v0.6.1-0.20230523125520-f9351bc3442b
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.42.0
 	go.opentelemetry.io/otel v1.16.0
 	go.opentelemetry.io/otel/trace v1.16.0
