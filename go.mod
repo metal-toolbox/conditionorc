@@ -15,13 +15,12 @@ require (
 	github.com/nats-io/nats.go v1.28.0
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.15.1
-	github.com/sirupsen/logrus v1.9.2
+	github.com/sirupsen/logrus v1.9.3
 	github.com/slack-go/slack v0.12.2
 	github.com/spf13/cobra v1.7.0
 	github.com/spf13/viper v1.16.0
 	github.com/stretchr/testify v1.8.4
 	github.com/volatiletech/null/v8 v8.1.2
-	github.com/volatiletech/null/v9 v9.0.0
 	go.hollow.sh/serverservice v0.15.3-0.20230519171430-6d4a327f68f3
 	go.hollow.sh/toolbox v0.6.1-0.20230629125041-f32670307308
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.42.0
