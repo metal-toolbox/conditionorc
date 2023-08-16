@@ -2,6 +2,7 @@ package status
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	ptypes "github.com/metal-toolbox/conditionorc/pkg/types"
@@ -48,8 +49,8 @@ func ConnectToKVStores(s events.Stream, log *logrus.Logger, opts ...kv.Option) {
 
 // WatchFirmwareInstallStatus specializes some generic NATS functionality, mainly to keep
 // the callers cleaner of the NATS-specific details.
-func WatchFirmwareInstallStatus(ctx context.Context) (nats.KeyWatcher, error) {
-	// we can restrict the keys we watch (e.g. by facility code) here by using
-	// the KV Watch function instead.
-	return firmwareInstallKV.WatchAll(nats.Context(ctx))
+func WatchFirmwareInstallStatus(ctx context.Context, facility string) (nats.KeyWatcher, error) {
+	// format the facility as a NATS subject to use as a filter for relevant KVs
+	keyStr := fmt.Sprintf("%s.*", facility)
+	return firmwareInstallKV.Watch(keyStr, nats.Context(ctx))
 }
