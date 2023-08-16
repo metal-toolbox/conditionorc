@@ -36,6 +36,7 @@ type Orchestrator struct {
 	eventHandler  *v1EventHandlers.Handler
 	replicaCount  int
 	notifier      notify.Sender
+	facility      string
 }
 
 // Option type sets a parameter on the Orchestrator type.
@@ -89,6 +90,13 @@ func WithReplicas(c int) Option {
 func WithNotifier(s notify.Sender) Option {
 	return func(o *Orchestrator) {
 		o.notifier = s
+	}
+}
+
+// WithFacility sets a site-specific descriptor to focus the orchestrator's work.
+func WithFacility(f string) Option {
+	return func(o *Orchestrator) {
+		o.facility = f
 	}
 }
 

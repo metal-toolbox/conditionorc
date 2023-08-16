@@ -54,7 +54,7 @@ func (o *Orchestrator) startUpdateListener(ctx context.Context) {
 
 func (o *Orchestrator) statusKVListener(ctx context.Context) {
 	// start the watchers and return the associated channels
-	installWatcher, err := status.WatchFirmwareInstallStatus(ctx)
+	installWatcher, err := status.WatchFirmwareInstallStatus(ctx, o.facility)
 	if err != nil {
 		o.logger.WithError(err).Fatal("unable to watch install status KV")
 	}

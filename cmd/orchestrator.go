@@ -18,6 +18,7 @@ import (
 
 var (
 	replicaCount int
+	facility     string
 )
 
 // install orchestrator command
@@ -68,6 +69,7 @@ var cmdOrchestrator = &cobra.Command{
 			orchestrator.WithStore(repository),
 			orchestrator.WithStreamBroker(streamBroker),
 			orchestrator.WithNotifier(notifier),
+			orchestrator.WithFacility(facility),
 		}
 
 		app.Logger.Info("configuring status KV support")
@@ -80,8 +82,15 @@ var cmdOrchestrator = &cobra.Command{
 
 // install command flags
 func init() {
-	cmdOrchestrator.PersistentFlags().IntVarP(&replicaCount, "replica-count", "r", 3,
+	pflags := cmdOrchestrator.PersistentFlags()
+	pflags.IntVarP(&replicaCount, "replica-count", "r", 3,
 		"the number of replicas to configure for the NATS status KV store")
+
+	pflags.StringVarP(&facility, "facility", "f", "", "a site-specific token to focus this orchestrator's activities")
+
+	if err := cmdOrchestrator.MarkPersistentFlagRequired("facility"); err != nil {
+		log.Fatal("marking facility as required:", err)
+	}
 
 	rootCmd.AddCommand(cmdOrchestrator)
 }
