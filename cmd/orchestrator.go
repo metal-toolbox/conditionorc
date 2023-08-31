@@ -70,6 +70,7 @@ var cmdOrchestrator = &cobra.Command{
 			orchestrator.WithStreamBroker(streamBroker),
 			orchestrator.WithNotifier(notifier),
 			orchestrator.WithFacility(facility),
+			orchestrator.WithConditionDefs(app.Config.ConditionDefinitions),
 		}
 
 		app.Logger.Info("configuring status KV support")
