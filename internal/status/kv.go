@@ -64,14 +64,14 @@ func WatchConditionStatus(ctx context.Context, kind ptypes.ConditionKind, facili
 		return nil, errNotReady
 	}
 
-	kv, ok := kvCollection[string(kind)]
+	bucket, ok := kvCollection[string(kind)]
 	if !ok {
 		return nil, errors.Wrap(errNoKV, string(kind))
 	}
 
 	// format the facility as a NATS subject to use as a filter for relevant KVs
 	keyStr := fmt.Sprintf("%s.*", facility)
-	return kv.Watch(keyStr, nats.Context(ctx))
+	return bucket.Watch(keyStr, nats.Context(ctx))
 }
 
 // GetConditionKV returns the raw NATS KeyValue interface for the bucket associated
@@ -81,10 +81,10 @@ func GetConditionKV(kind ptypes.ConditionKind) (nats.KeyValue, error) {
 		return nil, errNotReady
 	}
 
-	kv, ok := kvCollection[string(kind)]
+	bucket, ok := kvCollection[string(kind)]
 	if !ok {
 		return nil, errors.Wrap(errNoKV, string(kind))
 	}
 
-	return kv, nil
+	return bucket, nil
 }

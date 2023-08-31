@@ -71,7 +71,6 @@ linters:
     - misspell
     - noctx
     - stylecheck
-    - whitespace
     - gosec
   enable-all: false
   disable-all: true
