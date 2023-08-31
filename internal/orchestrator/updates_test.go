@@ -5,11 +5,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"sync"
 	"testing"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/metal-toolbox/conditionorc/internal/status"
+	v1types "github.com/metal-toolbox/conditionorc/pkg/api/v1/types"
 	ptypes "github.com/metal-toolbox/conditionorc/pkg/types"
 	"github.com/nats-io/nats-server/v2/server"
 	srvtest "github.com/nats-io/nats-server/v2/test"
@@ -84,13 +86,14 @@ func TestParseStatusKey(t *testing.T) {
 func TestInstallEventFromKV(t *testing.T) {
 	srv := startJetStreamServer(t)
 	defer shutdownJetStream(t, srv)
-	nc, _ := jetStreamContext(t, srv) // nc is closed on evJS.Close(), js needs no cleanup
+	nc, js := jetStreamContext(t, srv) // nc is closed on evJS.Close(), js needs no cleanup
 	evJS := events.NewJetstreamFromConn(nc)
 	defer evJS.Close()
 
-	log := logrus.New()
-	status.ConnectToKVStores(evJS, log, kv.WithDescription("test install event KV"))
-	writeHandle, err := events.AsNatsJetStreamContext(evJS).KeyValue(string(ptypes.FirmwareInstall))
+	writeHandle, err := js.CreateKeyValue(&nats.KeyValueConfig{
+		Bucket:      string(ptypes.FirmwareInstall),
+		Description: "test install event",
+	})
 	require.NoError(t, err, "write handle")
 
 	// add some KVs
@@ -145,4 +148,63 @@ func TestInstallEventFromKV(t *testing.T) {
 	require.NoError(t, err)
 	_, err = installEventFromKV(context.Background(), entry)
 	require.ErrorIs(t, errStaleEvent, err)
+}
+
+func TestConditionListenersExit(t *testing.T) {
+	srv := startJetStreamServer(t)
+	defer shutdownJetStream(t, srv)
+	nc, _ := jetStreamContext(t, srv) // nc is closed on evJS.Close(), js needs no cleanup
+	evJS := events.NewJetstreamFromConn(nc)
+	defer evJS.Close()
+
+	log := logrus.New()
+	defs := ptypes.ConditionDefinitions{
+		&ptypes.ConditionDefinition{
+			Kind: ptypes.FirmwareInstall,
+		},
+		&ptypes.ConditionDefinition{
+			Kind: ptypes.InventoryOutofband,
+		},
+		&ptypes.ConditionDefinition{
+			Kind: ptypes.ConditionKind("bogus"),
+		},
+	}
+	// XXX: THIS FUNCTION CAN ONLY BE CALLED ONCE IN THE ENTIRE TEST! It uses a sync.Once
+	status.ConnectToKVStores(evJS, log, defs, kv.WithDescription("test watchers"))
+
+	o := Orchestrator{
+		logger:        log,
+		streamBroker:  evJS,
+		facility:      "test",
+		conditionDefs: defs,
+	}
+
+	// here we're acting in place of kvStatusPublisher to make sure that we can orchestrate the watchers
+	var wg sync.WaitGroup
+	testChan := make(chan *v1types.ConditionUpdateEvent)
+	ctx, cancel := context.WithCancel(context.TODO())
+
+	o.startConditionListeners(ctx, testChan, &wg)
+
+	sentinelChan := make(chan struct{})
+	toCtx, toCancel := context.WithTimeout(context.TODO(), time.Second)
+	defer toCancel()
+
+	var testPassed bool
+
+	go func() {
+		wg.Wait()
+		testPassed = true
+		close(sentinelChan)
+	}()
+
+	// cancel the original context and we should unwind all our listeners
+	cancel()
+
+	select {
+	case <-toCtx.Done():
+		t.Log("watchers did not exit")
+	case <-sentinelChan:
+	}
+	require.True(t, testPassed)
 }

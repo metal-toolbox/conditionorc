@@ -47,58 +47,109 @@ func (o *Orchestrator) startUpdateListener(ctx context.Context) {
 		if o.replicaCount > 1 {
 			opts = append(opts, kv.WithReplicas(o.replicaCount))
 		}
-		status.ConnectToKVStores(o.streamBroker, o.logger, opts...)
-		go o.statusKVListener(ctx)
+		status.ConnectToKVStores(o.streamBroker, o.logger, o.conditionDefs, opts...)
+		go o.kvStatusPublisher(ctx)
 	})
 }
 
-func (o *Orchestrator) statusKVListener(ctx context.Context) {
-	// start the watchers and return the associated channels
-	installWatcher, err := status.WatchFirmwareInstallStatus(ctx, o.facility)
-	if err != nil {
-		o.logger.WithError(err).Fatal("unable to watch install status KV")
-	}
-	// XXX: Alloy OOB support inventoryWatcher := status.WatchInventoryStatus(ctx)
-	o.logger.Info("listening for KV updates")
-	for {
-		var evt *v1types.ConditionUpdateEvent
-		var err error
+// kvStatusPublisher creates a channel for ConditionUpdateEvents, starts the watchers
+// for its configured conditions, then polls the ConditionUpdateEvent channel and publishes
+// any results.
+func (o *Orchestrator) kvStatusPublisher(ctx context.Context) {
+	var wg sync.WaitGroup
+
+	evtChan := make(chan *v1types.ConditionUpdateEvent)
+
+	o.startConditionListeners(ctx, evtChan, &wg)
+
+	o.logger.Debug("waiting for KV updates")
+
+	for stop := false; !stop; {
 		select {
 		case <-ctx.Done():
-			o.logger.Info("stopping KV update listener")
-			return
-			// retrieve and process events sent by controllers.
-		case entry := <-installWatcher.Updates():
-			if entry == nil {
-				o.logger.Debug("nil kv entry")
-				continue
+			o.logger.Debug("stopping KV update listener")
+			stop = true
+
+		// retrieve and process events sent by controllers.
+		case evt := <-evtChan:
+			le := o.logger.WithFields(logrus.Fields{
+				"conditionID":    evt.ConditionUpdate.ConditionID.String(),
+				"conditionState": string(evt.ConditionUpdate.State),
+				"kind":           string(evt.Kind),
+			})
+
+			if err := o.eventHandler.UpdateCondition(ctx, evt); err != nil {
+				le.WithError(err).Warn("updating condition")
 			}
-			evt, err = installEventFromKV(ctx, entry)
-			if err != nil {
-				o.logger.WithError(err).Warn("error creating install condition event")
-				continue
+
+			if err := o.notifier.Send(evt); err != nil {
+				le.WithError(err).Warn("sending notification")
 			}
-
-			/* XXX: Uncomment this for out-of-band inventory support
-			case entry := <-inventoryWatcher.Updates():
-				evt, err := inventoryEventFromKV(entry)
-				if err != nil {
-					o.logger.WithError(err).Warn("error creating inventory condition event")
-				} */
 		}
-		le := o.logger.WithFields(logrus.Fields{
-			"conditionID":    evt.ConditionUpdate.ConditionID.String(),
-			"conditionState": string(evt.ConditionUpdate.State),
-			"kind":           string(evt.Kind),
-		})
+	}
 
-		if err := o.eventHandler.UpdateCondition(ctx, evt); err != nil {
-			le.WithError(err).Warn("updating condition")
+	wg.Wait()
+	close(evtChan)
+
+	o.logger.Debug("shut down KV updates")
+}
+
+type translatorFn func(context.Context, nats.KeyValueEntry) (*v1types.ConditionUpdateEvent, error)
+
+// startConditionListeners does what it says on the tin; iterate across all configured conditions
+// and start a KV watcher for each one. We increment the waitgroup counter for each condition we
+// can handle.
+func (o *Orchestrator) startConditionListeners(ctx context.Context,
+	evtChan chan<- *v1types.ConditionUpdateEvent, wg *sync.WaitGroup) {
+
+	for _, def := range o.conditionDefs {
+		var tf translatorFn
+		var watcher nats.KeyWatcher
+
+		kind := def.Kind
+
+		switch kind {
+		case ptypes.FirmwareInstall:
+			tf = installEventFromKV
+		case ptypes.InventoryOutofband:
+			tf = inventoryEventFromKV
+		default:
+			o.logger.WithField("condition.kind", string(kind)).Warn("unsupported condition")
+			continue
 		}
 
-		if err := o.notifier.Send(evt); err != nil {
-			le.WithError(err).Warn("sending notification")
+		wg.Add(1)
+
+		watcher, err := status.WatchConditionStatus(ctx, kind, o.facility)
+		if err != nil {
+			o.logger.WithError(err).WithField("condition.kind", string(kind)).Fatal("unable to get watcher")
 		}
+
+		go func() {
+			defer wg.Done()
+			// remember, the condition has to be true to run the loop, so "not stop" == false
+			// stops the loop.
+			for stop := false; !stop; {
+				select {
+				case <-ctx.Done():
+					o.logger.WithField("condition.kind", string(kind)).Info("stopping KV update listener")
+					stop = true
+				case entry := <-watcher.Updates():
+					if entry == nil {
+						o.logger.WithField("condition.kind", string(kind)).Debug("nil KV update")
+						continue
+					}
+
+					evt, err := tf(ctx, entry)
+					if err != nil {
+						o.logger.WithError(err).WithField("condition.kind", string(kind)).
+							Warn("error transforming status data")
+						continue
+					}
+					evtChan <- evt
+				}
+			}
+		}()
 	}
 }
 
@@ -208,4 +259,12 @@ func installEventFromKV(ctx context.Context, kve nats.KeyValueEntry) (*v1types.C
 	}
 
 	return updEvent, nil
+}
+
+// XXX: need to sketch in the alloy status structure
+
+// inventoryEventFromKV converts a raw KeyValueEntry from NATS (in the inventory
+// bucket) to a ConditionUpdateEvent for publishing back to ServerService
+func inventoryEventFromKV(_ context.Context, _ nats.KeyValueEntry) (*v1types.ConditionUpdateEvent, error) {
+	return nil, errors.New("unimplemented")
 }
