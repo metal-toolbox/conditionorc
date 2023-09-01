@@ -22,6 +22,8 @@ import (
 	"go.hollow.sh/toolbox/events/pkg/kv"
 
 	ftypes "github.com/metal-toolbox/flasher/types"
+	ocview "go.opencensus.io/stats/view"
+	"go.uber.org/goleak"
 )
 
 func init() {
@@ -151,6 +153,8 @@ func TestInstallEventFromKV(t *testing.T) {
 }
 
 func TestConditionListenersExit(t *testing.T) {
+	defer goleak.VerifyNone(t) // defer this first to ensure that all the NATS routines et al. complete first
+
 	srv := startJetStreamServer(t)
 	defer shutdownJetStream(t, srv)
 	nc, _ := jetStreamContext(t, srv) // nc is closed on evJS.Close(), js needs no cleanup
@@ -184,7 +188,7 @@ func TestConditionListenersExit(t *testing.T) {
 	testChan := make(chan *v1types.ConditionUpdateEvent)
 	ctx, cancel := context.WithCancel(context.TODO())
 
-	o.startConditionListeners(ctx, testChan, &wg)
+	o.startConditionWatchers(ctx, testChan, &wg)
 
 	sentinelChan := make(chan struct{})
 	toCtx, toCancel := context.WithTimeout(context.TODO(), time.Second)
@@ -207,4 +211,8 @@ func TestConditionListenersExit(t *testing.T) {
 	case <-sentinelChan:
 	}
 	require.True(t, testPassed)
+
+	// XXX: it's a long story, but we need to stop the opencensus default worker
+	// because something imported opencensus and it starts a worker goroutine in init()
+	ocview.Stop()
 }

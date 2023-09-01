@@ -136,7 +136,7 @@ func (o *Orchestrator) Run(ctx context.Context) {
 		"AppVersion": v.AppVersion,
 	}).Info("running orchestrator")
 	o.startWorkerLivenessCheckin(ctx)
-	o.startUpdateListener(ctx)
+	o.startUpdateMonitor(ctx)
 	o.startEventListener(ctx)
 
 	<-ctx.Done()

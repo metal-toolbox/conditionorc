@@ -30,10 +30,10 @@ var (
 	staleEventThreshold = 30 * time.Minute
 )
 
-func (o *Orchestrator) startUpdateListener(ctx context.Context) {
+func (o *Orchestrator) startUpdateMonitor(ctx context.Context) {
 	updOnce.Do(func() {
 		var span trace.Span
-		ctx, span = otel.Tracer(pkgName).Start(ctx, "startUpdateListener")
+		ctx, span = otel.Tracer(pkgName).Start(ctx, "startUpdateMonitor")
 		defer span.End()
 
 		o.logger.Info("one-time update configuration")
@@ -60,7 +60,7 @@ func (o *Orchestrator) kvStatusPublisher(ctx context.Context) {
 
 	evtChan := make(chan *v1types.ConditionUpdateEvent)
 
-	o.startConditionListeners(ctx, evtChan, &wg)
+	o.startConditionWatchers(ctx, evtChan, &wg)
 
 	o.logger.Debug("waiting for KV updates")
 
@@ -96,10 +96,10 @@ func (o *Orchestrator) kvStatusPublisher(ctx context.Context) {
 
 type translatorFn func(context.Context, nats.KeyValueEntry) (*v1types.ConditionUpdateEvent, error)
 
-// startConditionListeners does what it says on the tin; iterate across all configured conditions
+// startConditionWatchers does what it says on the tin; iterate across all configured conditions
 // and start a KV watcher for each one. We increment the waitgroup counter for each condition we
 // can handle.
-func (o *Orchestrator) startConditionListeners(ctx context.Context,
+func (o *Orchestrator) startConditionWatchers(ctx context.Context,
 	evtChan chan<- *v1types.ConditionUpdateEvent, wg *sync.WaitGroup) {
 
 	for _, def := range o.conditionDefs {
@@ -127,13 +127,11 @@ func (o *Orchestrator) startConditionListeners(ctx context.Context,
 
 		go func() {
 			defer wg.Done()
-			// remember, the condition has to be true to run the loop, so "not stop" == false
-			// stops the loop.
-			for stop := false; !stop; {
+			for keepRunning := true; keepRunning; {
 				select {
 				case <-ctx.Done():
 					o.logger.WithField("condition.kind", string(kind)).Info("stopping KV update listener")
-					stop = true
+					keepRunning = false
 				case entry := <-watcher.Updates():
 					if entry == nil {
 						o.logger.WithField("condition.kind", string(kind)).Debug("nil KV update")
@@ -191,6 +189,7 @@ type flasherStatus struct {
 	MsgVersion int32           `json:"msgVersion"`
 }
 
+// XXX: Make this generic?
 // installEventFromKV converts the Flasher-native StatusValue (the value from the KV) to a
 // ConditionOrchestrator-native type that ConditionOrc can more-easily use for its
 // own purposes.

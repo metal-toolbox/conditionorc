@@ -23,9 +23,11 @@ require (
 	github.com/volatiletech/null/v8 v8.1.2
 	go.hollow.sh/serverservice v0.16.0
 	go.hollow.sh/toolbox v0.6.1
+	go.opencensus.io v0.24.0
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.42.0
 	go.opentelemetry.io/otel v1.16.0
 	go.opentelemetry.io/otel/trace v1.16.0
+	go.uber.org/goleak v1.2.1
 	golang.org/x/exp v0.0.0-20230811145659-89c5cff77bcb
 	golang.org/x/oauth2 v0.11.0
 	gopkg.in/square/go-jose.v2 v2.6.0
@@ -109,7 +111,6 @@ require (
 	github.com/volatiletech/sqlboiler v3.7.1+incompatible // indirect
 	github.com/volatiletech/sqlboiler/v4 v4.14.2 // indirect
 	github.com/volatiletech/strmangle v0.0.5 // indirect
-	go.opencensus.io v0.24.0 // indirect
 	go.opentelemetry.io/otel/exporters/otlp/internal/retry v1.16.0 // indirect
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace v1.16.0 // indirect
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc v1.16.0 // indirect
