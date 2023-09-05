@@ -94,8 +94,6 @@ func (o *Orchestrator) kvStatusPublisher(ctx context.Context) {
 	o.logger.Debug("shut down KV updates")
 }
 
-type translatorFn func(context.Context, nats.KeyValueEntry) (*v1types.ConditionUpdateEvent, error)
-
 // startConditionWatchers does what it says on the tin; iterate across all configured conditions
 // and start a KV watcher for each one. We increment the waitgroup counter for each condition we
 // can handle.
@@ -103,16 +101,13 @@ func (o *Orchestrator) startConditionWatchers(ctx context.Context,
 	evtChan chan<- *v1types.ConditionUpdateEvent, wg *sync.WaitGroup) {
 
 	for _, def := range o.conditionDefs {
-		var tf translatorFn
 		var watcher nats.KeyWatcher
 
 		kind := def.Kind
 
 		switch kind {
 		case ptypes.FirmwareInstall:
-			tf = installEventFromKV
 		case ptypes.InventoryOutofband:
-			tf = inventoryEventFromKV
 		default:
 			o.logger.WithField("condition.kind", string(kind)).Warn("unsupported condition")
 			continue
@@ -138,7 +133,7 @@ func (o *Orchestrator) startConditionWatchers(ctx context.Context,
 						continue
 					}
 
-					evt, err := tf(ctx, entry)
+					evt, err := eventUpdateFromKV(ctx, entry, kind)
 					if err != nil {
 						o.logger.WithError(err).WithField("condition.kind", string(kind)).
 							Warn("error transforming status data")
@@ -175,51 +170,56 @@ func parseStatusKVKey(key string) (*statusKey, error) {
 	}, nil
 }
 
-// XXX: This is a temporary copy of the StatusValue from Flasher. The structs shared by
-// controllers and ConditionOrc will be moved to a separate "API repo" so we can break
-// the direct dependencies of the apps on each other.
-type flasherStatus struct {
-	UpdatedAt  time.Time       `json:"updated"`
-	WorkerID   string          `json:"worker"`
-	TraceID    string          `json:"traceID"`
-	SpanID     string          `json:"spanID"`
-	Target     string          `json:"target"`
-	State      string          `json:"state"`
-	Status     json.RawMessage `json:"status"`
-	MsgVersion int32           `json:"msgVersion"`
+// XXX: This is a temporary subset of the StatusValue from Flasher and the rivets repo.
+// it needs to live here until both Flasher and Alloy have integrated with rivets and
+// deployed.
+type controllerStatus struct {
+	UpdatedAt time.Time       `json:"updated"`
+	TraceID   string          `json:"traceID"`
+	SpanID    string          `json:"spanID"`
+	Target    string          `json:"target"`
+	State     string          `json:"state"`
+	Status    json.RawMessage `json:"status"`
 }
 
-// XXX: Make this generic?
-// installEventFromKV converts the Flasher-native StatusValue (the value from the KV) to a
+// eventUpdateFromKV converts the stored rivets.StatusValue (the value from the KV) to a
 // ConditionOrchestrator-native type that ConditionOrc can more-easily use for its
 // own purposes.
-func installEventFromKV(ctx context.Context, kve nats.KeyValueEntry) (*v1types.ConditionUpdateEvent, error) {
+func eventUpdateFromKV(ctx context.Context, kve nats.KeyValueEntry,
+	kind ptypes.ConditionKind) (*v1types.ConditionUpdateEvent, error) {
 	parsedKey, err := parseStatusKVKey(kve.Key())
 	if err != nil {
 		return nil, err
 	}
 
 	byt := kve.Value()
-	fs := flasherStatus{}
+	cs := controllerStatus{}
 	//nolint:govet // you and gocritic can argue about it outside.
-	if err := json.Unmarshal(byt, &fs); err != nil {
+	if err := json.Unmarshal(byt, &cs); err != nil {
 		return nil, err
 	}
 
-	if !ptypes.ConditionStateIsValid(ptypes.ConditionState(fs.State)) {
+	// validate the contents
+	serverID, err := uuid.Parse(cs.Target)
+	if err != nil {
+		return nil, errors.Wrap(err, "parsing target id")
+	}
+
+	convState := ptypes.ConditionState(cs.State)
+	if !ptypes.ConditionStateIsValid(convState) {
 		return nil, errInvalidState
 	}
 
 	// skip processing any records where we're in a final state and it's older than
 	// our threshold
-	if ptypes.ConditionStateIsComplete(ptypes.ConditionState(fs.State)) &&
-		time.Since(fs.UpdatedAt) > staleEventThreshold {
+	if ptypes.ConditionStateIsComplete(convState) &&
+		time.Since(cs.UpdatedAt) > staleEventThreshold {
 		return nil, errStaleEvent
 	}
 
 	// extract traceID and spanID
-	traceID, _ := trace.TraceIDFromHex(fs.TraceID)
-	spanID, _ := trace.SpanIDFromHex(fs.SpanID)
+	traceID, _ := trace.TraceIDFromHex(cs.TraceID)
+	spanID, _ := trace.SpanIDFromHex(cs.SpanID)
 
 	// add a trace span
 	if traceID.IsValid() && spanID.IsValid() {
@@ -231,20 +231,9 @@ func installEventFromKV(ctx context.Context, kve nats.KeyValueEntry) (*v1types.C
 
 		_, span := otel.Tracer(pkgName).Start(
 			trace.ContextWithRemoteSpanContext(ctx, remoteSpan),
-			"installEventFromKV",
+			"eventUpdateFromKV",
 		)
 		defer span.End()
-	}
-
-	// validate the contents
-	serverID, err := uuid.Parse(fs.Target)
-	if err != nil {
-		return nil, errors.Wrap(err, "parsing target id")
-	}
-
-	convState := ptypes.ConditionState(fs.State)
-	if !ptypes.ConditionStateIsValid(convState) {
-		return nil, errors.Wrap(errors.New("invalid condition state"), fs.State)
 	}
 
 	updEvent := &v1types.ConditionUpdateEvent{
@@ -252,18 +241,10 @@ func installEventFromKV(ctx context.Context, kve nats.KeyValueEntry) (*v1types.C
 			ConditionID: parsedKey.conditionID,
 			ServerID:    serverID,
 			State:       convState,
-			Status:      fs.Status,
+			Status:      cs.Status,
 		},
-		Kind: ptypes.FirmwareInstall,
+		Kind: kind,
 	}
 
 	return updEvent, nil
-}
-
-// XXX: need to sketch in the alloy status structure
-
-// inventoryEventFromKV converts a raw KeyValueEntry from NATS (in the inventory
-// bucket) to a ConditionUpdateEvent for publishing back to ServerService
-func inventoryEventFromKV(_ context.Context, _ nats.KeyValueEntry) (*v1types.ConditionUpdateEvent, error) {
-	return nil, errors.New("unimplemented")
 }
