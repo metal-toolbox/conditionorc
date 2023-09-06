@@ -105,14 +105,6 @@ func (o *Orchestrator) startConditionWatchers(ctx context.Context,
 
 		kind := def.Kind
 
-		switch kind {
-		case ptypes.FirmwareInstall:
-		case ptypes.InventoryOutofband:
-		default:
-			o.logger.WithField("condition.kind", string(kind)).Warn("unsupported condition")
-			continue
-		}
-
 		wg.Add(1)
 
 		watcher, err := status.WatchConditionStatus(ctx, kind, o.facility)
