@@ -134,7 +134,7 @@ func TestInstallEventFromKV(t *testing.T) {
 	entry, err := writeHandle.Get(k1)
 	require.NoError(t, err)
 
-	upd1, err := installEventFromKV(context.Background(), entry)
+	upd1, err := eventUpdateFromKV(context.Background(), entry, ptypes.FirmwareInstall)
 	require.NoError(t, err)
 	require.Equal(t, condID, upd1.ConditionUpdate.ConditionID)
 	require.Equal(t, ptypes.Pending, upd1.ConditionUpdate.State)
@@ -142,13 +142,13 @@ func TestInstallEventFromKV(t *testing.T) {
 	// bogus state should error
 	entry, err = writeHandle.Get(k2)
 	require.NoError(t, err)
-	_, err = installEventFromKV(context.Background(), entry)
+	_, err = eventUpdateFromKV(context.Background(), entry, ptypes.FirmwareInstall)
 	require.ErrorIs(t, errInvalidState, err)
 
 	// stale event should error as well
 	entry, err = writeHandle.Get(k3)
 	require.NoError(t, err)
-	_, err = installEventFromKV(context.Background(), entry)
+	_, err = eventUpdateFromKV(context.Background(), entry, ptypes.FirmwareInstall)
 	require.ErrorIs(t, errStaleEvent, err)
 }
 
