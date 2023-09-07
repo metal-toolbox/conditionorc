@@ -17,7 +17,7 @@ import (
 	"github.com/slack-go/slack"
 )
 
-var postTimeout = 800 * time.Millisecond
+var postTimeout = 2 * time.Second
 
 // this is the value associated with notificiations for a condition-execution
 // the key is the tuple of facility and condition ID (just like the status KV)
@@ -34,6 +34,51 @@ type slackSender struct {
 	api *slack.Client
 	trk map[uuid.UUID]slackNotification
 	ch  string
+}
+
+type simpleMsg struct {
+	Msg string `json:"msg",omitempty`
+}
+
+func (s *simpleMsg) MustBytes() []byte {
+	byt, err := json.Marshal(s)
+	if err != nil {
+		panic(fmt.Sprintf("bad simple json: %s", err.Error()))
+	}
+	return byt
+}
+
+func (ss *slackSender) SendSimple(payload string) error {
+	le := ss.log.WithFields(logrus.Fields{
+		"channel": ss.ch,
+	})
+
+	le.Debug("sending simple slack notification")
+
+	// cap the time we're willing to wait for Slack
+	ctx, cancel := context.WithTimeout(context.Background(), postTimeout)
+	defer cancel()
+
+	msg := &simpleMsg{
+		Msg: payload,
+	}
+
+	sendMe := msg.MustBytes()
+
+	var blocks []slack.Block
+	blocks = append(blocks,
+		slack.NewHeaderBlock(
+			slack.NewTextBlockObject(slack.PlainTextType, "orchestrator simple message", false, false)),
+		slack.NewSectionBlock(
+			slack.NewTextBlockObject(slack.MarkdownType, string(sendMe), false, false), nil, nil),
+	)
+
+	msgOpts := []slack.MsgOption{
+		slack.MsgOptionBlocks(blocks...),
+	}
+
+	_, _, err := ss.api.PostMessageContext(ctx, ss.ch, msgOpts...)
+	return err
 }
 
 func (ss *slackSender) Send(upd *v1types.ConditionUpdateEvent) error {

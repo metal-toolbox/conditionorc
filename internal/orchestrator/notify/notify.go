@@ -26,11 +26,16 @@ type Configuration struct {
 
 type Sender interface {
 	Send(upd *v1types.ConditionUpdateEvent) error
+	SendSimple(msg string) error
 }
 
 type nullNotifier struct{}
 
 func (n *nullNotifier) Send(_ *v1types.ConditionUpdateEvent) error {
+	return nil
+}
+
+func (n *nullNotifier) SendSimple(_ string) error {
 	return nil
 }
 

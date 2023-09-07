@@ -58,6 +58,15 @@ func (o *Orchestrator) checkinRoutine(ctx context.Context) {
 			Warn("unable to do initial worker liveness registration")
 	}
 
+	notify := func() {
+		helloMsg := fmt.Sprintf("hello from %s", me.String())
+		if err := o.notifier.SendSimple(helloMsg); err != nil {
+			o.logger.WithError(err).Warn("send simple notification")
+		}
+	}
+
+	notify()
+
 	tick := time.NewTicker(checkinCadence)
 	defer tick.Stop()
 
@@ -65,6 +74,7 @@ func (o *Orchestrator) checkinRoutine(ctx context.Context) {
 	for !stop {
 		select {
 		case <-tick.C:
+			notify()
 			err := registry.ControllerCheckin(me)
 			if err != nil {
 				metrics.DependencyError("liveness", "check-in")
