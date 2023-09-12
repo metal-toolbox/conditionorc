@@ -103,6 +103,36 @@ func TestStatusKV(t *testing.T) {
 	_, err = WatchConditionStatus(context.TODO(), ptypes.ConditionKind("test-event"), "my-facility")
 	require.NoError(t, err)
 
-	_, err = GetConditionKV(ptypes.ConditionKind("test-event"))
+	testKind := ptypes.ConditionKind("test-event")
+	handle, err := GetConditionKV(testKind)
 	require.NoError(t, err)
+
+	// write some data to the KV store to exercise our get methods
+	_, err = handle.PutString("badkeyformat", "bogus data")
+	require.NoError(t, err)
+	_, err = handle.PutString("fc13.firstkey", "This is some fc13 data")
+	require.NoError(t, err)
+	_, err = handle.PutString("fc1.firstkey", "This is some fc1 data")
+	require.NoError(t, err)
+	_, err = handle.PutString("fc13.secondkey", "This is more fc13 data")
+	require.NoError(t, err)
+
+	c, err := GetSingleCondition(testKind, "fc1", "firstkey")
+	require.NotNil(t, c)
+	require.NoError(t, err)
+
+	es, err := GetAllConditions(testKind, "fc13")
+	require.NoError(t, err)
+	require.Equal(t, 2, len(es))
+
+	// Delete fc13.secondkey and it's gone
+	err = DeleteCondition(testKind, "fc13", "secondkey")
+	require.NoError(t, err)
+	c, err = GetSingleCondition(testKind, "fc13", "secondkey")
+	require.Nil(t, c)
+	require.ErrorIs(t, err, nats.ErrKeyNotFound)
+
+	es, err = GetAllConditions(testKind, "fc8")
+	require.NoError(t, err)
+	require.Equal(t, 0, len(es))
 }
