@@ -95,11 +95,6 @@ func GetConditionKV(kind ptypes.ConditionKind) (nats.KeyValue, error) {
 	return bucket, nil
 }
 
-type ConditionEntry struct {
-	Key   string
-	Value []byte
-}
-
 // DeleteCondition does what it says on the tin. If this does not return an error, the
 // KV entry is gone.
 func DeleteCondition(kind ptypes.ConditionKind, facility, condID string) error {
@@ -112,7 +107,7 @@ func DeleteCondition(kind ptypes.ConditionKind, facility, condID string) error {
 }
 
 // GetSingleCondition does exactly that given a kind, facility, and condition-id
-func GetSingleCondition(kind ptypes.ConditionKind, facility, condID string) (*ConditionEntry, error) {
+func GetSingleCondition(kind ptypes.ConditionKind, facility, condID string) (nats.KeyValueEntry, error) {
 	bucket, err := getKVBucket(kind)
 	if err != nil {
 		return nil, err
@@ -123,10 +118,7 @@ func GetSingleCondition(kind ptypes.ConditionKind, facility, condID string) (*Co
 		return nil, err
 	}
 
-	return &ConditionEntry{
-		Key:   entry.Key(),
-		Value: entry.Value(),
-	}, nil
+	return entry, nil
 }
 
 // facility is always the initial token of the key, and is terminated by a period.
@@ -140,7 +132,7 @@ func matchFacility(facility, key string) bool {
 
 // GetAllConditions returns all conditions for a specific type and facility. This includes any
 // entry in any state, provided it has not been reaped by TTL.
-func GetAllConditions(kind ptypes.ConditionKind, facility string) ([]*ConditionEntry, error) {
+func GetAllConditions(kind ptypes.ConditionKind, facility string) ([]nats.KeyValueEntry, error) {
 	bucket, err := getKVBucket(kind)
 	if err != nil {
 		return nil, err
@@ -156,7 +148,7 @@ func GetAllConditions(kind ptypes.ConditionKind, facility string) ([]*ConditionE
 	}
 	defer watcher.Stop()
 
-	conds := []*ConditionEntry{}
+	conds := []nats.KeyValueEntry{}
 
 	for kve := range watcher.Updates() {
 		if kve == nil {
@@ -168,10 +160,7 @@ func GetAllConditions(kind ptypes.ConditionKind, facility string) ([]*ConditionE
 		if !matchFacility(facility, kve.Key()) {
 			continue
 		}
-		conds = append(conds, &ConditionEntry{
-			Key:   kve.Key(),
-			Value: kve.Value(),
-		})
+		conds = append(conds, kve)
 	}
 	return conds, nil
 }

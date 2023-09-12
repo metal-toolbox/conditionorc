@@ -21,11 +21,12 @@ import (
 )
 
 var (
-	updOnce         sync.Once
-	expectedDots    = 1 // we expect keys for KV-based status updates to be facilityCode.conditionID
-	errKeyFormat    = errors.New("malformed update key")
-	errConditionID  = errors.New("bad condition uuid")
-	errInvalidState = errors.New("invalid condition state")
+	updOnce             sync.Once
+	expectedDots        = 1 // we expect keys for KV-based status updates to be facilityCode.conditionID
+	errKeyFormat        = errors.New("malformed update key")
+	errConditionID      = errors.New("bad condition uuid")
+	errInvalidState     = errors.New("invalid condition state")
+	staleEventThreshold = 30 * time.Minute
 )
 
 func (o *Orchestrator) startUpdateMonitor(ctx context.Context) {
@@ -78,10 +79,23 @@ func (o *Orchestrator) kvStatusPublisher(ctx context.Context) {
 
 			if err := o.eventHandler.UpdateCondition(ctx, evt); err != nil {
 				le.WithError(err).Warn("updating condition")
+				// if we can't update the condition at the DB, skip this and move on
+				continue
 			}
 
 			if err := o.notifier.Send(evt); err != nil {
 				le.WithError(err).Warn("sending notification")
+				// notifications are advisory, so if we fail to notify we keep processing
+			}
+
+			if ptypes.ConditionStateIsComplete(evt.ConditionUpdate.State) {
+				// if this condition is complete, attempt a delete
+				err := status.DeleteCondition(evt.Kind, o.facility, evt.ConditionUpdate.ConditionID.String())
+				if err != nil {
+					// The delete failed. We will reprocess this on the next restart unless the reconciler
+					// beats us to it.
+					le.WithError(err).Warn("deleting condition data")
+				}
 			}
 		}
 	}
