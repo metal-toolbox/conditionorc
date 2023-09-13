@@ -316,6 +316,7 @@ func (o *Orchestrator) eventUpdate(ctx context.Context, evt *v1types.ConditionUp
 
 func (o *Orchestrator) eventNeedsReconciliation(evt *v1types.ConditionUpdateEvent) bool {
 	// the last update should be later than our internal threshold
+	// this might still be actively worked
 	if time.Since(evt.UpdatedAt) < staleEventThreshold {
 		return false
 	}

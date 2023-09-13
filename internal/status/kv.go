@@ -146,6 +146,7 @@ func GetAllConditions(kind ptypes.ConditionKind, facility string) ([]nats.KeyVal
 	if err != nil {
 		return nil, errors.Wrap(err, "GetAllConditions::"+string(kind)+"::"+facility)
 	}
+	//nolint:errcheck,gocritic
 	defer watcher.Stop()
 
 	conds := []nats.KeyValueEntry{}
