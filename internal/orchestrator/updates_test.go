@@ -20,6 +20,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.hollow.sh/toolbox/events"
 	"go.hollow.sh/toolbox/events/pkg/kv"
+	"go.hollow.sh/toolbox/events/registry"
 
 	ftypes "github.com/metal-toolbox/flasher/types"
 	ocview "go.opencensus.io/stats/view"
@@ -85,7 +86,7 @@ func TestParseStatusKey(t *testing.T) {
 	require.ErrorIs(t, err, errConditionID)
 }
 
-func TestInstallEventFromKV(t *testing.T) {
+func TestEventUpdateFromKV(t *testing.T) {
 	srv := startJetStreamServer(t)
 	defer shutdownJetStream(t, srv)
 	nc, js := jetStreamContext(t, srv) // nc is closed on evJS.Close(), js needs no cleanup
@@ -98,16 +99,25 @@ func TestInstallEventFromKV(t *testing.T) {
 	})
 	require.NoError(t, err, "write handle")
 
+	cID := registry.GetID("test-app")
+
 	// add some KVs
 	sv1 := ftypes.StatusValue{
-		Target: uuid.New().String(),
-		State:  "pending",
-		Status: json.RawMessage(`{"msg":"some-status"}`),
+		Target:   uuid.New().String(),
+		State:    "pending",
+		Status:   json.RawMessage(`{"msg":"some-status"}`),
+		WorkerID: cID.String(),
 	}
 	bogus := ftypes.StatusValue{
 		Target: uuid.New().String(),
 		State:  "bogus",
 		Status: json.RawMessage(`{"msg":"some-status"}`),
+	}
+	noCID := ftypes.StatusValue{
+		Target:    uuid.New().String(),
+		State:     "failed",
+		Status:    json.RawMessage(`{"msg":"some-status"}`),
+		UpdatedAt: time.Now().Add(-90 * time.Minute),
 	}
 
 	condID := uuid.New()
@@ -118,6 +128,9 @@ func TestInstallEventFromKV(t *testing.T) {
 	require.NoError(t, err)
 
 	_, err = writeHandle.Put(k2, bogus.MustBytes())
+	require.NoError(t, err)
+
+	_, err = writeHandle.Put(k3, noCID.MustBytes())
 	require.NoError(t, err)
 
 	// test the expected good KV entry
@@ -134,6 +147,15 @@ func TestInstallEventFromKV(t *testing.T) {
 	require.NoError(t, err)
 	_, err = eventUpdateFromKV(context.Background(), entry, ptypes.FirmwareInstall)
 	require.ErrorIs(t, errInvalidState, err)
+
+	// no controller id event should error as well
+	entry, err = writeHandle.Get(k3)
+	require.NoError(t, err)
+	_, err = eventUpdateFromKV(context.Background(), entry, ptypes.FirmwareInstall)
+	require.ErrorIs(t, err, registry.ErrBadFormat)
+}
+
+func TestEventNeedsReconciliation(t *testing.T) {
 }
 
 func TestConditionListenersExit(t *testing.T) {
@@ -173,6 +195,7 @@ func TestConditionListenersExit(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.TODO())
 
 	o.startConditionWatchers(ctx, testChan, &wg)
+	o.startReconciler(ctx, &wg)
 
 	sentinelChan := make(chan struct{})
 	toCtx, toCancel := context.WithTimeout(context.TODO(), time.Second)

@@ -2,10 +2,13 @@ package types
 
 import (
 	"encoding/json"
+	"time"
 
 	"github.com/google/uuid"
 	ptypes "github.com/metal-toolbox/conditionorc/pkg/types"
 	"github.com/pkg/errors"
+
+	"go.hollow.sh/toolbox/events/registry"
 )
 
 var (
@@ -80,7 +83,9 @@ func (c *ConditionUpdate) Validate() error {
 // ConditionUpdateEvent is the payload received for a condition update over the event stream.
 type ConditionUpdateEvent struct {
 	ConditionUpdate
-	Kind ptypes.ConditionKind `json:"kind"`
+	Kind                  ptypes.ConditionKind `json:"kind"`
+	UpdatedAt             time.Time            `json:"updatedAt"`
+	registry.ControllerID `json:"controllerID"`
 }
 
 // Validate checks for required attributes.
