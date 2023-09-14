@@ -21,13 +21,11 @@ import (
 )
 
 var (
-	updOnce             sync.Once
-	expectedDots        = 1 // we expect keys for KV-based status updates to be facilityCode.conditionID
-	errKeyFormat        = errors.New("malformed update key")
-	errConditionID      = errors.New("bad condition uuid")
-	errInvalidState     = errors.New("invalid condition state")
-	errStaleEvent       = errors.New("event is stale")
-	staleEventThreshold = 30 * time.Minute
+	updOnce         sync.Once
+	expectedDots    = 1 // we expect keys for KV-based status updates to be facilityCode.conditionID
+	errKeyFormat    = errors.New("malformed update key")
+	errConditionID  = errors.New("bad condition uuid")
+	errInvalidState = errors.New("invalid condition state")
 )
 
 func (o *Orchestrator) startUpdateMonitor(ctx context.Context) {
@@ -125,6 +123,11 @@ func (o *Orchestrator) startConditionWatchers(ctx context.Context,
 						continue
 					}
 
+					o.logger.WithFields(logrus.Fields{
+						"condition.kind": string(kind),
+						"entry.key":      entry.Key(),
+					}).Debug("KV update")
+
 					evt, err := eventUpdateFromKV(ctx, entry, kind)
 					if err != nil {
 						o.logger.WithError(err).WithField("condition.kind", string(kind)).
@@ -200,13 +203,6 @@ func eventUpdateFromKV(ctx context.Context, kve nats.KeyValueEntry,
 	convState := ptypes.ConditionState(cs.State)
 	if !ptypes.ConditionStateIsValid(convState) {
 		return nil, errInvalidState
-	}
-
-	// skip processing any records where we're in a final state and it's older than
-	// our threshold
-	if ptypes.ConditionStateIsComplete(convState) &&
-		time.Since(cs.UpdatedAt) > staleEventThreshold {
-		return nil, errStaleEvent
 	}
 
 	// extract traceID and spanID

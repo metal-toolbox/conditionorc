@@ -93,7 +93,7 @@ func TestInstallEventFromKV(t *testing.T) {
 	defer evJS.Close()
 
 	writeHandle, err := js.CreateKeyValue(&nats.KeyValueConfig{
-		Bucket:      string(ptypes.FirmwareInstall),
+		Bucket:      "installEventFromKV",
 		Description: "test install event",
 	})
 	require.NoError(t, err, "write handle")
@@ -109,25 +109,15 @@ func TestInstallEventFromKV(t *testing.T) {
 		State:  "bogus",
 		Status: json.RawMessage(`{"msg":"some-status"}`),
 	}
-	stale := ftypes.StatusValue{
-		Target:    uuid.New().String(),
-		State:     "failed",
-		Status:    json.RawMessage(`{"msg":"some-status"}`),
-		UpdatedAt: time.Now().Add(-90 * time.Minute),
-	}
 
 	condID := uuid.New()
 	k1 := fmt.Sprintf("fc13.%s", condID)
 	k2 := fmt.Sprintf("fc13.%s", uuid.New())
-	k3 := fmt.Sprintf("fc13.%s", uuid.New())
 
 	_, err = writeHandle.Put(k1, sv1.MustBytes())
 	require.NoError(t, err)
 
 	_, err = writeHandle.Put(k2, bogus.MustBytes())
-	require.NoError(t, err)
-
-	_, err = writeHandle.Put(k3, stale.MustBytes())
 	require.NoError(t, err)
 
 	// test the expected good KV entry
@@ -144,12 +134,6 @@ func TestInstallEventFromKV(t *testing.T) {
 	require.NoError(t, err)
 	_, err = eventUpdateFromKV(context.Background(), entry, ptypes.FirmwareInstall)
 	require.ErrorIs(t, errInvalidState, err)
-
-	// stale event should error as well
-	entry, err = writeHandle.Get(k3)
-	require.NoError(t, err)
-	_, err = eventUpdateFromKV(context.Background(), entry, ptypes.FirmwareInstall)
-	require.ErrorIs(t, errStaleEvent, err)
 }
 
 func TestConditionListenersExit(t *testing.T) {
