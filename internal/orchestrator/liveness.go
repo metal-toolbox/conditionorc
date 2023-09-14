@@ -3,6 +3,7 @@ package orchestrator
 import (
 	"context"
 	"errors"
+	"fmt"
 	"sync"
 	"time"
 
@@ -48,7 +49,8 @@ func (o *Orchestrator) startWorkerLivenessCheckin(ctx context.Context) {
 }
 
 func (o *Orchestrator) checkinRoutine(ctx context.Context) {
-	me := registry.GetID("condition-orchestrator")
+	workerName := fmt.Sprintf("orchestrator-%s", o.facility)
+	me := registry.GetID(workerName)
 	o.logger.WithField("id", me.String()).Info("worker id assigned")
 	if err := registry.RegisterController(me); err != nil {
 		metrics.DependencyError("liveness", "register")
