@@ -29,21 +29,8 @@ var (
 	errInvalidState     = errors.New("invalid condition state")
 	staleEventThreshold = 30 * time.Minute
 	reconcilerCadence   = 10 * time.Minute
-	failedByReconciler  []byte
+	failedByReconciler  = []byte(`{ "msg": "worker failed processing this event" }`)
 )
-
-func init() {
-	msg := struct {
-		Msg string `json:"msg"`
-	}{
-		Msg: "worker failed processing this event",
-	}
-	var err error
-	failedByReconciler, err = json.Marshal(&msg)
-	if err != nil {
-		panic("bad reconciler failed message: " + err.Error())
-	}
-}
 
 func (o *Orchestrator) startUpdateMonitor(ctx context.Context) {
 	updOnce.Do(func() {
@@ -137,6 +124,8 @@ func (o *Orchestrator) startConditionWatchers(ctx context.Context,
 				case <-ctx.Done():
 					o.logger.WithField("condition.kind", string(kind)).Info("stopping KV update listener")
 					keepRunning = false
+					//nolint:errcheck,gocritic
+					watcher.Stop()
 				case entry := <-watcher.Updates():
 					if entry == nil {
 						o.logger.WithField("condition.kind", string(kind)).Debug("nil KV update")

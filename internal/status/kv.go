@@ -3,7 +3,6 @@ package status
 import (
 	"context"
 	"fmt"
-	"strings"
 	"sync"
 	"time"
 
@@ -121,15 +120,6 @@ func GetSingleCondition(kind ptypes.ConditionKind, facility, condID string) (nat
 	return entry, nil
 }
 
-// facility is always the initial token of the key, and is terminated by a period.
-func matchFacility(facility, key string) bool {
-	pre, _, found := strings.Cut(key, ".")
-	if !found {
-		return false
-	}
-	return pre == facility
-}
-
 // GetAllConditions returns all conditions for a specific type and facility. This includes any
 // entry in any state, provided it has not been reaped by TTL.
 func GetAllConditions(kind ptypes.ConditionKind, facility string) ([]nats.KeyValueEntry, error) {
@@ -142,7 +132,9 @@ func GetAllConditions(kind ptypes.ConditionKind, facility string) ([]nats.KeyVal
 	// do what they do in the NATS code and use a watcher to get everything from the server
 	// in one shot.
 
-	watcher, err := bucket.WatchAll(nats.IgnoreDeletes())
+	facilityOnlyKey := fmt.Sprintf("%s.*", facility)
+
+	watcher, err := bucket.Watch(facilityOnlyKey, nats.IgnoreDeletes())
 	if err != nil {
 		return nil, errors.Wrap(err, "GetAllConditions::"+string(kind)+"::"+facility)
 	}
@@ -157,9 +149,6 @@ func GetAllConditions(kind ptypes.ConditionKind, facility string) ([]nats.KeyVal
 			// until the internal watcher's subscription to the KV subject is shut down
 			// so getting an explicit nil here means "nothing more."
 			break
-		}
-		if !matchFacility(facility, kve.Key()) {
-			continue
 		}
 		conds = append(conds, kve)
 	}
