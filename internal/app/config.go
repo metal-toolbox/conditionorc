@@ -150,6 +150,8 @@ func (a *App) envVarOverrides() error {
 	if a.Config.Notifications.Enabled {
 		// load the token from the environment b/c it's a secret
 		a.Config.Notifications.Token = a.v.GetString("notifications.token")
+		// same with any webhook that is set
+		a.Config.Notifications.Webhook = a.v.GetString("notifications.webhook")
 	}
 
 	switch a.Config.StoreKind {

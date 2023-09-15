@@ -13,8 +13,9 @@ import (
 type NotificationType string
 
 const (
-	Slack NotificationType = "slack"
-	Null  NotificationType = "null"
+	SlackWH NotificationType = "slack-webhook"
+	Slack   NotificationType = "slack"
+	Null    NotificationType = "null"
 )
 
 type Configuration struct {
@@ -22,6 +23,7 @@ type Configuration struct {
 	NotificationType `mapstructure:"type"`
 	Channel          string `mapstructure:"channel"`
 	Token            string `mapstructure:"token"`
+	Webhook          string `mapstructure:"webhook"` // using a web-hook trumps a channel and token
 }
 
 type Sender interface {
@@ -48,6 +50,8 @@ func New(l *logrus.Logger, cfg Configuration) Sender {
 
 	switch cfg.NotificationType {
 	case Null:
+	case SlackWH:
+		notifier = newSlackWebhook(l, cfg)
 	case Slack:
 		notifier = newSlackSender(l, cfg)
 	default:

@@ -36,8 +36,14 @@ type slackSender struct {
 	ch  string
 }
 
+type slackWebhook struct {
+	log     *logrus.Logger
+	hookURL string
+	trk     map[uuid.UUID]slackNotification
+}
+
 type simpleMsg struct {
-	Msg string `json:"msg",omitempty`
+	Msg string `json:"msg,omitempty"`
 }
 
 func (s *simpleMsg) MustBytes() []byte {
@@ -50,6 +56,7 @@ func (s *simpleMsg) MustBytes() []byte {
 
 func (ss *slackSender) SendSimple(payload string) error {
 	le := ss.log.WithFields(logrus.Fields{
+		"mode":    "api",
 		"channel": ss.ch,
 	})
 
@@ -78,6 +85,112 @@ func (ss *slackSender) SendSimple(payload string) error {
 	}
 
 	_, _, err := ss.api.PostMessageContext(ctx, ss.ch, msgOpts...)
+	return err
+}
+
+func (w *slackWebhook) SendSimple(payload string) error {
+	le := w.log.WithField("mode", "webhook")
+	le.Debug("sending simple slack notification")
+
+	ctx, cancel := context.WithTimeout(context.Background(), postTimeout)
+	defer cancel()
+
+	msg := &simpleMsg{
+		Msg: payload,
+	}
+
+	sendMe := msg.MustBytes()
+
+	var blocks []slack.Block
+	blocks = append(blocks,
+		slack.NewHeaderBlock(
+			slack.NewTextBlockObject(slack.PlainTextType, "orchestrator simple message", false, false)),
+		slack.NewSectionBlock(
+			slack.NewTextBlockObject(slack.MarkdownType, string(sendMe), false, false), nil, nil),
+	)
+
+	webhookMsg := &slack.WebhookMessage{
+		Blocks: &slack.Blocks{
+			BlockSet: blocks,
+		},
+	}
+
+	return slack.PostWebhookContext(ctx, w.hookURL, webhookMsg)
+}
+
+func (w *slackWebhook) Send(upd *v1types.ConditionUpdateEvent) error {
+	le := w.log.WithFields(logrus.Fields{
+		"mode":        "webhook",
+		"state":       upd.ConditionUpdate.State,
+		"conditionID": upd.ConditionUpdate.ConditionID.String(),
+	})
+
+	le.Debug("sending slack notification")
+
+	// cap the time we're willing to wait for Slack
+	ctx, cancel := context.WithTimeout(context.Background(), postTimeout)
+	defer cancel()
+
+	entry := w.trk[upd.ConditionID]
+	if entry.ConditionState == string(upd.ConditionUpdate.State) &&
+		entry.ConditionStatus == string(upd.ConditionUpdate.Status) {
+		le.Info("skipping notification on duplicate state and status")
+		return nil
+	}
+
+	hdrStr := fmt.Sprintf("Condition: %s", upd.ConditionID.String())
+	var emojiStr string
+	switch upd.State {
+	case ptypes.Succeeded:
+		emojiStr = ":white_check_mark:"
+	case ptypes.Failed:
+		emojiStr = ":exclamation:"
+	}
+	stateStr := fmt.Sprintf("Type: _%s_\nState: *%s* %s", upd.Kind, string(upd.State), emojiStr)
+
+	marshaledStatus, err := json.Marshal(upd.Status)
+	if err != nil {
+		w.log.WithFields(logrus.Fields{
+			"state":       upd.State,
+			"conditionID": upd.ConditionID.String(),
+		}).Warn("bad status payload")
+		marshaledStatus = nil
+	}
+
+	statusString := fmt.Sprintf("Server: *%s*\nStatus: _%s_", upd.ServerID.String(),
+		string(marshaledStatus))
+
+	blocks := []slack.Block{
+		slack.NewHeaderBlock(
+			slack.NewTextBlockObject(slack.PlainTextType, hdrStr, false, false)),
+		slack.NewSectionBlock(
+			slack.NewTextBlockObject(slack.MarkdownType, stateStr, false, false), nil, nil),
+	}
+
+	if marshaledStatus != nil {
+		blocks = append(blocks, slack.NewSectionBlock(
+			slack.NewTextBlockObject(slack.MarkdownType, statusString, false, false), nil, nil),
+		)
+	}
+
+	whMsg := &slack.WebhookMessage{
+		Blocks: &slack.Blocks{
+			BlockSet: blocks,
+		},
+	}
+
+	err = slack.PostWebhookContext(ctx, w.hookURL, whMsg)
+
+	// special handling for the last update
+	if ptypes.ConditionStateIsComplete(upd.State) {
+		delete(w.trk, upd.ConditionID)
+		return err
+	}
+
+	entry.ConditionState = string(upd.State)
+	entry.ConditionStatus = string(upd.Status)
+	w.trk[upd.ConditionID] = entry
+
 	return err
 }
 
@@ -178,5 +291,13 @@ func newSlackSender(l *logrus.Logger, cfg Configuration) *slackSender {
 		api: slack.New(cfg.Token),
 		trk: make(map[uuid.UUID]slackNotification),
 		ch:  cfg.Channel,
+	}
+}
+
+func newSlackWebhook(l *logrus.Logger, cfg Configuration) *slackWebhook {
+	return &slackWebhook{
+		log:     l,
+		hookURL: cfg.Webhook,
+		trk:     make(map[uuid.UUID]slackNotification),
 	}
 }
