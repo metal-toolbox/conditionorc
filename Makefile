@@ -74,6 +74,17 @@ push-image:
 	docker push ${DOCKER_IMAGE}:latest
 
 
+SWAG_INSTALLED := $(shell command -v swag 2> /dev/null)
+
+## generate swagger docs for api
+gen-docs:
+ifndef SWAG_INSTALLED
+	echo "Attempting to install swagger . . ."
+	go install github.com/swaggo/swag/cmd/swag@latest
+endif
+	swag init --parseDependency --parseDepth 1
+
+
 # https://gist.github.com/prwhite/8168133
 # COLORS
 GREEN  := $(shell tput -Txterm setaf 2)

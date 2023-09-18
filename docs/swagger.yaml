@@ -1,0 +1,246 @@
+basePath: /api
+definitions:
+  types.Condition:
+    properties:
+      createdAt:
+        description: CreatedAt is when this object was created.
+        type: string
+      exclusive:
+        description: |-
+          Exclusive indicates this condition holds exclusive access to the device
+          and other conditions have to wait until this is in a finalized state.
+        type: boolean
+      failOnCheckpointError:
+        description: |-
+          Should the worker executing this condition fail if its unable to checkpoint
+          the status of work on this condition.
+        type: boolean
+      fault:
+        allOf:
+        - $ref: '#/definitions/types.Fault'
+        description: Fault is used to introduce faults into the controller when executing
+          on a condition.
+      id:
+        description: ID is the identifier for this condition.
+        type: string
+      kind:
+        allOf:
+        - $ref: '#/definitions/types.ConditionKind'
+        description: Kind is one of ConditionKind.
+      parameters:
+        description: |-
+          Parameters is a JSON object that is agreed upon by the controller
+          reconciling the condition and the client requesting the condition.
+        items:
+          type: integer
+        type: array
+      resourceVersion:
+        description: |-
+          ResourceVersion has to be set to the value received by the
+          client updating it, this it to make sure condition updates
+          occur in the expected order.
+        type: integer
+      state:
+        allOf:
+        - $ref: '#/definitions/types.ConditionState'
+        description: State is one of ConditionState
+      status:
+        description: |-
+          Status is a JSON object that is agreed upon by the controller
+          reconciling the condition and the client requesting the condition.
+        items:
+          type: integer
+        type: array
+      updatedAt:
+        description: UpdatedAt is when this object was last updated.
+        type: string
+      version:
+        description: Version identifies the revision number for this struct.
+        type: string
+    type: object
+  types.ConditionKind:
+    enum:
+    - firmwareInstall
+    - inventoryOutofband
+    type: string
+    x-enum-varnames:
+    - FirmwareInstall
+    - InventoryOutofband
+  types.ConditionState:
+    enum:
+    - pending
+    - active
+    - failed
+    - succeeded
+    type: string
+    x-enum-varnames:
+    - Pending
+    - Active
+    - Failed
+    - Succeeded
+  types.ConditionsResponse:
+    properties:
+      conditions:
+        items:
+          $ref: '#/definitions/types.Condition'
+        type: array
+      serverID:
+        type: string
+    type: object
+  types.Fault:
+    properties:
+      delayDuration:
+        description: |-
+          Introduce specified delay in execution of the condition on the controller.
+
+          accepts the string format of time.Duration - 5s, 5m, 5h
+        type: string
+      failAt:
+        description: |-
+          FailAt is a controller specific task/stage that the condition should fail in execution.
+
+          for example, in the flasher controller, setting this field to `init` will cause the
+          condition task to fail at initialization.
+        type: string
+      panic:
+        description: will cause the condition execution to panic on the controller.
+        type: boolean
+    type: object
+  types.ServerResponse:
+    properties:
+      message:
+        type: string
+      records:
+        $ref: '#/definitions/types.ConditionsResponse'
+      statusCode:
+        type: integer
+    type: object
+info:
+  contact: {}
+  description: Conditions API expose CRUD actions to condition objects on servers
+  title: Condition orchestrator API
+  version: 1.0.0
+paths:
+  /v1/servers/{uuid}/condition/{conditionKind}:
+    delete:
+      consumes:
+      - application/json
+      description: Deletes a condition on a server
+      operationId: serverConditionDelete
+      parameters:
+      - description: Server ID
+        in: path
+        name: uuid
+        required: true
+        type: string
+      - description: Condition Kind
+        in: path
+        name: conditionKind
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/types.ServerResponse'
+      summary: Condition Delete
+    get:
+      consumes:
+      - application/json
+      description: Returns condition of a server
+      operationId: serverConditionGet
+      parameters:
+      - description: Server ID
+        in: path
+        name: uuid
+        required: true
+        type: string
+      - description: Condition Kind
+        in: path
+        name: conditionKind
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/types.ServerResponse'
+      summary: Condition Get
+    post:
+      consumes:
+      - application/json
+      description: Deletes a condition on a server
+      operationId: serverConditionCreate
+      parameters:
+      - description: Server ID
+        in: path
+        name: uuid
+        required: true
+        type: string
+      - description: Condition Kind
+        in: path
+        name: conditionKind
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/types.ServerResponse'
+      summary: Condition Create
+    put:
+      consumes:
+      - application/json
+      description: Updates a condition on a server
+      operationId: serverConditionUpdate
+      parameters:
+      - description: Server ID
+        in: path
+        name: uuid
+        required: true
+        type: string
+      - description: Condition Kind
+        in: path
+        name: conditionKind
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/types.ServerResponse'
+      summary: Condition Update
+  /v1/servers/{uuid}/state/{conditionState}:
+    get:
+      consumes:
+      - application/json
+      description: Returns all conditions set on a server by the condition state.
+      operationId: serverConditionList
+      parameters:
+      - description: Server ID
+        in: path
+        name: uuid
+        required: true
+        type: string
+      - description: Condition State
+        in: path
+        name: conditionState
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/types.ServerResponse'
+      summary: Condition List
+swagger: "2.0"
