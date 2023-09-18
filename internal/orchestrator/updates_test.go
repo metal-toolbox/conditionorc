@@ -20,39 +20,45 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.hollow.sh/toolbox/events"
 	"go.hollow.sh/toolbox/events/pkg/kv"
+	"go.hollow.sh/toolbox/events/registry"
+	"go.uber.org/goleak"
 
 	ftypes "github.com/metal-toolbox/flasher/types"
-	ocview "go.opencensus.io/stats/view"
-	"go.uber.org/goleak"
+)
+
+var (
+	nc         *nats.Conn
+	js         nats.JetStreamContext
+	evJS       *events.NatsJetstream
+	logger     *logrus.Logger
+	defs       ptypes.ConditionDefinitions
+	liveWorker = registry.GetID("updates-test")
 )
 
 func init() {
 	logrus.SetFormatter(&logrus.JSONFormatter{})
 }
 
-func startJetStreamServer(t *testing.T) *server.Server {
-	t.Helper()
+func startJetStreamServer() *server.Server {
 	opts := srvtest.DefaultTestOptions
 	opts.Port = -1
 	opts.JetStream = true
 	return srvtest.RunServer(&opts)
 }
 
-func jetStreamContext(t *testing.T, s *server.Server) (*nats.Conn, nats.JetStreamContext) {
-	t.Helper()
+func jetStreamContext(s *server.Server) (*nats.Conn, nats.JetStreamContext) {
 	nc, err := nats.Connect(s.ClientURL())
 	if err != nil {
-		t.Fatalf("connect => %v", err)
+		logger.Fatalf("connect => %v", err)
 	}
 	js, err := nc.JetStream(nats.MaxWait(10 * time.Second))
 	if err != nil {
-		t.Fatalf("JetStream => %v", err)
+		logger.Fatalf("JetStream => %v", err)
 	}
 	return nc, js
 }
 
-func shutdownJetStream(t *testing.T, s *server.Server) {
-	t.Helper()
+func shutdownJetStream(s *server.Server) {
 	var sd string
 	if config := s.JetStreamConfig(); config != nil {
 		sd = config.StoreDir
@@ -60,10 +66,42 @@ func shutdownJetStream(t *testing.T, s *server.Server) {
 	s.Shutdown()
 	if sd != "" {
 		if err := os.RemoveAll(sd); err != nil {
-			t.Fatalf("Unable to remove storage %q: %v", sd, err)
+			logger.Fatalf("Unable to remove storage %q: %v", sd, err)
 		}
 	}
 	s.WaitForShutdown()
+}
+
+// let's pretend we're a conditioon-orchestrator app and do some one-time setup
+func TestMain(m *testing.M) {
+	logger = logrus.New()
+
+	srv := startJetStreamServer()
+	defer shutdownJetStream(srv)
+	nc, js = jetStreamContext(srv) // nc is closed on evJS.Close(), js needs no cleanup
+	evJS = events.NewJetstreamFromConn(nc)
+	defer evJS.Close()
+
+	defs = ptypes.ConditionDefinitions{
+		&ptypes.ConditionDefinition{
+			Kind: ptypes.FirmwareInstall,
+		},
+		&ptypes.ConditionDefinition{
+			Kind: ptypes.InventoryOutofband,
+		},
+		&ptypes.ConditionDefinition{
+			Kind: ptypes.ConditionKind("bogus"),
+		},
+	}
+
+	status.ConnectToKVStores(evJS, logger, defs, kv.WithDescription("test watchers"))
+	registry.InitializeRegistryWithOptions(evJS) // we don't need a TTL or replicas
+	if err := registry.RegisterController(liveWorker); err != nil {
+		logger.WithError(err).Fatal("registering controller id")
+	}
+
+	exitCode := m.Run()
+	os.Exit(exitCode)
 }
 
 func TestParseStatusKey(t *testing.T) {
@@ -85,39 +123,70 @@ func TestParseStatusKey(t *testing.T) {
 	require.ErrorIs(t, err, errConditionID)
 }
 
-func TestInstallEventFromKV(t *testing.T) {
-	srv := startJetStreamServer(t)
-	defer shutdownJetStream(t, srv)
-	nc, js := jetStreamContext(t, srv) // nc is closed on evJS.Close(), js needs no cleanup
-	evJS := events.NewJetstreamFromConn(nc)
-	defer evJS.Close()
+func TestEventNeedsReconciliation(t *testing.T) {
+	t.Parallel()
 
-	writeHandle, err := js.CreateKeyValue(&nats.KeyValueConfig{
-		Bucket:      "installEventFromKV",
-		Description: "test install event",
-	})
+	o := Orchestrator{
+		logger: logger,
+	}
+
+	evt := &v1types.ConditionUpdateEvent{
+		UpdatedAt: time.Now(),
+	}
+
+	require.False(t, o.eventNeedsReconciliation(evt))
+
+	evt.UpdatedAt = time.Now().Add(-90 * time.Minute)
+	evt.ConditionUpdate.State = ptypes.Failed
+
+	require.True(t, o.eventNeedsReconciliation(evt))
+
+	evt.ConditionUpdate.State = ptypes.Active
+	evt.ControllerID = registry.GetID("needs-reconciliation-test")
+
+	require.True(t, o.eventNeedsReconciliation(evt))
+
+	evt.ControllerID = liveWorker
+	require.False(t, o.eventNeedsReconciliation(evt))
+}
+
+func TestEventUpdateFromKV(t *testing.T) {
+	writeHandle, err := status.GetConditionKV(ptypes.FirmwareInstall)
 	require.NoError(t, err, "write handle")
+
+	cID := registry.GetID("test-app")
 
 	// add some KVs
 	sv1 := ftypes.StatusValue{
-		Target: uuid.New().String(),
-		State:  "pending",
-		Status: json.RawMessage(`{"msg":"some-status"}`),
+		Target:   uuid.New().String(),
+		State:    "pending",
+		Status:   json.RawMessage(`{"msg":"some-status"}`),
+		WorkerID: cID.String(),
 	}
 	bogus := ftypes.StatusValue{
 		Target: uuid.New().String(),
 		State:  "bogus",
 		Status: json.RawMessage(`{"msg":"some-status"}`),
 	}
+	noCID := ftypes.StatusValue{
+		Target:    uuid.New().String(),
+		State:     "failed",
+		Status:    json.RawMessage(`{"msg":"some-status"}`),
+		UpdatedAt: time.Now().Add(-90 * time.Minute),
+	}
 
 	condID := uuid.New()
 	k1 := fmt.Sprintf("fc13.%s", condID)
 	k2 := fmt.Sprintf("fc13.%s", uuid.New())
+	k3 := fmt.Sprintf("fc13.%s", uuid.New())
 
 	_, err = writeHandle.Put(k1, sv1.MustBytes())
 	require.NoError(t, err)
 
 	_, err = writeHandle.Put(k2, bogus.MustBytes())
+	require.NoError(t, err)
+
+	_, err = writeHandle.Put(k3, noCID.MustBytes())
 	require.NoError(t, err)
 
 	// test the expected good KV entry
@@ -134,34 +203,20 @@ func TestInstallEventFromKV(t *testing.T) {
 	require.NoError(t, err)
 	_, err = eventUpdateFromKV(context.Background(), entry, ptypes.FirmwareInstall)
 	require.ErrorIs(t, errInvalidState, err)
+
+	// no controller id event should error as well
+	entry, err = writeHandle.Get(k3)
+	require.NoError(t, err)
+	_, err = eventUpdateFromKV(context.Background(), entry, ptypes.FirmwareInstall)
+	require.ErrorIs(t, err, registry.ErrBadFormat)
 }
 
 func TestConditionListenersExit(t *testing.T) {
-	defer goleak.VerifyNone(t) // defer this first to ensure that all the NATS routines et al. complete first
-
-	srv := startJetStreamServer(t)
-	defer shutdownJetStream(t, srv)
-	nc, _ := jetStreamContext(t, srv) // nc is closed on evJS.Close(), js needs no cleanup
-	evJS := events.NewJetstreamFromConn(nc)
-	defer evJS.Close()
-
-	log := logrus.New()
-	defs := ptypes.ConditionDefinitions{
-		&ptypes.ConditionDefinition{
-			Kind: ptypes.FirmwareInstall,
-		},
-		&ptypes.ConditionDefinition{
-			Kind: ptypes.InventoryOutofband,
-		},
-		&ptypes.ConditionDefinition{
-			Kind: ptypes.ConditionKind("bogus"),
-		},
-	}
-	// XXX: THIS FUNCTION CAN ONLY BE CALLED ONCE IN THE ENTIRE TEST! It uses a sync.Once
-	status.ConnectToKVStores(evJS, log, defs, kv.WithDescription("test watchers"))
+	ic := goleak.IgnoreCurrent()
+	defer goleak.VerifyNone(t, ic)
 
 	o := Orchestrator{
-		logger:        log,
+		logger:        logger,
 		streamBroker:  evJS,
 		facility:      "test",
 		conditionDefs: defs,
@@ -173,6 +228,7 @@ func TestConditionListenersExit(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.TODO())
 
 	o.startConditionWatchers(ctx, testChan, &wg)
+	o.startReconciler(ctx, &wg)
 
 	sentinelChan := make(chan struct{})
 	toCtx, toCancel := context.WithTimeout(context.TODO(), time.Second)
@@ -195,8 +251,4 @@ func TestConditionListenersExit(t *testing.T) {
 	case <-sentinelChan:
 	}
 	require.True(t, testPassed)
-
-	// XXX: it's a long story, but we need to stop the opencensus default worker
-	// because something imported opencensus and it starts a worker goroutine in init()
-	ocview.Stop()
 }
