@@ -1,4 +1,4 @@
-basePath: /api
+basePath: /api/v1
 definitions:
   types.Condition:
     properties:
@@ -119,9 +119,8 @@ info:
   contact: {}
   description: Conditions API expose CRUD actions to condition objects on servers
   title: Condition orchestrator API
-  version: 1.0.0
 paths:
-  /v1/servers/{uuid}/condition/{conditionKind}:
+  /servers/{uuid}/condition/{conditionKind}:
     delete:
       consumes:
       - application/json
@@ -218,7 +217,7 @@ paths:
           schema:
             $ref: '#/definitions/types.ServerResponse'
       summary: Condition Update
-  /v1/servers/{uuid}/state/{conditionState}:
+  /servers/{uuid}/state/{conditionState}:
     get:
       consumes:
       - application/json

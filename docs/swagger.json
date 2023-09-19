@@ -3,12 +3,11 @@
     "info": {
         "description": "Conditions API expose CRUD actions to condition objects on servers",
         "title": "Condition orchestrator API",
-        "contact": {},
-        "version": "1.0.0"
+        "contact": {}
     },
-    "basePath": "/api",
+    "basePath": "/api/v1",
     "paths": {
-        "/v1/servers/{uuid}/condition/{conditionKind}": {
+        "/servers/{uuid}/condition/{conditionKind}": {
             "get": {
                 "description": "Returns condition of a server",
                 "consumes": [
@@ -150,7 +149,7 @@
                 }
             }
         },
-        "/v1/servers/{uuid}/state/{conditionState}": {
+        "/servers/{uuid}/state/{conditionState}": {
             "get": {
                 "description": "Returns all conditions set on a server by the condition state.",
                 "consumes": [

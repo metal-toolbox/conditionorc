@@ -41,7 +41,7 @@ func (r *Routes) conditionKindValid(kind ptypes.ConditionKind) bool {
 // @Accept json
 // @Produce json
 // @Success 200 {object} v1types.ServerResponse
-// @Router /v1/servers/{uuid}/condition/{conditionKind} [put]
+// @Router /servers/{uuid}/condition/{conditionKind} [put]
 func (r *Routes) serverConditionUpdate(c *gin.Context) (int, *v1types.ServerResponse) {
 	otelCtx, span := otel.Tracer(pkgName).Start(c.Request.Context(), "Routes.serverConditionUpdate")
 	defer span.End()
@@ -174,7 +174,7 @@ func (r *Routes) serverConditionUpdate(c *gin.Context) (int, *v1types.ServerResp
 // @Accept json
 // @Produce json
 // @Success 200 {object} v1types.ServerResponse
-// @Router /v1/servers/{uuid}/condition/{conditionKind} [post]
+// @Router /servers/{uuid}/condition/{conditionKind} [post]
 func (r *Routes) serverConditionCreate(c *gin.Context) (int, *v1types.ServerResponse) {
 	otelCtx, span := otel.Tracer(pkgName).Start(c.Request.Context(), "Routes.serverConditionCreate")
 	defer span.End()
@@ -461,7 +461,7 @@ func (r *Routes) publishCondition(ctx context.Context, serverID uuid.UUID, facil
 // @Accept json
 // @Produce json
 // @Success 200 {object} v1types.ServerResponse
-// @Router /v1/servers/{uuid}/condition/{conditionKind} [delete]
+// @Router /servers/{uuid}/condition/{conditionKind} [delete]
 func (r *Routes) serverConditionDelete(c *gin.Context) (int, *v1types.ServerResponse) {
 	otelCtx, span := otel.Tracer(pkgName).Start(c.Request.Context(), "Routes.serverConditionDelete")
 	defer span.End()
@@ -513,7 +513,7 @@ func (r *Routes) serverConditionDelete(c *gin.Context) (int, *v1types.ServerResp
 // @Accept json
 // @Produce json
 // @Success 200 {object} v1types.ServerResponse
-// @Router /v1/servers/{uuid}/state/{conditionState} [get]
+// @Router /servers/{uuid}/state/{conditionState} [get]
 func (r *Routes) serverConditionList(c *gin.Context) (int, *v1types.ServerResponse) {
 	otelCtx, span := otel.Tracer(pkgName).Start(c.Request.Context(), "Routes.serverConditionList")
 	defer span.End()
@@ -560,7 +560,7 @@ func (r *Routes) serverConditionList(c *gin.Context) (int, *v1types.ServerRespon
 // @Accept json
 // @Produce json
 // @Success 200 {object} v1types.ServerResponse
-// @Router /v1/servers/{uuid}/condition/{conditionKind} [get]
+// @Router /servers/{uuid}/condition/{conditionKind} [get]
 func (r *Routes) serverConditionGet(c *gin.Context) (int, *v1types.ServerResponse) {
 	otelCtx, span := otel.Tracer(pkgName).Start(c.Request.Context(), "Routes.serverConditionGet")
 	defer span.End()

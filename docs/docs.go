@@ -15,7 +15,7 @@ const docTemplate = `{
     "host": "{{.Host}}",
     "basePath": "{{.BasePath}}",
     "paths": {
-        "/v1/servers/{uuid}/condition/{conditionKind}": {
+        "/servers/{uuid}/condition/{conditionKind}": {
             "get": {
                 "description": "Returns condition of a server",
                 "consumes": [
@@ -157,7 +157,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/v1/servers/{uuid}/state/{conditionState}": {
+        "/servers/{uuid}/state/{conditionState}": {
             "get": {
                 "description": "Returns all conditions set on a server by the condition state.",
                 "consumes": [
@@ -343,9 +343,9 @@ const docTemplate = `{
 
 // SwaggerInfo holds exported Swagger Info so clients can modify it
 var SwaggerInfo = &swag.Spec{
-	Version:          "1.0.0",
+	Version:          "",
 	Host:             "",
-	BasePath:         "/api",
+	BasePath:         "/api/v1",
 	Schemes:          []string{},
 	Title:            "Condition orchestrator API",
 	Description:      "Conditions API expose CRUD actions to condition objects on servers",
