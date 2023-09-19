@@ -17,6 +17,10 @@ package main
 
 import "github.com/metal-toolbox/conditionorc/cmd"
 
+// @BasePath /api/v1
+// @title Condition orchestrator API
+// @description Conditions API expose CRUD actions to condition objects on servers
+
 func main() {
 	cmd.Execute()
 }
