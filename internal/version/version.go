@@ -3,7 +3,7 @@ package version
 import (
 	"fmt"
 	"runtime"
-	rdebug "runtime/debug"
+	"runtime/debug"
 	"strings"
 )
 
@@ -44,7 +44,7 @@ func (v *Version) String() string {
 }
 
 func serverserviceVersion() string {
-	buildInfo, ok := rdebug.ReadBuildInfo()
+	buildInfo, ok := debug.ReadBuildInfo()
 	if !ok {
 		return ""
 	}
