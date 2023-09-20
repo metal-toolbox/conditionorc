@@ -4,6 +4,10 @@ import (
 	"net/http"
 	"time"
 
+	docs "github.com/metal-toolbox/conditionorc/docs"
+	swaggerfiles "github.com/swaggo/files"
+	ginSwagger "github.com/swaggo/gin-swagger"
+
 	"github.com/gin-gonic/gin"
 	"github.com/metal-toolbox/conditionorc/internal/store"
 	"github.com/metal-toolbox/conditionorc/pkg/api/v1/routes"
@@ -118,6 +122,10 @@ func New(opts ...Option) *http.Server {
 	g.NoRoute(func(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"message": "invalid request - route not found"})
 	})
+
+	// Swagger Doc API Endpoint. <IP:Port>/api/v1/docs/index.html is the URL you want
+	docs.SwaggerInfo.BasePath = "/api/v1"
+	g.GET("/api/v1/docs/*any", ginSwagger.WrapHandler(swaggerfiles.Handler))
 
 	return &http.Server{
 		Addr:         s.listenAddress,

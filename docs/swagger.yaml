@@ -172,7 +172,7 @@ paths:
     post:
       consumes:
       - application/json
-      description: Deletes a condition on a server
+      description: Creates a condition on a server
       operationId: serverConditionCreate
       parameters:
       - description: Server ID
