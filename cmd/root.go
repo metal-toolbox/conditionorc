@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/metal-toolbox/conditionorc/internal/version"
 	"github.com/spf13/cobra"
 )
 
@@ -29,8 +30,9 @@ var (
 
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
-	Use:   "conditionorc",
-	Short: "server condition orchestrator",
+	Use:     "conditionorc",
+	Short:   "server condition orchestrator",
+	Version: version.Current().String(),
 }
 
 // Execute adds all child commands to the root command and sets flags appropriately.
