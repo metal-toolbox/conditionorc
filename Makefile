@@ -7,7 +7,7 @@ VERSION     := $(shell git describe --tags 2> /dev/null)
 BUILD_DATE  := $(shell date +%s)
 GIT_COMMIT_FULL  := $(shell git rev-parse HEAD)
 GO_VERSION := $(shell expr `go version |cut -d ' ' -f3 |cut -d. -f2` \>= 16)
-DOCKER_IMAGE  := "ghcr.io/metal-toolbox/conditionorc"
+DOCKER_IMAGE  ?= "ghcr.io/metal-toolbox/conditionorc"
 REPO := "https://github.com/metal-toolbox/conditionorc.git"
 
 .DEFAULT_GOAL := help
@@ -83,6 +83,14 @@ ifndef SWAG_INSTALLED
 	go install github.com/swaggo/swag/cmd/swag@latest
 endif
 	swag init --parseDependency --parseDepth 1
+
+# experimental
+multistage-image:
+	docker build -f Dockerfile.builder -t ${DOCKER_IMAGE}:latest . \
+		--build-arg GIT_COMMIT=$(GIT_COMMIT) --build-arg GIT_BRANCH=$(GIT_BRANCH) \
+		--build-arg GIT_SUMMARY=$(GIT_SUMMARY) --build-arg VERSION=$(VERSION) \
+		--build-arg BUILD_DATE=$(BUILD_DATE) --label org.label-schema.schema-version=1.0 \
+		--label org.label-schema.vcs-ref=$(GIT_COMMIT_FULL) --label=org.label-schema.vcs-url=$(REPO)
 
 
 # https://gist.github.com/prwhite/8168133
