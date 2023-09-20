@@ -87,7 +87,7 @@ const docTemplate = `{
                 }
             },
             "post": {
-                "description": "Deletes a condition on a server",
+                "description": "Creates a condition on a server",
                 "consumes": [
                     "application/json"
                 ],

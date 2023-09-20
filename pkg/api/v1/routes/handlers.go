@@ -41,6 +41,10 @@ func (r *Routes) conditionKindValid(kind ptypes.ConditionKind) bool {
 // @Accept json
 // @Produce json
 // @Success 200 {object} v1types.ServerResponse
+// Failure 400 {object} v1types.ServerResponse
+// Failure 404 {object} v1types.ServerResponse
+// Failure 500 {object} v1types.ServerResponse
+// Failure 503 {object} v1types.ServerResponse
 // @Router /servers/{uuid}/condition/{conditionKind} [put]
 func (r *Routes) serverConditionUpdate(c *gin.Context) (int, *v1types.ServerResponse) {
 	otelCtx, span := otel.Tracer(pkgName).Start(c.Request.Context(), "Routes.serverConditionUpdate")
@@ -167,13 +171,16 @@ func (r *Routes) serverConditionUpdate(c *gin.Context) (int, *v1types.ServerResp
 // nolint:gocyclo //TODO: break up this method
 // @Summary Condition Create
 // @Tag Conditions
-// @Description Deletes a condition on a server
+// @Description Creates a condition on a server
 // @ID serverConditionCreate
 // @Param uuid path string true "Server ID"
 // @Param conditionKind path string true "Condition Kind"
 // @Accept json
 // @Produce json
 // @Success 200 {object} v1types.ServerResponse
+// Failure 400 {object} v1types.ServerResponse
+// Failure 500 {object} v1types.ServerResponse
+// Failure 503 {object} v1types.ServerResponse
 // @Router /servers/{uuid}/condition/{conditionKind} [post]
 func (r *Routes) serverConditionCreate(c *gin.Context) (int, *v1types.ServerResponse) {
 	otelCtx, span := otel.Tracer(pkgName).Start(c.Request.Context(), "Routes.serverConditionCreate")
@@ -461,6 +468,8 @@ func (r *Routes) publishCondition(ctx context.Context, serverID uuid.UUID, facil
 // @Accept json
 // @Produce json
 // @Success 200 {object} v1types.ServerResponse
+// Failure 400 {object} v1types.ServerResponse
+// Failure 500 {object} v1types.ServerResponse
 // @Router /servers/{uuid}/condition/{conditionKind} [delete]
 func (r *Routes) serverConditionDelete(c *gin.Context) (int, *v1types.ServerResponse) {
 	otelCtx, span := otel.Tracer(pkgName).Start(c.Request.Context(), "Routes.serverConditionDelete")
@@ -513,6 +522,9 @@ func (r *Routes) serverConditionDelete(c *gin.Context) (int, *v1types.ServerResp
 // @Accept json
 // @Produce json
 // @Success 200 {object} v1types.ServerResponse
+// Failure 400 {object} v1types.ServerResponse
+// Failure 404 {object} v1types.ServerResponse
+// Failure 500 {object} v1types.ServerResponse
 // @Router /servers/{uuid}/state/{conditionState} [get]
 func (r *Routes) serverConditionList(c *gin.Context) (int, *v1types.ServerResponse) {
 	otelCtx, span := otel.Tracer(pkgName).Start(c.Request.Context(), "Routes.serverConditionList")
@@ -560,6 +572,9 @@ func (r *Routes) serverConditionList(c *gin.Context) (int, *v1types.ServerRespon
 // @Accept json
 // @Produce json
 // @Success 200 {object} v1types.ServerResponse
+// Failure 400 {object} v1types.ServerResponse
+// Failure 404 {object} v1types.ServerResponse
+// Failure 503 {object} v1types.ServerResponse
 // @Router /servers/{uuid}/condition/{conditionKind} [get]
 func (r *Routes) serverConditionGet(c *gin.Context) (int, *v1types.ServerResponse) {
 	otelCtx, span := otel.Tracer(pkgName).Start(c.Request.Context(), "Routes.serverConditionGet")
