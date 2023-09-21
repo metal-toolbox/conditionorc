@@ -1,4 +1,4 @@
-FROM alpine:3.18.0
+FROM alpine:3.18.3
 RUN apk -U add curl
 
 ENTRYPOINT ["/usr/sbin/conditionorc"]
