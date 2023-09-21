@@ -8,7 +8,7 @@ require (
 	github.com/equinix-labs/otel-init-go v0.0.9
 	github.com/gin-gonic/gin v1.9.1
 	github.com/golang/mock v1.6.0
-	github.com/google/uuid v1.3.0
+	github.com/google/uuid v1.3.1
 	github.com/hashicorp/go-retryablehttp v0.7.4
 	github.com/metal-toolbox/flasher v0.2.4
 	github.com/nats-io/nats-server/v2 v2.9.22
@@ -24,13 +24,13 @@ require (
 	github.com/swaggo/gin-swagger v1.6.0
 	github.com/swaggo/swag v1.16.2
 	github.com/volatiletech/null/v8 v8.1.2
-	go.hollow.sh/serverservice v0.16.0
+	go.hollow.sh/serverservice v0.16.1
 	go.hollow.sh/toolbox v0.6.1
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.42.0
 	go.opentelemetry.io/otel v1.18.0
 	go.opentelemetry.io/otel/trace v1.18.0
 	go.uber.org/goleak v1.2.1
-	golang.org/x/exp v0.0.0-20230811145659-89c5cff77bcb
+	golang.org/x/exp v0.0.0-20230817173708-d852ddb80c63
 	golang.org/x/oauth2 v0.12.0
 	gopkg.in/square/go-jose.v2 v2.6.0
 )
@@ -120,7 +120,7 @@ require (
 	github.com/volatiletech/null v8.0.0+incompatible // indirect
 	github.com/volatiletech/randomize v0.0.1 // indirect
 	github.com/volatiletech/sqlboiler v3.7.1+incompatible // indirect
-	github.com/volatiletech/sqlboiler/v4 v4.14.2 // indirect
+	github.com/volatiletech/sqlboiler/v4 v4.15.0 // indirect
 	github.com/volatiletech/strmangle v0.0.5 // indirect
 	go.opencensus.io v0.24.0 // indirect
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace v1.18.0 // indirect
@@ -137,7 +137,7 @@ require (
 	golang.org/x/sys v0.12.0 // indirect
 	golang.org/x/text v0.13.0 // indirect
 	golang.org/x/time v0.3.0 // indirect
-	golang.org/x/tools v0.7.0 // indirect
+	golang.org/x/tools v0.12.1-0.20230815132531-74c255bcf846 // indirect
 	golang.org/x/xerrors v0.0.0-20220907171357-04be3eba64a2 // indirect
 	google.golang.org/api v0.137.0 // indirect
 	google.golang.org/appengine v1.6.7 // indirect
