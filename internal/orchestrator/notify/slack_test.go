@@ -28,7 +28,7 @@ func startServer() {
 }
 
 func TestSlackSend(t *testing.T) {
-	//var timestampExpected bool
+	// var timestampExpected bool
 	http.DefaultServeMux = new(http.ServeMux)
 	http.HandleFunc("/chat.postMessage", func(rw http.ResponseWriter, r *http.Request) {
 		r.ParseForm()

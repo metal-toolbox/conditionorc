@@ -18,9 +18,7 @@ import (
 	"go.hollow.sh/toolbox/events"
 )
 
-var (
-	shutdownTimeout = 10 * time.Second
-)
+var shutdownTimeout = 10 * time.Second
 
 // install server command
 var cmdServer = &cobra.Command{

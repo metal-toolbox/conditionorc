@@ -210,7 +210,6 @@ func TestIntegration_AuthToken(t *testing.T) {
 					ForceInstall:         true,
 					FirmwareSetID:        "fake",
 				})
-
 				if err != nil {
 					t.Error(err)
 				}
@@ -238,7 +237,6 @@ func TestIntegration_AuthToken(t *testing.T) {
 					ForceInstall:         true,
 					FirmwareSetID:        "fake",
 				})
-
 				if err != nil {
 					t.Error(err)
 				}
@@ -312,7 +310,6 @@ func TestIntegration_ConditionsGet(t *testing.T) {
 					ForceInstall:         true,
 					FirmwareSetID:        "fake",
 				})
-
 				if err != nil {
 					t.Error(err)
 				}
@@ -340,7 +337,6 @@ func TestIntegration_ConditionsGet(t *testing.T) {
 					ForceInstall:         true,
 					FirmwareSetID:        "fake",
 				})
-
 				if err != nil {
 					t.Error(err)
 				}
@@ -451,7 +447,6 @@ func TestIntegration_ConditionsList(t *testing.T) {
 					ForceInstall:         true,
 					FirmwareSetID:        "fake",
 				})
-
 				if err != nil {
 					t.Error(err)
 				}
@@ -487,7 +482,6 @@ func TestIntegration_ConditionsList(t *testing.T) {
 					ForceInstall:         true,
 					FirmwareSetID:        "fake",
 				})
-
 				if err != nil {
 					t.Error(err)
 				}

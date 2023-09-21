@@ -14,9 +14,7 @@ import (
 	"go.hollow.sh/toolbox/ginjwt"
 )
 
-var (
-	ErrConfig = errors.New("configuration error")
-)
+var ErrConfig = errors.New("configuration error")
 
 // Configuration holds application configuration read from a YAML or set by env variables.
 //

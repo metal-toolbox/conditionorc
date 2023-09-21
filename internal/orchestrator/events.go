@@ -5,9 +5,7 @@ import (
 	"sync"
 )
 
-var (
-	evtOnce sync.Once
-)
+var evtOnce sync.Once
 
 func (o *Orchestrator) startEventListener(ctx context.Context) {
 	evtOnce.Do(func() {
