@@ -8,7 +8,7 @@ require (
 	github.com/equinix-labs/otel-init-go v0.0.9
 	github.com/gin-gonic/gin v1.9.1
 	github.com/golang/mock v1.6.0
-	github.com/google/uuid v1.3.0
+	github.com/google/uuid v1.3.1
 	github.com/hashicorp/go-retryablehttp v0.7.4
 	github.com/metal-toolbox/flasher v0.2.4
 	github.com/nats-io/nats-server/v2 v2.9.22
