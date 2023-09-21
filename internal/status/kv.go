@@ -28,7 +28,8 @@ var (
 // Any errors here are fatal, as we are failing to initialize something we are explicitly
 // configured for.
 func ConnectToKVStores(s events.Stream, log *logrus.Logger,
-	defs ptypes.ConditionDefinitions, opts ...kv.Option) {
+	defs ptypes.ConditionDefinitions, opts ...kv.Option,
+) {
 	js, ok := s.(*events.NatsJetstream)
 	if !ok {
 		log.Fatal("status via KV updates is only supported on NATS")

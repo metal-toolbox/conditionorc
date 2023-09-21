@@ -142,7 +142,8 @@ func (s *Serverservice) Ping(_ context.Context) error {
 // @id: required
 // @conditionKind: required
 func (s *Serverservice) Get(ctx context.Context, serverID uuid.UUID,
-	conditionKind ptypes.ConditionKind) (*ptypes.Condition, error) {
+	conditionKind ptypes.ConditionKind,
+) (*ptypes.Condition, error) {
 	otelCtx, span := otel.Tracer(pkgName).Start(ctx, "Serverservice.Get")
 	defer span.End()
 	// list attributes on a server
@@ -206,7 +207,8 @@ func (s *Serverservice) GetServer(ctx context.Context, serverID uuid.UUID) (*mod
 // @id: required
 // @conditionState: optional
 func (s *Serverservice) List(ctx context.Context, serverID uuid.UUID,
-	conditionState ptypes.ConditionState) ([]*ptypes.Condition, error) {
+	conditionState ptypes.ConditionState,
+) ([]*ptypes.Condition, error) {
 	otelCtx, span := otel.Tracer(pkgName).Start(ctx, "Serverservice.List")
 	defer span.End()
 	found := []*sservice.Attributes{}
@@ -329,7 +331,8 @@ func (s *Serverservice) Delete(ctx context.Context, serverID uuid.UUID, conditio
 
 // ListServersWithCondition lists servers with the given condition kind.
 func (s *Serverservice) ListServersWithCondition(ctx context.Context,
-	conditionKind ptypes.ConditionKind, conditionState ptypes.ConditionState) ([]*ptypes.ServerConditions, error) {
+	conditionKind ptypes.ConditionKind, conditionState ptypes.ConditionState,
+) ([]*ptypes.ServerConditions, error) {
 	otelCtx, span := otel.Tracer(pkgName).Start(ctx, "Serverservice.ListServersWithCondition")
 	defer span.End()
 	params := &sservice.ServerListParams{

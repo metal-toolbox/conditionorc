@@ -49,9 +49,7 @@ type Repository interface {
 	Delete(ctx context.Context, serverID uuid.UUID, conditionKind ptypes.ConditionKind) error
 }
 
-var (
-	ErrRepository = errors.New("storage repository error")
-)
+var ErrRepository = errors.New("storage repository error")
 
 func NewStore(ctx context.Context, config *app.Configuration, conditionDefs ptypes.ConditionDefinitions, logger *logrus.Logger) (Repository, error) {
 	switch config.StoreKind {

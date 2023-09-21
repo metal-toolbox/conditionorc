@@ -103,8 +103,8 @@ func (o *Orchestrator) kvStatusPublisher(ctx context.Context) {
 // and start a KV watcher for each one. We increment the waitgroup counter for each condition we
 // can handle.
 func (o *Orchestrator) startConditionWatchers(ctx context.Context,
-	evtChan chan<- *v1types.ConditionUpdateEvent, wg *sync.WaitGroup) {
-
+	evtChan chan<- *v1types.ConditionUpdateEvent, wg *sync.WaitGroup,
+) {
 	for _, def := range o.conditionDefs {
 		var watcher nats.KeyWatcher
 
@@ -191,7 +191,8 @@ type controllerStatus struct {
 // ConditionOrchestrator-native type that ConditionOrc can more-easily use for its
 // own purposes.
 func eventUpdateFromKV(ctx context.Context, kve nats.KeyValueEntry,
-	kind ptypes.ConditionKind) (*v1types.ConditionUpdateEvent, error) {
+	kind ptypes.ConditionKind,
+) (*v1types.ConditionUpdateEvent, error) {
 	parsedKey, err := parseStatusKVKey(kve.Key())
 	if err != nil {
 		return nil, err

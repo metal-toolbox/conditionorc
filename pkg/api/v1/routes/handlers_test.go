@@ -856,7 +856,6 @@ func TestServerConditionCreate(t *testing.T) {
 					Delete(gomock.Any(), gomock.Eq(serverID), gomock.Eq(ptypes.FirmwareInstall)).
 					Times(1).
 					Return(nil)
-
 			},
 			func(r *mockevents.MockStream) {
 				r.EXPECT().
