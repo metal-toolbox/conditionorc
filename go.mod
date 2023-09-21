@@ -12,7 +12,7 @@ require (
 	github.com/hashicorp/go-retryablehttp v0.7.4
 	github.com/metal-toolbox/flasher v0.0.5
 	github.com/nats-io/nats-server/v2 v2.9.22
-	github.com/nats-io/nats.go v1.28.0
+	github.com/nats-io/nats.go v1.29.0
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.16.0
 	github.com/sirupsen/logrus v1.9.3
