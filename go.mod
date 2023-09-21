@@ -31,7 +31,7 @@ require (
 	go.opentelemetry.io/otel/trace v1.16.0
 	go.uber.org/goleak v1.2.1
 	golang.org/x/exp v0.0.0-20230811145659-89c5cff77bcb
-	golang.org/x/oauth2 v0.11.0
+	golang.org/x/oauth2 v0.12.0
 	gopkg.in/square/go-jose.v2 v2.6.0
 )
 
@@ -133,10 +133,10 @@ require (
 	go.uber.org/zap v1.25.0 // indirect
 	gocloud.dev v0.33.0 // indirect
 	golang.org/x/arch v0.4.0 // indirect
-	golang.org/x/crypto v0.12.0 // indirect
-	golang.org/x/net v0.14.0 // indirect
-	golang.org/x/sys v0.11.0 // indirect
-	golang.org/x/text v0.12.0 // indirect
+	golang.org/x/crypto v0.13.0 // indirect
+	golang.org/x/net v0.15.0 // indirect
+	golang.org/x/sys v0.12.0 // indirect
+	golang.org/x/text v0.13.0 // indirect
 	golang.org/x/time v0.3.0 // indirect
 	golang.org/x/tools v0.7.0 // indirect
 	golang.org/x/xerrors v0.0.0-20220907171357-04be3eba64a2 // indirect
