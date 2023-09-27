@@ -6,7 +6,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/metal-toolbox/conditionorc/internal/app"
 	"github.com/metal-toolbox/conditionorc/internal/model"
-	ptypes "github.com/metal-toolbox/conditionorc/pkg/types"
+	condition "github.com/metal-toolbox/rivets/condition"
 
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -20,7 +20,7 @@ type Repository interface {
 	// Get a condition set on a server.
 	// @serverID: required
 	// @conditionKind: required
-	Get(ctx context.Context, serverID uuid.UUID, conditionKind ptypes.ConditionKind) (*ptypes.Condition, error)
+	Get(ctx context.Context, serverID uuid.UUID, conditionKind condition.Kind) (*condition.Condition, error)
 
 	// Get Server attributes.
 	// @serverID: required
@@ -29,29 +29,29 @@ type Repository interface {
 	// List all conditions set on a server.
 	// @serverID: required
 	// @conditionState: optional
-	List(ctx context.Context, serverID uuid.UUID, conditionState ptypes.ConditionState) ([]*ptypes.Condition, error)
+	List(ctx context.Context, serverID uuid.UUID, conditionState condition.State) ([]*condition.Condition, error)
 
-	ListServersWithCondition(ctx context.Context, conditionKind ptypes.ConditionKind, conditionState ptypes.ConditionState) ([]*ptypes.ServerConditions, error)
+	ListServersWithCondition(ctx context.Context, conditionKind condition.Kind, conditionState condition.State) ([]*condition.ServerConditions, error)
 
 	// Create a condition on a server.
 	// @serverID: required
 	// @condition: required
-	Create(ctx context.Context, serverID uuid.UUID, condition *ptypes.Condition) error
+	Create(ctx context.Context, serverID uuid.UUID, condition *condition.Condition) error
 
 	// Update a condition on a server
 	// @serverID: required
 	// @condition: required
-	Update(ctx context.Context, serverID uuid.UUID, condition *ptypes.Condition) error
+	Update(ctx context.Context, serverID uuid.UUID, condition *condition.Condition) error
 
 	// Delete a condition from a server.
 	// @serverID: required
 	// @conditionKind: required
-	Delete(ctx context.Context, serverID uuid.UUID, conditionKind ptypes.ConditionKind) error
+	Delete(ctx context.Context, serverID uuid.UUID, conditionKind condition.Kind) error
 }
 
 var ErrRepository = errors.New("storage repository error")
 
-func NewStore(ctx context.Context, config *app.Configuration, conditionDefs ptypes.ConditionDefinitions, logger *logrus.Logger) (Repository, error) {
+func NewStore(ctx context.Context, config *app.Configuration, conditionDefs condition.Definitions, logger *logrus.Logger) (Repository, error) {
 	switch config.StoreKind {
 	case model.ServerserviceStore:
 		return newServerserviceStore(ctx, &config.ServerserviceOptions, conditionDefs, logger)

@@ -11,7 +11,7 @@ import (
 	gomock "github.com/golang/mock/gomock"
 	uuid "github.com/google/uuid"
 	model "github.com/metal-toolbox/conditionorc/internal/model"
-	types "github.com/metal-toolbox/conditionorc/pkg/types"
+	condition "github.com/metal-toolbox/rivets/condition"
 )
 
 // MockRepository is a mock of Repository interface.
@@ -38,7 +38,7 @@ func (m *MockRepository) EXPECT() *MockRepositoryMockRecorder {
 }
 
 // Create mocks base method.
-func (m *MockRepository) Create(ctx context.Context, serverID uuid.UUID, condition *types.Condition) error {
+func (m *MockRepository) Create(ctx context.Context, serverID uuid.UUID, condition *condition.Condition) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Create", ctx, serverID, condition)
 	ret0, _ := ret[0].(error)
@@ -52,7 +52,7 @@ func (mr *MockRepositoryMockRecorder) Create(ctx, serverID, condition interface{
 }
 
 // Delete mocks base method.
-func (m *MockRepository) Delete(ctx context.Context, serverID uuid.UUID, conditionKind types.ConditionKind) error {
+func (m *MockRepository) Delete(ctx context.Context, serverID uuid.UUID, conditionKind condition.Kind) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Delete", ctx, serverID, conditionKind)
 	ret0, _ := ret[0].(error)
@@ -66,10 +66,10 @@ func (mr *MockRepositoryMockRecorder) Delete(ctx, serverID, conditionKind interf
 }
 
 // Get mocks base method.
-func (m *MockRepository) Get(ctx context.Context, serverID uuid.UUID, conditionKind types.ConditionKind) (*types.Condition, error) {
+func (m *MockRepository) Get(ctx context.Context, serverID uuid.UUID, conditionKind condition.Kind) (*condition.Condition, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Get", ctx, serverID, conditionKind)
-	ret0, _ := ret[0].(*types.Condition)
+	ret0, _ := ret[0].(*condition.Condition)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -96,10 +96,10 @@ func (mr *MockRepositoryMockRecorder) GetServer(ctx, serverID interface{}) *gomo
 }
 
 // List mocks base method.
-func (m *MockRepository) List(ctx context.Context, serverID uuid.UUID, conditionState types.ConditionState) ([]*types.Condition, error) {
+func (m *MockRepository) List(ctx context.Context, serverID uuid.UUID, conditionState condition.State) ([]*condition.Condition, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "List", ctx, serverID, conditionState)
-	ret0, _ := ret[0].([]*types.Condition)
+	ret0, _ := ret[0].([]*condition.Condition)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -111,10 +111,10 @@ func (mr *MockRepositoryMockRecorder) List(ctx, serverID, conditionState interfa
 }
 
 // ListServersWithCondition mocks base method.
-func (m *MockRepository) ListServersWithCondition(ctx context.Context, conditionKind types.ConditionKind, conditionState types.ConditionState) ([]*types.ServerConditions, error) {
+func (m *MockRepository) ListServersWithCondition(ctx context.Context, conditionKind condition.Kind, conditionState condition.State) ([]*condition.ServerConditions, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "ListServersWithCondition", ctx, conditionKind, conditionState)
-	ret0, _ := ret[0].([]*types.ServerConditions)
+	ret0, _ := ret[0].([]*condition.ServerConditions)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -140,7 +140,7 @@ func (mr *MockRepositoryMockRecorder) Ping(ctx interface{}) *gomock.Call {
 }
 
 // Update mocks base method.
-func (m *MockRepository) Update(ctx context.Context, serverID uuid.UUID, condition *types.Condition) error {
+func (m *MockRepository) Update(ctx context.Context, serverID uuid.UUID, condition *condition.Condition) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Update", ctx, serverID, condition)
 	ret0, _ := ret[0].(error)

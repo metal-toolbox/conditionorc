@@ -17,7 +17,7 @@ import (
 	"github.com/metal-toolbox/conditionorc/internal/model"
 	"github.com/metal-toolbox/conditionorc/internal/store"
 	v1types "github.com/metal-toolbox/conditionorc/pkg/api/v1/types"
-	ptypes "github.com/metal-toolbox/conditionorc/pkg/types"
+	condition "github.com/metal-toolbox/rivets/condition"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
@@ -36,8 +36,8 @@ func mockserver(t *testing.T, logger *logrus.Logger, repository store.Repository
 		WithLogger(logger),
 		WithStore(repository),
 		WithConditionDefinitions(
-			[]*ptypes.ConditionDefinition{
-				{Kind: ptypes.FirmwareInstall},
+			[]*condition.Definition{
+				{Kind: condition.FirmwareInstall},
 			},
 		),
 	}
@@ -99,7 +99,7 @@ func TestServerConditionUpdate(t *testing.T) {
 	}
 
 	updateNoStatus, err := json.Marshal(&v1types.ConditionUpdate{
-		State:           ptypes.Active,
+		State:           condition.Active,
 		ResourceVersion: int64(1),
 	})
 	if err != nil {
@@ -109,7 +109,7 @@ func TestServerConditionUpdate(t *testing.T) {
 	updateValid := v1types.ConditionUpdate{
 		ConditionID:     uuid.New(),
 		ServerID:        serverID,
-		State:           ptypes.Active,
+		State:           condition.Active,
 		Status:          []byte(`{"foo": "bar"}`),
 		ResourceVersion: int64(time.Now().Nanosecond()),
 	}
@@ -173,7 +173,7 @@ func TestServerConditionUpdate(t *testing.T) {
 			"invalid server condition update payload returns error",
 			nil,
 			func(t *testing.T) *http.Request {
-				url := fmt.Sprintf("/api/v1/servers/%s/condition/%s", serverID.String(), ptypes.FirmwareInstall)
+				url := fmt.Sprintf("/api/v1/servers/%s/condition/%s", serverID.String(), condition.FirmwareInstall)
 				request, err := http.NewRequestWithContext(context.TODO(), http.MethodPut, url, bytes.NewReader(payloadInvalid))
 				if err != nil {
 					t.Fatal(err)
@@ -191,7 +191,7 @@ func TestServerConditionUpdate(t *testing.T) {
 			"update with no state returns an error",
 			nil,
 			func(t *testing.T) *http.Request {
-				url := fmt.Sprintf("/api/v1/servers/%s/condition/%s", serverID.String(), ptypes.FirmwareInstall)
+				url := fmt.Sprintf("/api/v1/servers/%s/condition/%s", serverID.String(), condition.FirmwareInstall)
 				request, err := http.NewRequestWithContext(context.TODO(), http.MethodPut, url, bytes.NewReader(updateNoState))
 				if err != nil {
 					t.Fatal(err)
@@ -209,7 +209,7 @@ func TestServerConditionUpdate(t *testing.T) {
 			"update with no status returns an error",
 			nil,
 			func(t *testing.T) *http.Request {
-				url := fmt.Sprintf("/api/v1/servers/%s/condition/%s", serverID.String(), ptypes.FirmwareInstall)
+				url := fmt.Sprintf("/api/v1/servers/%s/condition/%s", serverID.String(), condition.FirmwareInstall)
 				request, err := http.NewRequestWithContext(context.TODO(), http.MethodPut, url, bytes.NewReader(updateNoStatus))
 				if err != nil {
 					t.Fatal(err)
@@ -233,13 +233,13 @@ func TestServerConditionUpdate(t *testing.T) {
 					Get(
 						gomock.Any(),
 						gomock.Eq(serverID),
-						gomock.Eq(ptypes.FirmwareInstall),
+						gomock.Eq(condition.FirmwareInstall),
 					).
 					Return(nil, nil).
 					Times(1)
 			},
 			func(t *testing.T) *http.Request {
-				url := fmt.Sprintf("/api/v1/servers/%s/condition/%s", serverID.String(), ptypes.FirmwareInstall)
+				url := fmt.Sprintf("/api/v1/servers/%s/condition/%s", serverID.String(), condition.FirmwareInstall)
 				request, err := http.NewRequestWithContext(context.TODO(), http.MethodPut, url, bytes.NewReader(payloadValid))
 				if err != nil {
 					t.Fatal(err)
@@ -261,11 +261,11 @@ func TestServerConditionUpdate(t *testing.T) {
 					Get(
 						gomock.Any(),
 						gomock.Eq(serverID),
-						gomock.Eq(ptypes.FirmwareInstall),
+						gomock.Eq(condition.FirmwareInstall),
 					).
-					Return(&ptypes.Condition{ // condition present
+					Return(&condition.Condition{ // condition present
 						ID:              updateValid.ConditionID,
-						Kind:            ptypes.FirmwareInstall,
+						Kind:            condition.FirmwareInstall,
 						State:           updateValid.State,
 						Status:          updateValid.Status,
 						ResourceVersion: updateValid.ResourceVersion,
@@ -282,7 +282,7 @@ func TestServerConditionUpdate(t *testing.T) {
 					Times(1)
 			},
 			func(t *testing.T) *http.Request {
-				url := fmt.Sprintf("/api/v1/servers/%s/condition/%s", serverID.String(), ptypes.FirmwareInstall)
+				url := fmt.Sprintf("/api/v1/servers/%s/condition/%s", serverID.String(), condition.FirmwareInstall)
 				request, err := http.NewRequestWithContext(context.TODO(), http.MethodPut, url, bytes.NewReader(payloadValid))
 				if err != nil {
 					t.Fatal(err)
@@ -380,7 +380,7 @@ func TestServerConditionCreate(t *testing.T) {
 			nil,
 			nil,
 			func(t *testing.T) *http.Request {
-				url := fmt.Sprintf("/api/v1/servers/%s/condition/%s", serverID.String(), ptypes.FirmwareInstall)
+				url := fmt.Sprintf("/api/v1/servers/%s/condition/%s", serverID.String(), condition.FirmwareInstall)
 				request, err := http.NewRequestWithContext(context.TODO(), http.MethodPost, url, bytes.NewReader([]byte(``)))
 				if err != nil {
 					t.Fatal(err)
@@ -402,7 +402,7 @@ func TestServerConditionCreate(t *testing.T) {
 					Get(
 						gomock.Any(),
 						gomock.Eq(serverID),
-						gomock.Eq(ptypes.FirmwareInstall),
+						gomock.Eq(condition.FirmwareInstall),
 					).
 					Return(nil, nil). // no condition exists
 					Times(1)
@@ -435,7 +435,7 @@ func TestServerConditionCreate(t *testing.T) {
 					t.Error()
 				}
 
-				url := fmt.Sprintf("/api/v1/servers/%s/condition/%s", serverID.String(), ptypes.FirmwareInstall)
+				url := fmt.Sprintf("/api/v1/servers/%s/condition/%s", serverID.String(), condition.FirmwareInstall)
 				request, err := http.NewRequestWithContext(context.TODO(), http.MethodPost, url, bytes.NewReader(payload))
 				if err != nil {
 					t.Fatal(err)
@@ -459,7 +459,7 @@ func TestServerConditionCreate(t *testing.T) {
 					Get(
 						gomock.Any(),
 						gomock.Eq(serverID),
-						gomock.Eq(ptypes.FirmwareInstall),
+						gomock.Eq(condition.FirmwareInstall),
 					).
 					Return(nil, nil). // no condition exists
 					Times(1)
@@ -492,11 +492,11 @@ func TestServerConditionCreate(t *testing.T) {
 						gomock.Eq(serverID),
 						gomock.Any(),
 					).
-					DoAndReturn(func(_ context.Context, _ uuid.UUID, c *ptypes.Condition) error {
-						assert.Equal(t, ptypes.ConditionStructVersion, c.Version, "condition version mismatch")
-						assert.Equal(t, ptypes.FirmwareInstall, c.Kind, "condition kind mismatch")
+					DoAndReturn(func(_ context.Context, _ uuid.UUID, c *condition.Condition) error {
+						assert.Equal(t, condition.ConditionStructVersion, c.Version, "condition version mismatch")
+						assert.Equal(t, condition.FirmwareInstall, c.Kind, "condition kind mismatch")
 						assert.Equal(t, json.RawMessage(parametersJSON), c.Parameters, "condition parameters mismatch")
-						assert.Equal(t, ptypes.Pending, c.State, "condition state mismatch")
+						assert.Equal(t, condition.Pending, c.State, "condition state mismatch")
 						return nil
 					}).
 					Times(1)
@@ -505,7 +505,7 @@ func TestServerConditionCreate(t *testing.T) {
 				r.EXPECT().
 					Publish(
 						gomock.Any(),
-						gomock.Eq(fmt.Sprintf("%s.servers.%s", facilityCode, ptypes.FirmwareInstall)),
+						gomock.Eq(fmt.Sprintf("%s.servers.%s", facilityCode, condition.FirmwareInstall)),
 						gomock.Any(),
 					).
 					Return(nil).
@@ -517,7 +517,7 @@ func TestServerConditionCreate(t *testing.T) {
 					t.Error()
 				}
 
-				url := fmt.Sprintf("/api/v1/servers/%s/condition/%s", serverID.String(), ptypes.FirmwareInstall)
+				url := fmt.Sprintf("/api/v1/servers/%s/condition/%s", serverID.String(), condition.FirmwareInstall)
 				request, err := http.NewRequestWithContext(context.TODO(), http.MethodPost, url, bytes.NewReader(payload))
 				if err != nil {
 					t.Fatal(err)
@@ -543,7 +543,7 @@ func TestServerConditionCreate(t *testing.T) {
 					Get(
 						gomock.Any(),
 						gomock.Eq(serverID),
-						gomock.Eq(ptypes.FirmwareInstall),
+						gomock.Eq(condition.FirmwareInstall),
 					).
 					Return(nil, nil). // no condition exists
 					Times(1)
@@ -576,8 +576,8 @@ func TestServerConditionCreate(t *testing.T) {
 						gomock.Eq(serverID),
 						gomock.Any(),
 					).
-					DoAndReturn(func(_ context.Context, _ uuid.UUID, c *ptypes.Condition) error {
-						expect := &ptypes.Fault{Panic: true, DelayDuration: "10s", FailAt: "foobar"}
+					DoAndReturn(func(_ context.Context, _ uuid.UUID, c *condition.Condition) error {
+						expect := &condition.Fault{Panic: true, DelayDuration: "10s", FailAt: "foobar"}
 						assert.Equal(t, c.Fault, expect)
 						return nil
 					}).
@@ -587,20 +587,20 @@ func TestServerConditionCreate(t *testing.T) {
 				r.EXPECT().
 					Publish(
 						gomock.Any(),
-						gomock.Eq(fmt.Sprintf("%s.servers.%s", facilityCode, ptypes.FirmwareInstall)),
+						gomock.Eq(fmt.Sprintf("%s.servers.%s", facilityCode, condition.FirmwareInstall)),
 						gomock.Any(),
 					).
 					Return(nil).
 					Times(1)
 			},
 			func(t *testing.T) *http.Request {
-				fault := ptypes.Fault{Panic: true, DelayDuration: "10s", FailAt: "foobar"}
+				fault := condition.Fault{Panic: true, DelayDuration: "10s", FailAt: "foobar"}
 				payload, err := json.Marshal(&v1types.ConditionCreate{Parameters: []byte(`{"some param": "1"}`), Fault: &fault})
 				if err != nil {
 					t.Error(err)
 				}
 
-				url := fmt.Sprintf("/api/v1/servers/%s/condition/%s", serverID.String(), ptypes.FirmwareInstall)
+				url := fmt.Sprintf("/api/v1/servers/%s/condition/%s", serverID.String(), condition.FirmwareInstall)
 				request, err := http.NewRequestWithContext(context.TODO(), http.MethodPost, url, bytes.NewReader(payload))
 				if err != nil {
 					t.Fatal(err)
@@ -631,11 +631,11 @@ func TestServerConditionCreate(t *testing.T) {
 					Get(
 						gomock.Any(),
 						gomock.Eq(serverID),
-						gomock.Eq(ptypes.FirmwareInstall),
+						gomock.Eq(condition.FirmwareInstall),
 					).
-					Return(&ptypes.Condition{
-						Kind:  ptypes.FirmwareInstall,
-						State: ptypes.Succeeded,
+					Return(&condition.Condition{
+						Kind:  condition.FirmwareInstall,
+						State: condition.Succeeded,
 					}, nil). // no condition exists
 					Times(1)
 
@@ -652,7 +652,7 @@ func TestServerConditionCreate(t *testing.T) {
 					Delete(
 						gomock.Any(),
 						gomock.Eq(serverID),
-						gomock.Eq(ptypes.FirmwareInstall),
+						gomock.Eq(condition.FirmwareInstall),
 					).
 					Return(nil).
 					Times(1)
@@ -676,11 +676,11 @@ func TestServerConditionCreate(t *testing.T) {
 						gomock.Eq(serverID),
 						gomock.Any(),
 					).
-					DoAndReturn(func(_ context.Context, _ uuid.UUID, c *ptypes.Condition) error {
-						assert.Equal(t, ptypes.ConditionStructVersion, c.Version, "condition version mismatch")
-						assert.Equal(t, ptypes.FirmwareInstall, c.Kind, "condition kind mismatch")
+					DoAndReturn(func(_ context.Context, _ uuid.UUID, c *condition.Condition) error {
+						assert.Equal(t, condition.ConditionStructVersion, c.Version, "condition version mismatch")
+						assert.Equal(t, condition.FirmwareInstall, c.Kind, "condition kind mismatch")
 						assert.Equal(t, json.RawMessage(parametersJSON), c.Parameters, "condition parameters mismatch")
-						assert.Equal(t, ptypes.Pending, c.State, "condition state mismatch")
+						assert.Equal(t, condition.Pending, c.State, "condition state mismatch")
 						return nil
 					}).
 					Times(1)
@@ -689,7 +689,7 @@ func TestServerConditionCreate(t *testing.T) {
 				r.EXPECT().
 					Publish(
 						gomock.Any(),
-						gomock.Eq(fmt.Sprintf("%s.servers.%s", facilityCode, ptypes.FirmwareInstall)),
+						gomock.Eq(fmt.Sprintf("%s.servers.%s", facilityCode, condition.FirmwareInstall)),
 						gomock.Any(),
 					).
 					Return(nil).
@@ -701,7 +701,7 @@ func TestServerConditionCreate(t *testing.T) {
 					t.Error()
 				}
 
-				url := fmt.Sprintf("/api/v1/servers/%s/condition/%s", serverID.String(), ptypes.FirmwareInstall)
+				url := fmt.Sprintf("/api/v1/servers/%s/condition/%s", serverID.String(), condition.FirmwareInstall)
 				request, err := http.NewRequestWithContext(context.TODO(), http.MethodPost, url, bytes.NewReader(payload))
 				if err != nil {
 					t.Fatal(err)
@@ -728,11 +728,11 @@ func TestServerConditionCreate(t *testing.T) {
 					Get(
 						gomock.Any(),
 						gomock.Eq(serverID),
-						gomock.Eq(ptypes.FirmwareInstall),
+						gomock.Eq(condition.FirmwareInstall),
 					).
-					Return(&ptypes.Condition{ // condition present
-						Kind:       ptypes.FirmwareInstall,
-						State:      ptypes.Pending,
+					Return(&condition.Condition{ // condition present
+						Kind:       condition.FirmwareInstall,
+						State:      condition.Pending,
 						Parameters: []byte(`{"hello":"world"}`),
 					}, nil).
 					Times(1)
@@ -740,7 +740,7 @@ func TestServerConditionCreate(t *testing.T) {
 			func(r *mockevents.MockStream) {
 			},
 			func(t *testing.T) *http.Request {
-				url := fmt.Sprintf("/api/v1/servers/%s/condition/%s", serverID.String(), ptypes.FirmwareInstall)
+				url := fmt.Sprintf("/api/v1/servers/%s/condition/%s", serverID.String(), condition.FirmwareInstall)
 				request, err := http.NewRequestWithContext(context.TODO(), http.MethodPost, url, bytes.NewReader([]byte(`{"hello":"world"}`)))
 				if err != nil {
 					t.Fatal(err)
@@ -762,7 +762,7 @@ func TestServerConditionCreate(t *testing.T) {
 					Get(
 						gomock.Any(),
 						gomock.Eq(serverID),
-						gomock.Eq(ptypes.FirmwareInstall),
+						gomock.Eq(condition.FirmwareInstall),
 					).
 					Return(nil, nil).
 					Times(1)
@@ -771,13 +771,13 @@ func TestServerConditionCreate(t *testing.T) {
 					List(
 						gomock.Any(),
 						gomock.Eq(serverID),
-						gomock.Eq(ptypes.Active),
+						gomock.Eq(condition.Active),
 					).
-					Return([]*ptypes.Condition{
+					Return([]*condition.Condition{
 						{
-							Kind:      ptypes.InventoryOutofband,
+							Kind:      condition.Inventory,
 							Exclusive: true,
-							State:     ptypes.Active,
+							State:     condition.Active,
 						},
 					}, nil).
 					Times(1)
@@ -785,7 +785,7 @@ func TestServerConditionCreate(t *testing.T) {
 			func(r *mockevents.MockStream) {
 			},
 			func(t *testing.T) *http.Request {
-				url := fmt.Sprintf("/api/v1/servers/%s/condition/%s", serverID.String(), ptypes.FirmwareInstall)
+				url := fmt.Sprintf("/api/v1/servers/%s/condition/%s", serverID.String(), condition.FirmwareInstall)
 				request, err := http.NewRequestWithContext(context.TODO(), http.MethodPost, url, bytes.NewReader([]byte(`{"hello":"world"}`)))
 				if err != nil {
 					t.Fatal(err)
@@ -809,7 +809,7 @@ func TestServerConditionCreate(t *testing.T) {
 					Get(
 						gomock.Any(),
 						gomock.Eq(serverID),
-						gomock.Eq(ptypes.FirmwareInstall),
+						gomock.Eq(condition.FirmwareInstall),
 					).
 					Return(nil, nil). // no condition exists
 					Times(1)
@@ -842,18 +842,18 @@ func TestServerConditionCreate(t *testing.T) {
 						gomock.Eq(serverID),
 						gomock.Any(),
 					).
-					DoAndReturn(func(_ context.Context, _ uuid.UUID, c *ptypes.Condition) error {
-						assert.Equal(t, ptypes.ConditionStructVersion, c.Version, "condition version mismatch")
-						assert.Equal(t, ptypes.FirmwareInstall, c.Kind, "condition kind mismatch")
+					DoAndReturn(func(_ context.Context, _ uuid.UUID, c *condition.Condition) error {
+						assert.Equal(t, condition.ConditionStructVersion, c.Version, "condition version mismatch")
+						assert.Equal(t, condition.FirmwareInstall, c.Kind, "condition kind mismatch")
 						assert.Equal(t, json.RawMessage(parametersJSON), c.Parameters, "condition parameters mismatch")
-						assert.Equal(t, ptypes.Pending, c.State, "condition state mismatch")
+						assert.Equal(t, condition.Pending, c.State, "condition state mismatch")
 						return nil
 					}).
 					Times(1)
 
 				// condition deletion due to publish failure
 				r.EXPECT().
-					Delete(gomock.Any(), gomock.Eq(serverID), gomock.Eq(ptypes.FirmwareInstall)).
+					Delete(gomock.Any(), gomock.Eq(serverID), gomock.Eq(condition.FirmwareInstall)).
 					Times(1).
 					Return(nil)
 			},
@@ -861,7 +861,7 @@ func TestServerConditionCreate(t *testing.T) {
 				r.EXPECT().
 					Publish(
 						gomock.Any(),
-						gomock.Eq(fmt.Sprintf("%s.servers.%s", facilityCode, ptypes.FirmwareInstall)),
+						gomock.Eq(fmt.Sprintf("%s.servers.%s", facilityCode, condition.FirmwareInstall)),
 						gomock.Any(),
 					).
 					Return(errors.New("gremlins in the pipes")).
@@ -873,7 +873,7 @@ func TestServerConditionCreate(t *testing.T) {
 					t.Error()
 				}
 
-				url := fmt.Sprintf("/api/v1/servers/%s/condition/%s", serverID.String(), ptypes.FirmwareInstall)
+				url := fmt.Sprintf("/api/v1/servers/%s/condition/%s", serverID.String(), condition.FirmwareInstall)
 				request, err := http.NewRequestWithContext(context.TODO(), http.MethodPost, url, bytes.NewReader(payload))
 				if err != nil {
 					t.Fatal(err)
@@ -910,22 +910,22 @@ func TestServerConditionCreate(t *testing.T) {
 }
 
 func TestServerConditionList(t *testing.T) {
-	var firmwareInstall ptypes.ConditionKind = "firmwareInstall"
+	var firmwareInstall condition.Kind = "firmwareInstall"
 
-	var inventoryOutofband ptypes.ConditionKind = "inventoryOutofband"
+	var Inventory condition.Kind = "Inventory"
 
 	serverID := uuid.New()
 
-	conditions := []*ptypes.Condition{
+	conditions := []*condition.Condition{
 		{
 			Kind:       firmwareInstall,
 			Parameters: []byte(`{"FirmwareSetID": "123"}`),
-			State:      ptypes.Pending,
+			State:      condition.Pending,
 		},
 		{
-			Kind:       inventoryOutofband,
+			Kind:       Inventory,
 			Parameters: []byte(`{}`),
-			State:      ptypes.Pending,
+			State:      condition.Pending,
 		},
 	}
 
@@ -985,12 +985,12 @@ func TestServerConditionList(t *testing.T) {
 			// mock repository
 			func(r *store.MockRepository) {
 				r.EXPECT().
-					List(gomock.Any(), gomock.Eq(serverID), gomock.Eq(ptypes.Pending)).
+					List(gomock.Any(), gomock.Eq(serverID), gomock.Eq(condition.Pending)).
 					Times(1).
 					Return(conditions, nil)
 			},
 			func(t *testing.T) *http.Request {
-				url := fmt.Sprintf("/api/v1/servers/%s/state/%s", serverID.String(), ptypes.Pending)
+				url := fmt.Sprintf("/api/v1/servers/%s/state/%s", serverID.String(), condition.Pending)
 
 				request, err := http.NewRequestWithContext(context.TODO(), http.MethodGet, url, http.NoBody)
 				if err != nil {
@@ -1033,8 +1033,8 @@ func TestServerConditionList(t *testing.T) {
 
 func TestServerConditionGet(t *testing.T) {
 	serverID := uuid.New()
-	condition := &ptypes.Condition{
-		Kind:       ptypes.FirmwareInstall,
+	testCondition := &condition.Condition{
+		Kind:       condition.FirmwareInstall,
 		Parameters: json.RawMessage{},
 	}
 
@@ -1094,12 +1094,12 @@ func TestServerConditionGet(t *testing.T) {
 			// mock repository
 			func(r *store.MockRepository) {
 				r.EXPECT().
-					Get(gomock.Any(), gomock.Eq(serverID), gomock.Eq(ptypes.FirmwareInstall)).
+					Get(gomock.Any(), gomock.Eq(serverID), gomock.Eq(condition.FirmwareInstall)).
 					Times(1).
-					Return(condition, nil)
+					Return(testCondition, nil)
 			},
 			func(t *testing.T) *http.Request {
-				url := fmt.Sprintf("/api/v1/servers/%s/condition/%s", serverID.String(), ptypes.FirmwareInstall)
+				url := fmt.Sprintf("/api/v1/servers/%s/condition/%s", serverID.String(), condition.FirmwareInstall)
 
 				request, err := http.NewRequestWithContext(context.TODO(), http.MethodGet, url, http.NoBody)
 				if err != nil {
@@ -1116,8 +1116,8 @@ func TestServerConditionGet(t *testing.T) {
 					&v1types.ServerResponse{
 						Records: &v1types.ConditionsResponse{
 							ServerID: serverID,
-							Conditions: []*ptypes.Condition{
-								condition,
+							Conditions: []*condition.Condition{
+								testCondition,
 							},
 						},
 					},
@@ -1201,12 +1201,12 @@ func TestServerConditionDelete(t *testing.T) {
 			// mock repository
 			func(r *store.MockRepository) {
 				r.EXPECT().
-					Delete(gomock.Any(), gomock.Eq(serverID), gomock.Eq(ptypes.FirmwareInstall)).
+					Delete(gomock.Any(), gomock.Eq(serverID), gomock.Eq(condition.FirmwareInstall)).
 					Times(1).
 					Return(nil)
 			},
 			func(t *testing.T) *http.Request {
-				url := fmt.Sprintf("/api/v1/servers/%s/condition/%s", serverID.String(), ptypes.FirmwareInstall)
+				url := fmt.Sprintf("/api/v1/servers/%s/condition/%s", serverID.String(), condition.FirmwareInstall)
 
 				request, err := http.NewRequestWithContext(context.TODO(), http.MethodDelete, url, http.NoBody)
 				if err != nil {

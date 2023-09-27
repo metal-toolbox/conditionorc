@@ -12,7 +12,7 @@ import (
 
 	"github.com/google/uuid"
 	v1types "github.com/metal-toolbox/conditionorc/pkg/api/v1/types"
-	ptypes "github.com/metal-toolbox/conditionorc/pkg/types"
+	condition "github.com/metal-toolbox/rivets/condition"
 	"github.com/sirupsen/logrus"
 	"github.com/slack-go/slack"
 )
@@ -68,7 +68,7 @@ func (ss *slackSender) Send(upd *v1types.ConditionUpdateEvent) error {
 	_, ts, err := ss.api.PostMessageContext(ctx, ss.ch, msgOpts...)
 
 	// special handling for the last update
-	if ptypes.ConditionStateIsComplete(upd.State) {
+	if condition.StateIsComplete(upd.State) {
 		delete(ss.trk, upd.ConditionID)
 		return err
 	}
@@ -89,9 +89,9 @@ func (ss *slackSender) optionsFromUpdate(upd *v1types.ConditionUpdate, kind stri
 	hdrStr := fmt.Sprintf("Condition: %s", upd.ConditionID.String())
 	var emojiStr string
 	switch upd.State {
-	case ptypes.Succeeded:
+	case condition.Succeeded:
 		emojiStr = ":white_check_mark:"
-	case ptypes.Failed:
+	case condition.Failed:
 		emojiStr = ":exclamation:"
 	}
 	stateStr := fmt.Sprintf("Type: _%s_\nState: *%s* %s", kind, string(upd.State), emojiStr)

@@ -10,7 +10,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/metal-toolbox/conditionorc/internal/status"
 	v1types "github.com/metal-toolbox/conditionorc/pkg/api/v1/types"
-	ptypes "github.com/metal-toolbox/conditionorc/pkg/types"
+	condition "github.com/metal-toolbox/rivets/condition"
 	"github.com/sirupsen/logrus"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/trace"
@@ -191,7 +191,7 @@ type controllerStatus struct {
 // ConditionOrchestrator-native type that ConditionOrc can more-easily use for its
 // own purposes.
 func eventUpdateFromKV(ctx context.Context, kve nats.KeyValueEntry,
-	kind ptypes.ConditionKind,
+	kind condition.Kind,
 ) (*v1types.ConditionUpdateEvent, error) {
 	parsedKey, err := parseStatusKVKey(kve.Key())
 	if err != nil {
@@ -211,8 +211,8 @@ func eventUpdateFromKV(ctx context.Context, kve nats.KeyValueEntry,
 		return nil, errors.Wrap(err, "parsing target id")
 	}
 
-	convState := ptypes.ConditionState(cs.State)
-	if !ptypes.ConditionStateIsValid(convState) {
+	convState := condition.State(cs.State)
+	if !condition.StateIsValid(convState) {
 		return nil, errInvalidState
 	}
 
@@ -277,9 +277,9 @@ func (o *Orchestrator) getEventsToReconcile(ctx context.Context) []*v1types.Cond
 				continue
 			}
 			if o.eventNeedsReconciliation(evt) {
-				if !ptypes.ConditionStateIsComplete(evt.ConditionUpdate.State) {
+				if !condition.StateIsComplete(evt.ConditionUpdate.State) {
 					// we need to deal with this event, so mark it failed
-					evt.ConditionUpdate.State = ptypes.Failed
+					evt.ConditionUpdate.State = condition.Failed
 					evt.ConditionUpdate.Status = failedByReconciler
 				}
 				evts = append(evts, evt)
@@ -294,7 +294,7 @@ func (o *Orchestrator) eventUpdate(ctx context.Context, evt *v1types.ConditionUp
 		return errors.Wrap(err, "updating condition")
 	}
 
-	if ptypes.ConditionStateIsComplete(evt.ConditionUpdate.State) {
+	if condition.StateIsComplete(evt.ConditionUpdate.State) {
 		err := status.DeleteCondition(evt.Kind, o.facility, evt.ConditionUpdate.ConditionID.String())
 		if err != nil {
 			return errors.Wrap(err, "deleting event KV data")
@@ -312,7 +312,7 @@ func (o *Orchestrator) eventNeedsReconciliation(evt *v1types.ConditionUpdateEven
 	}
 
 	// if the event is in a final state it should be handled
-	if ptypes.ConditionStateIsComplete(evt.ConditionUpdate.State) {
+	if condition.StateIsComplete(evt.ConditionUpdate.State) {
 		return true
 	}
 

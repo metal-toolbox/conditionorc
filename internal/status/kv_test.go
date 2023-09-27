@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	ptypes "github.com/metal-toolbox/conditionorc/pkg/types"
+	condition "github.com/metal-toolbox/rivets/condition"
 
 	"github.com/nats-io/nats-server/v2/server"
 	srvtest "github.com/nats-io/nats-server/v2/test"
@@ -74,36 +74,36 @@ func TestStatusKV(t *testing.T) {
 	js, testDone := startTestJetStream(t)
 	defer testDone()
 
-	defs := ptypes.ConditionDefinitions{
-		&ptypes.ConditionDefinition{
-			Kind:      ptypes.ConditionKind("test-event"),
+	defs := condition.Definitions{
+		&condition.Definition{
+			Kind:      condition.Kind("test-event"),
 			Exclusive: true,
 		},
 	}
 
 	// pre-ready returns an error
 	require.False(t, kvReady)
-	_, err := WatchConditionStatus(context.TODO(), ptypes.ConditionKind("bogus"), "my-facility")
+	_, err := WatchConditionStatus(context.TODO(), condition.Kind("bogus"), "my-facility")
 	require.ErrorIs(t, err, errNotReady, "wrong error")
 
-	_, err = GetConditionKV(ptypes.ConditionKind("bogus"))
+	_, err = GetConditionKV(condition.Kind("bogus"))
 	require.ErrorIs(t, err, errNotReady, "wrong error")
 
 	ConnectToKVStores(js, &logrus.Logger{}, defs)
 	require.True(t, kvReady)
 
 	// bogus condition name returns an error
-	_, err = WatchConditionStatus(context.TODO(), ptypes.ConditionKind("bogus"), "my-facility")
+	_, err = WatchConditionStatus(context.TODO(), condition.Kind("bogus"), "my-facility")
 	require.ErrorIs(t, err, errNoKV, "wrong error")
 
-	_, err = GetConditionKV(ptypes.ConditionKind("bogus"))
+	_, err = GetConditionKV(condition.Kind("bogus"))
 	require.ErrorIs(t, err, errNoKV, "wrong error")
 
 	// use the configured kind and get a real object back
-	_, err = WatchConditionStatus(context.TODO(), ptypes.ConditionKind("test-event"), "my-facility")
+	_, err = WatchConditionStatus(context.TODO(), condition.Kind("test-event"), "my-facility")
 	require.NoError(t, err)
 
-	testKind := ptypes.ConditionKind("test-event")
+	testKind := condition.Kind("test-event")
 	handle, err := GetConditionKV(testKind)
 	require.NoError(t, err)
 
