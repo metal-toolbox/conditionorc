@@ -87,7 +87,7 @@ const docTemplate = `{
                 }
             },
             "post": {
-                "description": "Creates a condition on a server",
+                "description": "Creates a condition on a server\nSample firmwareInstall payload, response: https://github.com/metal-toolbox/conditionorc/blob/main/sample/firmwareInstall.md",
                 "consumes": [
                     "application/json"
                 ],
@@ -95,7 +95,6 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "summary": "Condition Create",
-                "operationId": "serverConditionCreate",
                 "parameters": [
                     {
                         "type": "string",
@@ -196,7 +195,7 @@ const docTemplate = `{
         }
     },
     "definitions": {
-        "types.Condition": {
+        "condition.Condition": {
             "type": "object",
             "properties": {
                 "createdAt": {
@@ -215,7 +214,7 @@ const docTemplate = `{
                     "description": "Fault is used to introduce faults into the controller when executing on a condition.",
                     "allOf": [
                         {
-                            "$ref": "#/definitions/types.Fault"
+                            "$ref": "#/definitions/condition.Fault"
                         }
                     ]
                 },
@@ -224,10 +223,10 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "kind": {
-                    "description": "Kind is one of ConditionKind.",
+                    "description": "Kind is one of Kind.",
                     "allOf": [
                         {
-                            "$ref": "#/definitions/types.ConditionKind"
+                            "$ref": "#/definitions/condition.Kind"
                         }
                     ]
                 },
@@ -243,10 +242,10 @@ const docTemplate = `{
                     "type": "integer"
                 },
                 "state": {
-                    "description": "State is one of ConditionState",
+                    "description": "State is one of State",
                     "allOf": [
                         {
-                            "$ref": "#/definitions/types.ConditionState"
+                            "$ref": "#/definitions/condition.State"
                         }
                     ]
                 },
@@ -267,18 +266,37 @@ const docTemplate = `{
                 }
             }
         },
-        "types.ConditionKind": {
+        "condition.Fault": {
+            "type": "object",
+            "properties": {
+                "delayDuration": {
+                    "description": "Introduce specified delay in execution of the condition on the controller.\n\naccepts the string format of time.Duration - 5s, 5m, 5h",
+                    "type": "string"
+                },
+                "failAt": {
+                    "description": "FailAt is a controller specific task/stage that the condition should fail in execution.\n\nfor example, in the flasher controller, setting this field to ` + "`" + `init` + "`" + ` will cause the\ncondition task to fail at initialization.",
+                    "type": "string"
+                },
+                "panic": {
+                    "description": "will cause the condition execution to panic on the controller.",
+                    "type": "boolean"
+                }
+            }
+        },
+        "condition.Kind": {
             "type": "string",
             "enum": [
                 "firmwareInstall",
-                "inventoryOutofband"
+                "virtualMediaMount",
+                "inventory"
             ],
             "x-enum-varnames": [
                 "FirmwareInstall",
-                "InventoryOutofband"
+                "VirtualMediaMount",
+                "Inventory"
             ]
         },
-        "types.ConditionState": {
+        "condition.State": {
             "type": "string",
             "enum": [
                 "pending",
@@ -299,28 +317,11 @@ const docTemplate = `{
                 "conditions": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/types.Condition"
+                        "$ref": "#/definitions/condition.Condition"
                     }
                 },
                 "serverID": {
                     "type": "string"
-                }
-            }
-        },
-        "types.Fault": {
-            "type": "object",
-            "properties": {
-                "delayDuration": {
-                    "description": "Introduce specified delay in execution of the condition on the controller.\n\naccepts the string format of time.Duration - 5s, 5m, 5h",
-                    "type": "string"
-                },
-                "failAt": {
-                    "description": "FailAt is a controller specific task/stage that the condition should fail in execution.\n\nfor example, in the flasher controller, setting this field to ` + "`" + `init` + "`" + ` will cause the\ncondition task to fail at initialization.",
-                    "type": "string"
-                },
-                "panic": {
-                    "description": "will cause the condition execution to panic on the controller.",
-                    "type": "boolean"
                 }
             }
         },

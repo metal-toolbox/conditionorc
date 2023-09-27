@@ -172,7 +172,7 @@ func (r *Routes) serverConditionUpdate(c *gin.Context) (int, *v1types.ServerResp
 // @Summary Condition Create
 // @Tag Conditions
 // @Description Creates a condition on a server
-// @ID serverConditionCreate
+// @Description Sample firmwareInstall payload, response: https://github.com/metal-toolbox/conditionorc/blob/main/sample/firmwareInstall.md
 // @Param uuid path string true "Server ID"
 // @Param conditionKind path string true "Condition Kind"
 // @Accept json
