@@ -4,7 +4,7 @@ ConditionOrc provides the [conditions](https://github.com/metal-toolbox/architec
 for consumers wanting to execute actions on server hardware.
 
 It does this by,
- - Providing a CRUD API to setting conditions like `firmwareInstall`, `inventoryOutofband` on a server.
+ - Providing a CRUD API to setting conditions like `firmwareInstall`, `Inventory` on a server.
  - Follows up on with the controllers to nudge them to reconcile those conditions.
 
 For more information on how this fits all together, see
