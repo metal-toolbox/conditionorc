@@ -11,6 +11,7 @@ require (
 	github.com/google/uuid v1.3.1
 	github.com/hashicorp/go-retryablehttp v0.7.4
 	github.com/metal-toolbox/flasher v0.2.4
+	github.com/metal-toolbox/rivets v0.0.0-20230927091114-c7072205b479
 	github.com/nats-io/nats-server/v2 v2.9.22
 	github.com/nats-io/nats.go v1.29.0
 	github.com/pkg/errors v0.9.1
@@ -22,7 +23,7 @@ require (
 	github.com/stretchr/testify v1.8.4
 	github.com/swaggo/files v1.0.1
 	github.com/swaggo/gin-swagger v1.6.0
-	github.com/swaggo/swag v1.16.2
+	github.com/swaggo/swag v1.16.3-0.20230925065629-1460377e6729
 	github.com/volatiletech/null/v8 v8.1.2
 	go.hollow.sh/serverservice v0.16.1
 	go.hollow.sh/toolbox v0.6.1
