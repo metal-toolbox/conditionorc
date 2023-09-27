@@ -7,7 +7,7 @@ import (
 
 	"github.com/google/uuid"
 	v1types "github.com/metal-toolbox/conditionorc/pkg/api/v1/types"
-	ptypes "github.com/metal-toolbox/conditionorc/pkg/types"
+	condition "github.com/metal-toolbox/rivets/condition"
 )
 
 // Doer performs HTTP requests.
@@ -71,32 +71,32 @@ func WithAuthToken(authToken string) Option {
 	}
 }
 
-func (c *Client) ServerConditionGet(ctx context.Context, serverID uuid.UUID, conditionKind ptypes.ConditionKind) (*v1types.ServerResponse, error) {
+func (c *Client) ServerConditionGet(ctx context.Context, serverID uuid.UUID, conditionKind condition.Kind) (*v1types.ServerResponse, error) {
 	path := fmt.Sprintf("servers/%s/condition/%s", serverID.String(), conditionKind)
 
 	return c.get(ctx, path)
 }
 
-func (c *Client) ServerConditionList(ctx context.Context, serverID uuid.UUID, conditionState ptypes.ConditionState) (*v1types.ServerResponse, error) {
+func (c *Client) ServerConditionList(ctx context.Context, serverID uuid.UUID, conditionState condition.State) (*v1types.ServerResponse, error) {
 	path := fmt.Sprintf("servers/%s/state/%s", serverID.String(), conditionState)
 
 	return c.get(ctx, path)
 }
 
-func (c *Client) ServerConditionCreate(ctx context.Context, serverID uuid.UUID, conditionKind ptypes.ConditionKind, conditionCreate v1types.ConditionCreate) (*v1types.ServerResponse, error) {
+func (c *Client) ServerConditionCreate(ctx context.Context, serverID uuid.UUID, conditionKind condition.Kind, conditionCreate v1types.ConditionCreate) (*v1types.ServerResponse, error) {
 	path := fmt.Sprintf("servers/%s/condition/%s", serverID.String(), conditionKind)
 
 	return c.post(ctx, path, conditionCreate)
 }
 
 //nolint:gocritic // 80 bytes for v1types.ConditionUpdate is big, but not *huge*
-func (c *Client) ServerConditionUpdate(ctx context.Context, serverID uuid.UUID, conditionKind ptypes.ConditionKind, conditionUpdate v1types.ConditionUpdate) (*v1types.ServerResponse, error) {
+func (c *Client) ServerConditionUpdate(ctx context.Context, serverID uuid.UUID, conditionKind condition.Kind, conditionUpdate v1types.ConditionUpdate) (*v1types.ServerResponse, error) {
 	path := fmt.Sprintf("servers/%s/condition/%s", serverID.String(), conditionKind)
 
 	return c.put(ctx, path, conditionUpdate)
 }
 
-func (c *Client) ServerConditionDelete(ctx context.Context, serverID uuid.UUID, conditionKind ptypes.ConditionKind) (*v1types.ServerResponse, error) {
+func (c *Client) ServerConditionDelete(ctx context.Context, serverID uuid.UUID, conditionKind condition.Kind) (*v1types.ServerResponse, error) {
 	path := fmt.Sprintf("servers/%s/condition/%s", serverID.String(), conditionKind)
 
 	return c.delete(ctx, path)

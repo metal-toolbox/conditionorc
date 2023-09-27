@@ -4,42 +4,42 @@ import (
 	"encoding/json"
 	"fmt"
 
-	ptypes "github.com/metal-toolbox/conditionorc/pkg/types"
+	condition "github.com/metal-toolbox/rivets/condition"
 	"github.com/pkg/errors"
 	sservice "go.hollow.sh/serverservice/pkg/api/v1"
 )
 
-func (s *Serverservice) conditionNS(kind ptypes.ConditionKind) string {
+func (s *Serverservice) conditionNS(kind condition.Kind) string {
 	return fmt.Sprintf(ServerserviceConditionsNSFmtStr, kind)
 }
 
-func (s *Serverservice) conditionFromAttribute(attribute *sservice.Attributes) (*ptypes.Condition, error) {
-	condition := &ptypes.Condition{}
+func (s *Serverservice) conditionFromAttribute(attribute *sservice.Attributes) (*condition.Condition, error) {
+	conditionFromAttr := &condition.Condition{}
 
-	if err := json.Unmarshal(attribute.Data, condition); err != nil {
+	if err := json.Unmarshal(attribute.Data, conditionFromAttr); err != nil {
 		return nil, errors.Wrap(ErrServerserviceAttribute, err.Error())
 	}
 
-	condition.CreatedAt = attribute.CreatedAt
-	condition.UpdatedAt = attribute.UpdatedAt
+	conditionFromAttr.CreatedAt = attribute.CreatedAt
+	conditionFromAttr.UpdatedAt = attribute.UpdatedAt
 
-	return condition, nil
+	return conditionFromAttr, nil
 }
 
-func (s *Serverservice) findConditionByStateInAttributes(conditionState ptypes.ConditionState, attributes []*sservice.Attributes) []*ptypes.Condition {
-	found := []*ptypes.Condition{}
+func (s *Serverservice) findConditionByStateInAttributes(conditionState condition.State, attributes []*sservice.Attributes) []*condition.Condition {
+	found := []*condition.Condition{}
 
 	for _, attr := range attributes {
-		condition := &ptypes.Condition{}
-		if err := json.Unmarshal(attr.Data, condition); err != nil {
+		foundCondition := &condition.Condition{}
+		if err := json.Unmarshal(attr.Data, foundCondition); err != nil {
 			continue
 		}
 
-		if condition.State == conditionState {
-			condition.CreatedAt = attr.CreatedAt
-			condition.UpdatedAt = attr.UpdatedAt
+		if foundCondition.State == conditionState {
+			foundCondition.CreatedAt = attr.CreatedAt
+			foundCondition.UpdatedAt = attr.UpdatedAt
 
-			found = append(found, condition)
+			found = append(found, foundCondition)
 		}
 	}
 

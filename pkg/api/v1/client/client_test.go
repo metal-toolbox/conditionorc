@@ -30,7 +30,7 @@ import (
 	"gopkg.in/square/go-jose.v2/jwt"
 
 	v1types "github.com/metal-toolbox/conditionorc/pkg/api/v1/types"
-	ptypes "github.com/metal-toolbox/conditionorc/pkg/types"
+	condition "github.com/metal-toolbox/rivets/condition"
 	"github.com/sirupsen/logrus"
 )
 
@@ -75,8 +75,8 @@ func newTester(t *testing.T, enableAuth bool, authToken string) *integrationTest
 		server.WithListenAddress("localhost:9999"),
 		server.WithStore(repository),
 		server.WithConditionDefinitions(
-			[]*ptypes.ConditionDefinition{
-				{Kind: ptypes.FirmwareInstall},
+			[]*condition.Definition{
+				{Kind: condition.FirmwareInstall},
 			},
 		),
 	}
@@ -179,7 +179,7 @@ func TestIntegration_AuthToken(t *testing.T) {
 
 	testcases := []struct {
 		name                string
-		conditionKind       ptypes.ConditionKind
+		conditionKind       condition.Kind
 		tester              *integrationTester
 		mockStore           func(r *store.MockRepository)
 		expectResponse      func() *v1types.ServerResponse
@@ -187,7 +187,7 @@ func TestIntegration_AuthToken(t *testing.T) {
 	}{
 		{
 			"invalid auth token returns 401",
-			ptypes.FirmwareInstall,
+			condition.FirmwareInstall,
 			newTester(t, true, "asdf"),
 			// mock repository
 			nil,
@@ -201,7 +201,7 @@ func TestIntegration_AuthToken(t *testing.T) {
 		},
 		{
 			"valid auth token works",
-			ptypes.FirmwareInstall,
+			condition.FirmwareInstall,
 			newTester(t, true, testAuthToken(t)),
 			// mock repository
 			func(r *store.MockRepository) {
@@ -219,12 +219,12 @@ func TestIntegration_AuthToken(t *testing.T) {
 					Get(
 						gomock.Any(),
 						gomock.Eq(serverID),
-						gomock.Eq(ptypes.FirmwareInstall),
+						gomock.Eq(condition.FirmwareInstall),
 					).
 					Return(
-						&ptypes.Condition{
-							Kind:       ptypes.FirmwareInstall,
-							State:      ptypes.Pending,
+						&condition.Condition{
+							Kind:       condition.FirmwareInstall,
+							State:      condition.Pending,
 							Status:     []byte(`{"hello":"world"}`),
 							Parameters: parameters,
 						},
@@ -245,10 +245,10 @@ func TestIntegration_AuthToken(t *testing.T) {
 					StatusCode: 200,
 					Records: &v1types.ConditionsResponse{
 						ServerID: serverID,
-						Conditions: []*ptypes.Condition{
+						Conditions: []*condition.Condition{
 							{
-								Kind:       ptypes.FirmwareInstall,
-								State:      ptypes.Pending,
+								Kind:       condition.FirmwareInstall,
+								State:      condition.Pending,
 								Status:     []byte(`{"hello":"world"}`),
 								Parameters: parameters,
 							},
@@ -295,14 +295,14 @@ func TestIntegration_ConditionsGet(t *testing.T) {
 
 	testcases := []struct {
 		name                string
-		conditionKind       ptypes.ConditionKind
+		conditionKind       condition.Kind
 		mockStore           func(r *store.MockRepository)
 		expectResponse      func() *v1types.ServerResponse
 		expectErrorContains string
 	}{
 		{
 			"valid response",
-			ptypes.FirmwareInstall,
+			condition.FirmwareInstall,
 			// mock repository
 			func(r *store.MockRepository) {
 				parameters, err := json.Marshal(&FirmwareInstallParameters{
@@ -319,12 +319,12 @@ func TestIntegration_ConditionsGet(t *testing.T) {
 					Get(
 						gomock.Any(),
 						gomock.Eq(serverID),
-						gomock.Eq(ptypes.FirmwareInstall),
+						gomock.Eq(condition.FirmwareInstall),
 					).
 					Return(
-						&ptypes.Condition{
-							Kind:       ptypes.FirmwareInstall,
-							State:      ptypes.Pending,
+						&condition.Condition{
+							Kind:       condition.FirmwareInstall,
+							State:      condition.Pending,
 							Status:     []byte(`{"hello":"world"}`),
 							Parameters: parameters,
 						},
@@ -345,10 +345,10 @@ func TestIntegration_ConditionsGet(t *testing.T) {
 					StatusCode: 200,
 					Records: &v1types.ConditionsResponse{
 						ServerID: serverID,
-						Conditions: []*ptypes.Condition{
+						Conditions: []*condition.Condition{
 							{
-								Kind:       ptypes.FirmwareInstall,
-								State:      ptypes.Pending,
+								Kind:       condition.FirmwareInstall,
+								State:      condition.Pending,
 								Status:     []byte(`{"hello":"world"}`),
 								Parameters: parameters,
 							},
@@ -360,7 +360,7 @@ func TestIntegration_ConditionsGet(t *testing.T) {
 		},
 		{
 			"404 response",
-			ptypes.FirmwareInstall,
+			condition.FirmwareInstall,
 			// mock repository
 			func(r *store.MockRepository) {
 				// lookup existing condition
@@ -368,7 +368,7 @@ func TestIntegration_ConditionsGet(t *testing.T) {
 					Get(
 						gomock.Any(),
 						gomock.Eq(serverID),
-						gomock.Eq(ptypes.FirmwareInstall),
+						gomock.Eq(condition.FirmwareInstall),
 					).
 					Return(
 						nil,
@@ -385,7 +385,7 @@ func TestIntegration_ConditionsGet(t *testing.T) {
 		},
 		{
 			"400 response",
-			ptypes.ConditionKind("invalid"),
+			condition.Kind("invalid"),
 			nil,
 			func() *v1types.ServerResponse {
 				return &v1types.ServerResponse{
@@ -432,14 +432,14 @@ func TestIntegration_ConditionsList(t *testing.T) {
 
 	testcases := []struct {
 		name                string
-		conditionState      ptypes.ConditionState
+		conditionState      condition.State
 		mockStore           func(r *store.MockRepository)
 		expectResponse      func() *v1types.ServerResponse
 		expectErrorContains string
 	}{
 		{
 			"valid response",
-			ptypes.Pending,
+			condition.Pending,
 			// mock repository
 			func(r *store.MockRepository) {
 				parameters, err := json.Marshal(&FirmwareInstallParameters{
@@ -456,19 +456,19 @@ func TestIntegration_ConditionsList(t *testing.T) {
 					List(
 						gomock.Any(),
 						gomock.Eq(serverID),
-						gomock.Eq(ptypes.Pending),
+						gomock.Eq(condition.Pending),
 					).
 					Return(
-						[]*ptypes.Condition{
+						[]*condition.Condition{
 							{
-								Kind:       ptypes.FirmwareInstall,
-								State:      ptypes.Pending,
+								Kind:       condition.FirmwareInstall,
+								State:      condition.Pending,
 								Status:     []byte(`{"hello":"world"}`),
 								Parameters: parameters,
 							},
 							{
-								Kind:       ptypes.InventoryOutofband,
-								State:      ptypes.Pending,
+								Kind:       condition.Inventory,
+								State:      condition.Pending,
 								Status:     []byte(`{"hello":"world"}`),
 								Parameters: nil,
 							},
@@ -490,16 +490,16 @@ func TestIntegration_ConditionsList(t *testing.T) {
 					StatusCode: 200,
 					Records: &v1types.ConditionsResponse{
 						ServerID: serverID,
-						Conditions: []*ptypes.Condition{
+						Conditions: []*condition.Condition{
 							{
-								Kind:       ptypes.FirmwareInstall,
-								State:      ptypes.Pending,
+								Kind:       condition.FirmwareInstall,
+								State:      condition.Pending,
 								Status:     []byte(`{"hello":"world"}`),
 								Parameters: parameters,
 							},
 							{
-								Kind:       ptypes.InventoryOutofband,
-								State:      ptypes.Pending,
+								Kind:       condition.Inventory,
+								State:      condition.Pending,
 								Status:     []byte(`{"hello":"world"}`),
 								Parameters: nil,
 							},
@@ -511,7 +511,7 @@ func TestIntegration_ConditionsList(t *testing.T) {
 		},
 		{
 			"404 response",
-			ptypes.Active,
+			condition.Active,
 			// mock repository
 			func(r *store.MockRepository) {
 				// lookup existing condition
@@ -519,7 +519,7 @@ func TestIntegration_ConditionsList(t *testing.T) {
 					List(
 						gomock.Any(),
 						gomock.Eq(serverID),
-						gomock.Eq(ptypes.Active),
+						gomock.Eq(condition.Active),
 					).
 					Return(
 						nil,
@@ -536,7 +536,7 @@ func TestIntegration_ConditionsList(t *testing.T) {
 		},
 		{
 			"400 response",
-			ptypes.ConditionState("invalid"),
+			condition.State("invalid"),
 			nil,
 			func() *v1types.ServerResponse {
 				return &v1types.ServerResponse{
@@ -583,7 +583,7 @@ func TestIntegration_ConditionsCreate(t *testing.T) {
 
 	testcases := []struct {
 		name                string
-		conditionKind       ptypes.ConditionKind
+		conditionKind       condition.Kind
 		payload             v1types.ConditionCreate
 		mockStore           func(r *store.MockRepository)
 		expectResponse      func() *v1types.ServerResponse
@@ -591,7 +591,7 @@ func TestIntegration_ConditionsCreate(t *testing.T) {
 	}{
 		{
 			"valid payload sent",
-			ptypes.FirmwareInstall,
+			condition.FirmwareInstall,
 			v1types.ConditionCreate{Parameters: []byte(`{"hello":"world"}`)},
 			// mock repository
 			func(r *store.MockRepository) {
@@ -599,7 +599,7 @@ func TestIntegration_ConditionsCreate(t *testing.T) {
 					Get(
 						gomock.Any(),
 						gomock.Eq(serverID),
-						gomock.Eq(ptypes.FirmwareInstall),
+						gomock.Eq(condition.FirmwareInstall),
 					).
 					Return(
 						nil,
@@ -622,11 +622,11 @@ func TestIntegration_ConditionsCreate(t *testing.T) {
 						gomock.Eq(serverID),
 						gomock.Any(),
 					).
-					DoAndReturn(func(_ context.Context, _ uuid.UUID, c *ptypes.Condition) error {
-						assert.Equal(t, ptypes.ConditionStructVersion, c.Version, "condition version mismatch")
-						assert.Equal(t, ptypes.FirmwareInstall, c.Kind, "condition kind mismatch")
+					DoAndReturn(func(_ context.Context, _ uuid.UUID, c *condition.Condition) error {
+						assert.Equal(t, condition.ConditionStructVersion, c.Version, "condition version mismatch")
+						assert.Equal(t, condition.FirmwareInstall, c.Kind, "condition kind mismatch")
 						assert.Equal(t, json.RawMessage(`{"hello":"world"}`), c.Parameters, "condition parameters mismatch")
-						assert.Equal(t, ptypes.Pending, c.State, "condition state mismatch")
+						assert.Equal(t, condition.Pending, c.State, "condition state mismatch")
 						return nil
 					}).
 					Times(1)
@@ -641,7 +641,7 @@ func TestIntegration_ConditionsCreate(t *testing.T) {
 		},
 		{
 			"400 response",
-			ptypes.FirmwareInstall,
+			condition.FirmwareInstall,
 			v1types.ConditionCreate{Parameters: []byte(`{"hello":"world"}`)},
 			// mock repository
 			func(r *store.MockRepository) {
@@ -650,12 +650,12 @@ func TestIntegration_ConditionsCreate(t *testing.T) {
 					Get(
 						gomock.Any(),
 						gomock.Eq(serverID),
-						gomock.Eq(ptypes.FirmwareInstall),
+						gomock.Eq(condition.FirmwareInstall),
 					).
 					Return(
-						&ptypes.Condition{
-							Kind:  ptypes.FirmwareInstall,
-							State: ptypes.Active,
+						&condition.Condition{
+							Kind:  condition.FirmwareInstall,
+							State: condition.Active,
 						},
 						nil).
 					Times(1)
@@ -705,7 +705,7 @@ func TestIntegration_ConditionsUpdate(t *testing.T) {
 
 	testcases := []struct {
 		name                string
-		conditionKind       ptypes.ConditionKind
+		conditionKind       condition.Kind
 		payload             v1types.ConditionUpdate
 		mockStore           func(r *store.MockRepository)
 		expectResponse      func() *v1types.ServerResponse
@@ -713,9 +713,9 @@ func TestIntegration_ConditionsUpdate(t *testing.T) {
 	}{
 		{
 			"valid payload sent",
-			ptypes.FirmwareInstall,
+			condition.FirmwareInstall,
 			v1types.ConditionUpdate{
-				State:           ptypes.Active,
+				State:           condition.Active,
 				Status:          []byte(`{"hello":"world"}`),
 				ResourceVersion: 1,
 			},
@@ -727,11 +727,11 @@ func TestIntegration_ConditionsUpdate(t *testing.T) {
 					Get(
 						gomock.Any(),
 						gomock.Eq(serverID),
-						gomock.Eq(ptypes.FirmwareInstall),
+						gomock.Eq(condition.FirmwareInstall),
 					).
-					Return(&ptypes.Condition{ // condition present
-						Kind:            ptypes.FirmwareInstall,
-						State:           ptypes.Pending,
+					Return(&condition.Condition{ // condition present
+						Kind:            condition.FirmwareInstall,
+						State:           condition.Pending,
 						Status:          []byte(`{"hello":"world"}`),
 						ResourceVersion: 1,
 					}, nil).
@@ -756,9 +756,9 @@ func TestIntegration_ConditionsUpdate(t *testing.T) {
 		},
 		{
 			"404 response",
-			ptypes.FirmwareInstall,
+			condition.FirmwareInstall,
 			v1types.ConditionUpdate{
-				State:           ptypes.Active,
+				State:           condition.Active,
 				Status:          []byte(`{"hello":"world"}`),
 				ResourceVersion: 1,
 			},
@@ -770,7 +770,7 @@ func TestIntegration_ConditionsUpdate(t *testing.T) {
 					Get(
 						gomock.Any(),
 						gomock.Eq(serverID),
-						gomock.Eq(ptypes.FirmwareInstall),
+						gomock.Eq(condition.FirmwareInstall),
 					).
 					Return(nil, nil).
 					Times(1)
@@ -829,21 +829,21 @@ func TestIntegration_ConditionsDelete(t *testing.T) {
 
 	testcases := []struct {
 		name                string
-		conditionKind       ptypes.ConditionKind
+		conditionKind       condition.Kind
 		mockStore           func(r *store.MockRepository)
 		expectResponse      func() *v1types.ServerResponse
 		expectErrorContains string
 	}{
 		{
 			"valid response",
-			ptypes.FirmwareInstall,
+			condition.FirmwareInstall,
 			// mock repository
 			func(r *store.MockRepository) {
 				r.EXPECT().
 					Delete(
 						gomock.Any(),
 						gomock.Eq(serverID),
-						gomock.Eq(ptypes.FirmwareInstall),
+						gomock.Eq(condition.FirmwareInstall),
 					).
 					Return(nil).
 					Times(1)

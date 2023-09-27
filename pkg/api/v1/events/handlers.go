@@ -17,7 +17,7 @@ import (
 	"go.opentelemetry.io/otel"
 
 	v1types "github.com/metal-toolbox/conditionorc/pkg/api/v1/types"
-	ptypes "github.com/metal-toolbox/conditionorc/pkg/types"
+	condition "github.com/metal-toolbox/rivets/condition"
 )
 
 const (
@@ -166,24 +166,24 @@ func (h *Handler) ServerserviceEvent(ctx context.Context, ev events.Message) {
 			return
 		}
 
-		condition := &ptypes.Condition{
+		conditionFromEvent := &condition.Condition{
 			ID:         uuid.New(),
-			Kind:       ptypes.InventoryOutofband, // TODO: change, once the condition types package is moved into a shared package
-			State:      ptypes.Pending,
+			Kind:       condition.Inventory, // TODO: change, once the condition types package is moved into a shared package
+			State:      condition.Pending,
 			Exclusive:  false,
 			Parameters: byt, // pass the incoming message data to Alloy
 		}
 
-		if err := h.repository.Create(otelCtx, uuid.MustParse(incoming.ID), condition); err != nil {
+		if err := h.repository.Create(otelCtx, uuid.MustParse(incoming.ID), conditionFromEvent); err != nil {
 			h.logger.WithError(err).Error("error creating condition on server")
 			h.nakEvent(ev)
 			return
 		}
 
 		inventorySubject := fmt.Sprintf("servers.%s.inventory.outofband", string(facility))
-		if err := h.stream.Publish(otelCtx, inventorySubject, condition.MustBytes()); err != nil {
+		if err := h.stream.Publish(otelCtx, inventorySubject, conditionFromEvent.MustBytes()); err != nil {
 			h.logger.WithError(err).WithFields(
-				logrus.Fields{"condition_id": condition.ID},
+				logrus.Fields{"condition_id": conditionFromEvent.ID},
 			).Error("condition publish returned an error")
 			h.nakEvent(ev) // XXX: repeated Creates *must not* fail or this message will give us an explosion of errors
 			return
@@ -191,8 +191,8 @@ func (h *Handler) ServerserviceEvent(ctx context.Context, ev events.Message) {
 
 		h.logger.WithFields(
 			logrus.Fields{
-				"id":        condition.ID,
-				"condition": condition.Kind,
+				"id":        conditionFromEvent.ID,
+				"condition": conditionFromEvent.Kind,
 			},
 		).Info("condition published")
 		h.ackEvent(ev)

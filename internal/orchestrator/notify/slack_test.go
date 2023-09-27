@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	v1types "github.com/metal-toolbox/conditionorc/pkg/api/v1/types"
-	ptypes "github.com/metal-toolbox/conditionorc/pkg/types"
+	condition "github.com/metal-toolbox/rivets/condition"
 
 	"github.com/google/uuid"
 	"github.com/sirupsen/logrus"
@@ -53,19 +53,19 @@ func TestSlackSend(t *testing.T) {
 		ConditionUpdate: v1types.ConditionUpdate{
 			ConditionID: condID,
 			ServerID:    uuid.New(),
-			State:       ptypes.Pending,
+			State:       condition.Pending,
 			Status:      []byte(`{ "msg":"Hi Vince!" }`),
 		},
-		Kind: ptypes.FirmwareInstall,
+		Kind: condition.FirmwareInstall,
 	}
 
 	err := notifier.Send(update)
 	require.NoError(t, err)
 	entry, ok := notifier.trk[condID]
 	require.True(t, ok)
-	require.Equal(t, string(ptypes.Pending), entry.ConditionState) // weak test >.>;
+	require.Equal(t, string(condition.Pending), entry.ConditionState) // weak test >.>;
 
-	update.State = ptypes.Failed // oh no! :(
+	update.State = condition.Failed // oh no! :(
 	err = notifier.Send(update)
 	require.NoError(t, err)
 	entry, ok = notifier.trk[condID]

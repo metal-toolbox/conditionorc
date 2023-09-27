@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	ptypes "github.com/metal-toolbox/conditionorc/pkg/types"
+	condition "github.com/metal-toolbox/rivets/condition"
 	"github.com/pkg/errors"
 
 	"go.hollow.sh/toolbox/events/registry"
@@ -27,24 +27,24 @@ type ServerResponse struct {
 
 // ConditionsResponse is the response returned for listing multiple conditions on a server.
 type ConditionsResponse struct {
-	ServerID   uuid.UUID           `json:"serverID,omitempty"`
-	Conditions []*ptypes.Condition `json:"conditions,omitempty"`
+	ServerID   uuid.UUID              `json:"serverID,omitempty"`
+	Conditions []*condition.Condition `json:"conditions,omitempty"`
 }
 
 // ConditionCreate is the request payload to create a condition with its parameters on server.
 type ConditionCreate struct {
-	Exclusive  bool            `json:"exclusive"`
-	Parameters json.RawMessage `json:"parameters"`
-	Fault      *ptypes.Fault   `json:"fault,omitempty"`
+	Exclusive  bool             `json:"exclusive"`
+	Parameters json.RawMessage  `json:"parameters"`
+	Fault      *condition.Fault `json:"fault,omitempty"`
 }
 
 // NewCondition returns a new Condition type.
-func (c *ConditionCreate) NewCondition(kind ptypes.ConditionKind) *ptypes.Condition {
-	return &ptypes.Condition{
+func (c *ConditionCreate) NewCondition(kind condition.Kind) *condition.Condition {
+	return &condition.Condition{
 		ID:         uuid.New(),
-		Version:    ptypes.ConditionStructVersion,
+		Version:    condition.ConditionStructVersion,
 		Kind:       kind,
-		State:      ptypes.Pending,
+		State:      condition.Pending,
 		Exclusive:  c.Exclusive,
 		Parameters: c.Parameters,
 		Fault:      c.Fault,
@@ -53,11 +53,11 @@ func (c *ConditionCreate) NewCondition(kind ptypes.ConditionKind) *ptypes.Condit
 
 // ConditionUpdate is the request payload to update an existing condition.
 type ConditionUpdate struct {
-	ConditionID     uuid.UUID             `json:"conditionID"`
-	ServerID        uuid.UUID             `json:"serverID"`
-	State           ptypes.ConditionState `json:"state,omitempty"`
-	Status          json.RawMessage       `json:"status,omitempty"`
-	ResourceVersion int64                 `json:"resourceVersion"`
+	ConditionID     uuid.UUID       `json:"conditionID"`
+	ServerID        uuid.UUID       `json:"serverID"`
+	State           condition.State `json:"state,omitempty"`
+	Status          json.RawMessage `json:"status,omitempty"`
+	ResourceVersion int64           `json:"resourceVersion"`
 }
 
 func (c *ConditionUpdate) Validate() error {
@@ -83,8 +83,8 @@ func (c *ConditionUpdate) Validate() error {
 // ConditionUpdateEvent is the payload received for a condition update over the event stream.
 type ConditionUpdateEvent struct {
 	ConditionUpdate
-	Kind                  ptypes.ConditionKind `json:"kind"`
-	UpdatedAt             time.Time            `json:"updatedAt"`
+	Kind                  condition.Kind `json:"kind"`
+	UpdatedAt             time.Time      `json:"updatedAt"`
 	registry.ControllerID `json:"controllerID"`
 }
 
@@ -123,7 +123,7 @@ func (c *ConditionUpdateEvent) Validate() error {
 // The resourceVersion is not updated here and is left for the repository Store to update.
 //
 // This method makes sure that update does not overwrite existing data inadvertently.
-func (c *ConditionUpdate) MergeExisting(existing *ptypes.Condition, compareResourceVersion bool) (*ptypes.Condition, error) {
+func (c *ConditionUpdate) MergeExisting(existing *condition.Condition, compareResourceVersion bool) (*condition.Condition, error) {
 	// 1. condition must already exist for update.
 	if existing == nil {
 		return nil, errBadUpdateTarget
@@ -144,7 +144,7 @@ func (c *ConditionUpdate) MergeExisting(existing *ptypes.Condition, compareResou
 		return nil, errInvalidStateTransition
 	}
 
-	return &ptypes.Condition{
+	return &condition.Condition{
 		Version:               existing.Version,
 		ID:                    existing.ID,
 		Kind:                  existing.Kind,

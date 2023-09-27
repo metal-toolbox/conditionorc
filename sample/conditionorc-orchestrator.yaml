@@ -4,23 +4,12 @@ store_kind: serverservice
 serverservice:
   endpoint: http://serverservice:8000
   disable_oauth: true
-  facility_code: dc13
+  facility_code: sandbox
 conditions:
-  - kind: inventoryOutofband
+  - kind: inventory
     exclusive: false
-    failOnCheckpointError: false
-  - kind: firmwareInstallOutofband
+  - kind: firmwareInstall
     exclusive: true
-    failOnCheckpointError: true
-  - kind: resetBmc
-    exclusive: true
-    failOnCheckpointError: false
-  - kind: changeBmcPassword
-    exclusive: true
-    failOnCheckpointError: true
-  - kind: provisionDevice
-    exclusive: true
-    failOnCheckpointError: false
 # API server publishes commands when conditions are created.
 events_broker_kind: nats
 nats:
