@@ -9,16 +9,17 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/metal-toolbox/conditionorc/internal/status"
-	v1types "github.com/metal-toolbox/conditionorc/pkg/api/v1/types"
-	condition "github.com/metal-toolbox/rivets/condition"
+	"github.com/nats-io/nats.go"
+	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
+	"go.hollow.sh/toolbox/events/pkg/kv"
+	"go.hollow.sh/toolbox/events/registry"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/trace"
 
-	"github.com/nats-io/nats.go"
-	"github.com/pkg/errors"
-	"go.hollow.sh/toolbox/events/pkg/kv"
-	"go.hollow.sh/toolbox/events/registry"
+	v1types "github.com/metal-toolbox/conditionorc/pkg/api/v1/types"
+	condition "github.com/metal-toolbox/rivets/condition"
+	rkv "github.com/metal-toolbox/rivets/kv"
 )
 
 var (
@@ -174,19 +175,6 @@ func parseStatusKVKey(key string) (*statusKey, error) {
 	}, nil
 }
 
-// XXX: This is a temporary subset of the StatusValue from Flasher and the rivets repo.
-// it needs to live here until both Flasher and Alloy have integrated with rivets and
-// deployed.
-type controllerStatus struct {
-	UpdatedAt time.Time       `json:"updated"`
-	TraceID   string          `json:"traceID"`
-	SpanID    string          `json:"spanID"`
-	Target    string          `json:"target"`
-	State     string          `json:"state"`
-	Status    json.RawMessage `json:"status"`
-	WorkerID  string          `json:"worker"`
-}
-
 // eventUpdateFromKV converts the stored rivets.StatusValue (the value from the KV) to a
 // ConditionOrchestrator-native type that ConditionOrc can more-easily use for its
 // own purposes.
@@ -199,7 +187,7 @@ func eventUpdateFromKV(ctx context.Context, kve nats.KeyValueEntry,
 	}
 
 	byt := kve.Value()
-	cs := controllerStatus{}
+	cs := rkv.StatusValue{}
 	//nolint:govet // you and gocritic can argue about it outside.
 	if err := json.Unmarshal(byt, &cs); err != nil {
 		return nil, err
