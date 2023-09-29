@@ -6,13 +6,14 @@ import (
 	"sync"
 	"time"
 
-	condition "github.com/metal-toolbox/rivets/condition"
 	"github.com/pkg/errors"
 
 	"github.com/nats-io/nats.go"
 	"github.com/sirupsen/logrus"
 	"go.hollow.sh/toolbox/events"
 	"go.hollow.sh/toolbox/events/pkg/kv"
+
+	rctypes "github.com/metal-toolbox/rivets/condition"
 )
 
 var (
@@ -28,7 +29,7 @@ var (
 // Any errors here are fatal, as we are failing to initialize something we are explicitly
 // configured for.
 func ConnectToKVStores(s events.Stream, log *logrus.Logger,
-	defs condition.Definitions, opts ...kv.Option,
+	defs rctypes.Definitions, opts ...kv.Option,
 ) {
 	js, ok := s.(*events.NatsJetstream)
 	if !ok {
@@ -58,7 +59,7 @@ func ConnectToKVStores(s events.Stream, log *logrus.Logger,
 	})
 }
 
-func getKVBucket(kind condition.Kind) (nats.KeyValue, error) {
+func getKVBucket(kind rctypes.Kind) (nats.KeyValue, error) {
 	if !kvReady {
 		return nil, errNotReady
 	}
@@ -72,7 +73,7 @@ func getKVBucket(kind condition.Kind) (nats.KeyValue, error) {
 
 // WatchConditionStatus specializes some generic NATS functionality, mainly to keep
 // the callers cleaner of the NATS-specific details.
-func WatchConditionStatus(ctx context.Context, kind condition.Kind, facility string) (nats.KeyWatcher, error) {
+func WatchConditionStatus(ctx context.Context, kind rctypes.Kind, facility string) (nats.KeyWatcher, error) {
 	bucket, err := getKVBucket(kind)
 	if err != nil {
 		return nil, err
@@ -86,7 +87,7 @@ func WatchConditionStatus(ctx context.Context, kind condition.Kind, facility str
 // GetConditionKV returns the raw NATS KeyValue interface for the bucket associated
 // with the given condition type. This is a really low-level access, but if you want
 // a handle to the raw NATS API, here it is.
-func GetConditionKV(kind condition.Kind) (nats.KeyValue, error) {
+func GetConditionKV(kind rctypes.Kind) (nats.KeyValue, error) {
 	bucket, err := getKVBucket(kind)
 	if err != nil {
 		return nil, err
@@ -97,7 +98,7 @@ func GetConditionKV(kind condition.Kind) (nats.KeyValue, error) {
 
 // DeleteCondition does what it says on the tin. If this does not return an error, the
 // KV entry is gone.
-func DeleteCondition(kind condition.Kind, facility, condID string) error {
+func DeleteCondition(kind rctypes.Kind, facility, condID string) error {
 	bucket, err := getKVBucket(kind)
 	if err != nil {
 		return err
@@ -107,7 +108,7 @@ func DeleteCondition(kind condition.Kind, facility, condID string) error {
 }
 
 // GetSingleCondition does exactly that given a kind, facility, and condition-id
-func GetSingleCondition(kind condition.Kind, facility, condID string) (nats.KeyValueEntry, error) {
+func GetSingleCondition(kind rctypes.Kind, facility, condID string) (nats.KeyValueEntry, error) {
 	bucket, err := getKVBucket(kind)
 	if err != nil {
 		return nil, err
@@ -123,7 +124,7 @@ func GetSingleCondition(kind condition.Kind, facility, condID string) (nats.KeyV
 
 // GetAllConditions returns all conditions for a specific type and facility. This includes any
 // entry in any state, provided it has not been reaped by TTL.
-func GetAllConditions(kind condition.Kind, facility string) ([]nats.KeyValueEntry, error) {
+func GetAllConditions(kind rctypes.Kind, facility string) ([]nats.KeyValueEntry, error) {
 	bucket, err := getKVBucket(kind)
 	if err != nil {
 		return nil, err

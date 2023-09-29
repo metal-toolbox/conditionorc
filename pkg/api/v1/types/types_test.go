@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	"github.com/google/uuid"
-	condition "github.com/metal-toolbox/rivets/condition"
+	rctypes "github.com/metal-toolbox/rivets/condition"
 	"github.com/stretchr/testify/require"
 )
 
@@ -16,7 +16,7 @@ func TestValidate(t *testing.T) {
 	require.Error(t, update.Validate(), "only ConditionID")
 	update.ServerID = uuid.New()
 	require.Error(t, update.Validate(), "ConditionID and ServerID")
-	update.State = condition.Failed
+	update.State = rctypes.Failed
 	require.Error(t, update.Validate(), "ConditionID, ServerID, State")
 	update.Status = []byte(`{"you":"lose"}`)
 	require.Error(t, update.Validate(), "ConditionID, ServerID, State, Status")
@@ -28,8 +28,8 @@ func TestConditionUpdate_mergeExisting(t *testing.T) {
 	tests := []struct {
 		name     string
 		update   *ConditionUpdate
-		existing *condition.Condition
-		want     *condition.Condition
+		existing *rctypes.Condition
+		want     *rctypes.Condition
 		wantErr  error
 	}{
 		{
@@ -42,14 +42,14 @@ func TestConditionUpdate_mergeExisting(t *testing.T) {
 		{
 			"resource version mismatch returns error",
 			&ConditionUpdate{ResourceVersion: 0},
-			&condition.Condition{ResourceVersion: 1},
+			&rctypes.Condition{ResourceVersion: 1},
 			nil,
 			errResourceVersionMismatch,
 		},
 		{
 			"transition state invalid error",
-			&ConditionUpdate{ResourceVersion: 1, State: condition.Active},
-			&condition.Condition{ResourceVersion: 1, State: condition.Failed},
+			&ConditionUpdate{ResourceVersion: 1, State: rctypes.Active},
+			&rctypes.Condition{ResourceVersion: 1, State: rctypes.Failed},
 			nil,
 			errInvalidStateTransition,
 		},
@@ -58,15 +58,15 @@ func TestConditionUpdate_mergeExisting(t *testing.T) {
 			&ConditionUpdate{
 				ConditionID:     uuid.New(),
 				ResourceVersion: 1,
-				State:           condition.Active,
+				State:           rctypes.Active,
 				Status:          []byte("{'foo': 'bar'}"),
 			},
-			&condition.Condition{
+			&rctypes.Condition{
 				ID:              uuid.New(),
-				Kind:            condition.FirmwareInstall,
+				Kind:            rctypes.FirmwareInstall,
 				Parameters:      nil,
 				ResourceVersion: 1,
-				State:           condition.Pending,
+				State:           rctypes.Pending,
 				Status:          []byte("{'woo': 'alala'}"),
 			},
 			nil,
@@ -78,23 +78,23 @@ func TestConditionUpdate_mergeExisting(t *testing.T) {
 				ConditionID:     uuid.MustParse("48e632e0-d0af-013b-9540-2cde48001122"),
 				ServerID:        uuid.MustParse("f2cd1ef8-c759-4049-905e-f6fdf61719a9"),
 				ResourceVersion: 1,
-				State:           condition.Active,
+				State:           rctypes.Active,
 				Status:          []byte("{'foo': 'bar'}"),
 			},
-			&condition.Condition{
-				Kind:            condition.FirmwareInstall,
+			&rctypes.Condition{
+				Kind:            rctypes.FirmwareInstall,
 				ID:              uuid.MustParse("48e632e0-d0af-013b-9540-2cde48001122"),
 				Parameters:      nil,
 				ResourceVersion: 1,
-				State:           condition.Pending,
+				State:           rctypes.Pending,
 				Status:          []byte("{'woo': 'alala'}"),
 			},
-			&condition.Condition{
+			&rctypes.Condition{
 				ID:              uuid.MustParse("48e632e0-d0af-013b-9540-2cde48001122"),
-				Kind:            condition.FirmwareInstall,
+				Kind:            rctypes.FirmwareInstall,
 				Parameters:      nil,
 				ResourceVersion: 1,
-				State:           condition.Active,
+				State:           rctypes.Active,
 				Status:          []byte("{'foo': 'bar'}"),
 			},
 			nil,

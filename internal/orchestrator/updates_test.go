@@ -11,8 +11,6 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/metal-toolbox/conditionorc/internal/status"
-	v1types "github.com/metal-toolbox/conditionorc/pkg/api/v1/types"
-	condition "github.com/metal-toolbox/rivets/condition"
 	"github.com/nats-io/nats-server/v2/server"
 	srvtest "github.com/nats-io/nats-server/v2/test"
 	"github.com/nats-io/nats.go"
@@ -23,7 +21,9 @@ import (
 	"go.hollow.sh/toolbox/events/registry"
 	"go.uber.org/goleak"
 
-	ftypes "github.com/metal-toolbox/flasher/types"
+	v1types "github.com/metal-toolbox/conditionorc/pkg/api/v1/types"
+	rctypes "github.com/metal-toolbox/rivets/condition"
+	rkv "github.com/metal-toolbox/rivets/kv"
 )
 
 var (
@@ -31,7 +31,7 @@ var (
 	js         nats.JetStreamContext
 	evJS       *events.NatsJetstream
 	logger     *logrus.Logger
-	defs       condition.Definitions
+	defs       rctypes.Definitions
 	liveWorker = registry.GetID("updates-test")
 )
 
@@ -82,15 +82,15 @@ func TestMain(m *testing.M) {
 	evJS = events.NewJetstreamFromConn(nc)
 	defer evJS.Close()
 
-	defs = condition.Definitions{
-		&condition.Definition{
-			Kind: condition.FirmwareInstall,
+	defs = rctypes.Definitions{
+		&rctypes.Definition{
+			Kind: rctypes.FirmwareInstall,
 		},
-		&condition.Definition{
-			Kind: condition.Inventory,
+		&rctypes.Definition{
+			Kind: rctypes.Inventory,
 		},
-		&condition.Definition{
-			Kind: condition.Kind("bogus"),
+		&rctypes.Definition{
+			Kind: rctypes.Kind("bogus"),
 		},
 	}
 
@@ -137,11 +137,11 @@ func TestEventNeedsReconciliation(t *testing.T) {
 	require.False(t, o.eventNeedsReconciliation(evt))
 
 	evt.UpdatedAt = time.Now().Add(-90 * time.Minute)
-	evt.ConditionUpdate.State = condition.Failed
+	evt.ConditionUpdate.State = rctypes.Failed
 
 	require.True(t, o.eventNeedsReconciliation(evt))
 
-	evt.ConditionUpdate.State = condition.Active
+	evt.ConditionUpdate.State = rctypes.Active
 	evt.ControllerID = registry.GetID("needs-reconciliation-test")
 
 	require.True(t, o.eventNeedsReconciliation(evt))
@@ -151,24 +151,24 @@ func TestEventNeedsReconciliation(t *testing.T) {
 }
 
 func TestEventUpdateFromKV(t *testing.T) {
-	writeHandle, err := status.GetConditionKV(condition.FirmwareInstall)
+	writeHandle, err := status.GetConditionKV(rctypes.FirmwareInstall)
 	require.NoError(t, err, "write handle")
 
 	cID := registry.GetID("test-app")
 
 	// add some KVs
-	sv1 := ftypes.StatusValue{
+	sv1 := rkv.StatusValue{
 		Target:   uuid.New().String(),
 		State:    "pending",
 		Status:   json.RawMessage(`{"msg":"some-status"}`),
 		WorkerID: cID.String(),
 	}
-	bogus := ftypes.StatusValue{
+	bogus := rkv.StatusValue{
 		Target: uuid.New().String(),
 		State:  "bogus",
 		Status: json.RawMessage(`{"msg":"some-status"}`),
 	}
-	noCID := ftypes.StatusValue{
+	noCID := rkv.StatusValue{
 		Target:    uuid.New().String(),
 		State:     "failed",
 		Status:    json.RawMessage(`{"msg":"some-status"}`),
@@ -193,21 +193,21 @@ func TestEventUpdateFromKV(t *testing.T) {
 	entry, err := writeHandle.Get(k1)
 	require.NoError(t, err)
 
-	upd1, err := eventUpdateFromKV(context.Background(), entry, condition.FirmwareInstall)
+	upd1, err := eventUpdateFromKV(context.Background(), entry, rctypes.FirmwareInstall)
 	require.NoError(t, err)
 	require.Equal(t, condID, upd1.ConditionUpdate.ConditionID)
-	require.Equal(t, condition.Pending, upd1.ConditionUpdate.State)
+	require.Equal(t, rctypes.Pending, upd1.ConditionUpdate.State)
 
 	// bogus state should error
 	entry, err = writeHandle.Get(k2)
 	require.NoError(t, err)
-	_, err = eventUpdateFromKV(context.Background(), entry, condition.FirmwareInstall)
+	_, err = eventUpdateFromKV(context.Background(), entry, rctypes.FirmwareInstall)
 	require.ErrorIs(t, errInvalidState, err)
 
 	// no controller id event should error as well
 	entry, err = writeHandle.Get(k3)
 	require.NoError(t, err)
-	_, err = eventUpdateFromKV(context.Background(), entry, condition.FirmwareInstall)
+	_, err = eventUpdateFromKV(context.Background(), entry, rctypes.FirmwareInstall)
 	require.ErrorIs(t, err, registry.ErrBadFormat)
 }
 

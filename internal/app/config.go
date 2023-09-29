@@ -8,10 +8,11 @@ import (
 
 	"github.com/metal-toolbox/conditionorc/internal/model"
 	"github.com/metal-toolbox/conditionorc/internal/orchestrator/notify"
-	condition "github.com/metal-toolbox/rivets/condition"
 	"github.com/pkg/errors"
 	"go.hollow.sh/toolbox/events"
 	"go.hollow.sh/toolbox/ginjwt"
+
+	rctypes "github.com/metal-toolbox/rivets/condition"
 )
 
 var ErrConfig = errors.New("configuration error")
@@ -41,7 +42,7 @@ type Configuration struct {
 	APIServerJWTAuth *ginjwt.AuthConfig `mapstructure:"ginjwt_auth"`
 
 	// ConditionDefinitions holds one or more condition definitions the conditionorc API, orchestrator support.
-	ConditionDefinitions condition.Definitions `mapstructure:"conditions"`
+	ConditionDefinitions rctypes.Definitions `mapstructure:"conditions"`
 
 	// APIOIDCOptions defines configuration to handle OIDC authn/authz for conditions API clients.
 	APIOIDCOptions APIOIDCOptions `mapstructure:"api_server_oidc"`
