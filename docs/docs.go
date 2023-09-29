@@ -287,13 +287,13 @@ const docTemplate = `{
             "type": "string",
             "enum": [
                 "firmwareInstall",
-                "virtualMediaMount",
-                "inventory"
+                "inventory",
+                "virtualMediaMount"
             ],
             "x-enum-varnames": [
                 "FirmwareInstall",
-                "VirtualMediaMount",
-                "Inventory"
+                "Inventory",
+                "VirtualMediaMount"
             ]
         },
         "condition.State": {

@@ -80,13 +80,13 @@ definitions:
   condition.Kind:
     enum:
     - firmwareInstall
-    - virtualMediaMount
     - inventory
+    - virtualMediaMount
     type: string
     x-enum-varnames:
     - FirmwareInstall
-    - VirtualMediaMount
     - Inventory
+    - VirtualMediaMount
   condition.State:
     enum:
     - pending
