@@ -17,7 +17,7 @@ import (
 	"go.opentelemetry.io/otel"
 
 	v1types "github.com/metal-toolbox/conditionorc/pkg/api/v1/types"
-	condition "github.com/metal-toolbox/rivets/condition"
+	rctypes "github.com/metal-toolbox/rivets/condition"
 )
 
 const (
@@ -166,10 +166,10 @@ func (h *Handler) ServerserviceEvent(ctx context.Context, ev events.Message) {
 			return
 		}
 
-		conditionFromEvent := &condition.Condition{
+		conditionFromEvent := &rctypes.Condition{
 			ID:         uuid.New(),
-			Kind:       condition.Inventory, // TODO: change, once the condition types package is moved into a shared package
-			State:      condition.Pending,
+			Kind:       rctypes.Inventory, // TODO: change, once the condition types package is moved into a shared package
+			State:      rctypes.Pending,
 			Exclusive:  false,
 			Parameters: byt, // pass the incoming message data to Alloy
 		}

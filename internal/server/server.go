@@ -11,11 +11,12 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/metal-toolbox/conditionorc/internal/store"
 	"github.com/metal-toolbox/conditionorc/pkg/api/v1/routes"
-	condition "github.com/metal-toolbox/rivets/condition"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"go.hollow.sh/toolbox/events"
 	"go.hollow.sh/toolbox/ginjwt"
+
+	rctypes "github.com/metal-toolbox/rivets/condition"
 )
 
 var (
@@ -34,7 +35,7 @@ type Server struct {
 	logger               *logrus.Logger
 	streamBroker         events.Stream
 	listenAddress        string
-	conditionDefinitions condition.Definitions
+	conditionDefinitions rctypes.Definitions
 	repository           store.Repository
 }
 
@@ -70,7 +71,7 @@ func WithStreamBroker(broker events.Stream) Option {
 }
 
 // WithConditionDefinitions sets the supported condition types.
-func WithConditionDefinitions(defs condition.Definitions) Option {
+func WithConditionDefinitions(defs rctypes.Definitions) Option {
 	return func(s *Server) {
 		s.conditionDefinitions = defs
 	}

@@ -11,10 +11,11 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	v1types "github.com/metal-toolbox/conditionorc/pkg/api/v1/types"
-	condition "github.com/metal-toolbox/rivets/condition"
 	"github.com/sirupsen/logrus"
 	"github.com/slack-go/slack"
+
+	v1types "github.com/metal-toolbox/conditionorc/pkg/api/v1/types"
+	rctypes "github.com/metal-toolbox/rivets/condition"
 )
 
 var postTimeout = 800 * time.Millisecond
@@ -68,7 +69,7 @@ func (ss *slackSender) Send(upd *v1types.ConditionUpdateEvent) error {
 	_, ts, err := ss.api.PostMessageContext(ctx, ss.ch, msgOpts...)
 
 	// special handling for the last update
-	if condition.StateIsComplete(upd.State) {
+	if rctypes.StateIsComplete(upd.State) {
 		delete(ss.trk, upd.ConditionID)
 		return err
 	}
@@ -89,9 +90,9 @@ func (ss *slackSender) optionsFromUpdate(upd *v1types.ConditionUpdate, kind stri
 	hdrStr := fmt.Sprintf("Condition: %s", upd.ConditionID.String())
 	var emojiStr string
 	switch upd.State {
-	case condition.Succeeded:
+	case rctypes.Succeeded:
 		emojiStr = ":white_check_mark:"
-	case condition.Failed:
+	case rctypes.Failed:
 		emojiStr = ":exclamation:"
 	}
 	stateStr := fmt.Sprintf("Type: _%s_\nState: *%s* %s", kind, string(upd.State), emojiStr)

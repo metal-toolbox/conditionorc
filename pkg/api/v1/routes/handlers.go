@@ -19,7 +19,7 @@ import (
 	"github.com/metal-toolbox/conditionorc/internal/metrics"
 	"github.com/metal-toolbox/conditionorc/internal/store"
 	v1types "github.com/metal-toolbox/conditionorc/pkg/api/v1/types"
-	condition "github.com/metal-toolbox/rivets/condition"
+	rctypes "github.com/metal-toolbox/rivets/condition"
 )
 
 var (
@@ -27,7 +27,7 @@ var (
 	ErrConditionExclusive = errors.New("exclusive condition present")
 )
 
-func (r *Routes) conditionKindValid(kind condition.Kind) bool {
+func (r *Routes) conditionKindValid(kind rctypes.Kind) bool {
 	found := r.conditionDefinitions.FindByKind(kind)
 	return found != nil
 }
@@ -62,7 +62,7 @@ func (r *Routes) serverConditionUpdate(c *gin.Context) (int, *v1types.ServerResp
 		}
 	}
 
-	kind := condition.Kind(c.Param("conditionKind"))
+	kind := rctypes.Kind(c.Param("conditionKind"))
 	if !r.conditionKindValid(kind) {
 		r.logger.WithFields(logrus.Fields{
 			"kind": kind,
@@ -151,7 +151,7 @@ func (r *Routes) serverConditionUpdate(c *gin.Context) (int, *v1types.ServerResp
 		}
 	}
 
-	if condition.StateIsComplete(update.State) {
+	if rctypes.StateIsComplete(update.State) {
 		metrics.ConditionCompleted.With(
 			prometheus.Labels{
 				"conditionKind": string(update.Kind),
@@ -197,7 +197,7 @@ func (r *Routes) serverConditionCreate(c *gin.Context) (int, *v1types.ServerResp
 		}
 	}
 
-	kind := condition.Kind(c.Param("conditionKind"))
+	kind := rctypes.Kind(c.Param("conditionKind"))
 	if !r.conditionKindValid(kind) {
 		r.logger.WithFields(logrus.Fields{
 			"kind": kind,
@@ -339,7 +339,7 @@ func (r *Routes) serverConditionCreate(c *gin.Context) (int, *v1types.ServerResp
 		Message: "condition set",
 		Records: &v1types.ConditionsResponse{
 			ServerID: serverID,
-			Conditions: []*condition.Condition{
+			Conditions: []*rctypes.Condition{
 				newCondition,
 			},
 		},
@@ -370,8 +370,8 @@ func (r *Routes) serverFacilityCode(ctx context.Context, serverID uuid.UUID) (st
 func (r *Routes) exclusiveNonFinalConditionExists(ctx context.Context, serverID uuid.UUID) error {
 	otelCtx, span := otel.Tracer(pkgName).Start(ctx, "Routes.exclusiveNonFinalConditionExists")
 	defer span.End()
-	for _, state := range condition.States() {
-		if condition.StateIsComplete(state) {
+	for _, state := range rctypes.States() {
+		if rctypes.StateIsComplete(state) {
 			continue
 		}
 
@@ -384,18 +384,18 @@ func (r *Routes) exclusiveNonFinalConditionExists(ctx context.Context, serverID 
 			return err
 		}
 
-		for _, condition := range existing {
-			if condition.Exclusive && condition.State == state {
+		for _, existingCondition := range existing {
+			if existingCondition.Exclusive && existingCondition.State == state {
 				r.logger.WithFields(logrus.Fields{
 					"serverID":    serverID.String(),
-					"conditionID": condition.ID.String(),
-					"kind":        condition.Kind,
-					"state":       condition.State,
+					"conditionID": existingCondition.ID.String(),
+					"kind":        existingCondition.Kind,
+					"state":       existingCondition.State,
 				}).Info("existing exclusive server condition found")
 				return errors.Wrap(
 					ErrConditionExclusive,
 					fmt.Sprintf("%s:%s condition exists in an incomplete state - %s",
-						condition.ID.String(), condition.Kind, string(condition.State)),
+						existingCondition.ID.String(), existingCondition.Kind, string(existingCondition.State)),
 				)
 			}
 		}
@@ -412,7 +412,7 @@ func RegisterSpanEvent(span trace.Span, serverID, conditionID, conditionKind, ev
 	))
 }
 
-func (r *Routes) publishCondition(ctx context.Context, serverID uuid.UUID, facilityCode string, publishCondition *condition.Condition) error {
+func (r *Routes) publishCondition(ctx context.Context, serverID uuid.UUID, facilityCode string, publishCondition *rctypes.Condition) error {
 	errPublish := errors.New("error publishing condition")
 
 	otelCtx, span := otel.Tracer(pkgName).Start(
@@ -485,7 +485,7 @@ func (r *Routes) serverConditionDelete(c *gin.Context) (int, *v1types.ServerResp
 		}
 	}
 
-	kind := condition.Kind(c.Param("conditionKind"))
+	kind := rctypes.Kind(c.Param("conditionKind"))
 	if !r.conditionKindValid(kind) {
 		r.logger.WithFields(logrus.Fields{
 			"kind": kind,
@@ -535,8 +535,8 @@ func (r *Routes) serverConditionList(c *gin.Context) (int, *v1types.ServerRespon
 	}
 
 	// XXX: should this be condition_state in the gin Context?
-	state := condition.State(c.Param("conditionState"))
-	if state != "" && !condition.StateIsValid(state) {
+	state := rctypes.State(c.Param("conditionState"))
+	if state != "" && !rctypes.StateIsValid(state) {
 		return http.StatusBadRequest, &v1types.ServerResponse{
 			Message: "unsupported condition state: " + string(state),
 		}
@@ -586,7 +586,7 @@ func (r *Routes) serverConditionGet(c *gin.Context) (int, *v1types.ServerRespons
 		}
 	}
 
-	kind := condition.Kind(c.Param("conditionKind"))
+	kind := rctypes.Kind(c.Param("conditionKind"))
 	if !r.conditionKindValid(kind) {
 		return http.StatusBadRequest, &v1types.ServerResponse{
 			Message: "unsupported condition kind: " + string(kind),
@@ -615,7 +615,7 @@ func (r *Routes) serverConditionGet(c *gin.Context) (int, *v1types.ServerRespons
 	return http.StatusOK, &v1types.ServerResponse{
 		Records: &v1types.ConditionsResponse{
 			ServerID: serverID,
-			Conditions: []*condition.Condition{
+			Conditions: []*rctypes.Condition{
 				found,
 			},
 		},

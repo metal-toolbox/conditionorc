@@ -6,14 +6,13 @@ import (
 	"sync"
 	"testing"
 
-	v1types "github.com/metal-toolbox/conditionorc/pkg/api/v1/types"
-	condition "github.com/metal-toolbox/rivets/condition"
-
 	"github.com/google/uuid"
 	"github.com/sirupsen/logrus"
 	"github.com/slack-go/slack"
-
 	"github.com/stretchr/testify/require"
+
+	v1types "github.com/metal-toolbox/conditionorc/pkg/api/v1/types"
+	rctypes "github.com/metal-toolbox/rivets/condition"
 )
 
 // cribbed this test infra from the slack API open source code
@@ -32,7 +31,6 @@ func TestSlackSend(t *testing.T) {
 	http.DefaultServeMux = new(http.ServeMux)
 	http.HandleFunc("/chat.postMessage", func(rw http.ResponseWriter, r *http.Request) {
 		r.ParseForm()
-		t.Logf("request form: %s\n", r.Form)
 		r.Body.Close()
 		rw.Header().Set("Content-Type", "application/json")
 		response := []byte("{\"ok\": true}")
@@ -53,19 +51,19 @@ func TestSlackSend(t *testing.T) {
 		ConditionUpdate: v1types.ConditionUpdate{
 			ConditionID: condID,
 			ServerID:    uuid.New(),
-			State:       condition.Pending,
+			State:       rctypes.Pending,
 			Status:      []byte(`{ "msg":"Hi Vince!" }`),
 		},
-		Kind: condition.FirmwareInstall,
+		Kind: rctypes.FirmwareInstall,
 	}
 
 	err := notifier.Send(update)
 	require.NoError(t, err)
 	entry, ok := notifier.trk[condID]
 	require.True(t, ok)
-	require.Equal(t, string(condition.Pending), entry.ConditionState) // weak test >.>;
+	require.Equal(t, string(rctypes.Pending), entry.ConditionState) // weak test >.>;
 
-	update.State = condition.Failed // oh no! :(
+	update.State = rctypes.Failed // oh no! :(
 	err = notifier.Send(update)
 	require.NoError(t, err)
 	entry, ok = notifier.trk[condID]

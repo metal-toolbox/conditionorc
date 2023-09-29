@@ -8,12 +8,13 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/metal-toolbox/conditionorc/internal/metrics"
 	"github.com/metal-toolbox/conditionorc/internal/store"
-	v1types "github.com/metal-toolbox/conditionorc/pkg/api/v1/types"
-	condition "github.com/metal-toolbox/rivets/condition"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"go.hollow.sh/toolbox/events"
 	"go.hollow.sh/toolbox/ginjwt"
+
+	v1types "github.com/metal-toolbox/conditionorc/pkg/api/v1/types"
+	rctypes "github.com/metal-toolbox/rivets/condition"
 )
 
 const (
@@ -30,7 +31,7 @@ type Routes struct {
 	authMW               *ginjwt.Middleware
 	repository           store.Repository
 	streamBroker         events.Stream
-	conditionDefinitions condition.Definitions
+	conditionDefinitions rctypes.Definitions
 	logger               *logrus.Logger
 }
 
@@ -66,7 +67,7 @@ func WithAuthMiddleware(authMW *ginjwt.Middleware) Option {
 }
 
 // WithConditionDefinitions sets the supported condition types.
-func WithConditionDefinitions(defs condition.Definitions) Option {
+func WithConditionDefinitions(defs rctypes.Definitions) Option {
 	return func(r *Routes) {
 		r.conditionDefinitions = defs
 	}

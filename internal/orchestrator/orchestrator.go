@@ -8,12 +8,13 @@ import (
 	"github.com/metal-toolbox/conditionorc/internal/orchestrator/notify"
 	"github.com/metal-toolbox/conditionorc/internal/store"
 	"github.com/metal-toolbox/conditionorc/internal/version"
-	v1EventHandlers "github.com/metal-toolbox/conditionorc/pkg/api/v1/events"
-	condition "github.com/metal-toolbox/rivets/condition"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"go.hollow.sh/toolbox/events"
 	"go.opentelemetry.io/otel"
+
+	v1EventHandlers "github.com/metal-toolbox/conditionorc/pkg/api/v1/events"
+	rctypes "github.com/metal-toolbox/rivets/condition"
 )
 
 var (
@@ -38,7 +39,7 @@ type Orchestrator struct {
 	replicaCount  int
 	notifier      notify.Sender
 	facility      string
-	conditionDefs condition.Definitions
+	conditionDefs rctypes.Definitions
 }
 
 // Option type sets a parameter on the Orchestrator type.
@@ -104,7 +105,7 @@ func WithFacility(f string) Option {
 
 // WithConditionDefs sets the configured condition definitions where the orchestrator
 // can access them at runtime.
-func WithConditionDefs(defs condition.Definitions) Option {
+func WithConditionDefs(defs rctypes.Definitions) Option {
 	return func(o *Orchestrator) {
 		o.conditionDefs = defs
 	}

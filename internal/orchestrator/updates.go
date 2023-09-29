@@ -18,7 +18,7 @@ import (
 	"go.opentelemetry.io/otel/trace"
 
 	v1types "github.com/metal-toolbox/conditionorc/pkg/api/v1/types"
-	condition "github.com/metal-toolbox/rivets/condition"
+	rctypes "github.com/metal-toolbox/rivets/condition"
 	rkv "github.com/metal-toolbox/rivets/kv"
 )
 
@@ -115,7 +115,7 @@ func (o *Orchestrator) startConditionWatchers(ctx context.Context,
 
 		watcher, err := status.WatchConditionStatus(ctx, kind, o.facility)
 		if err != nil {
-			o.logger.WithError(err).WithField("condition.kind", string(kind)).Fatal("unable to get watcher")
+			o.logger.WithError(err).WithField("rctypes.kind", string(kind)).Fatal("unable to get watcher")
 		}
 
 		go func() {
@@ -123,24 +123,24 @@ func (o *Orchestrator) startConditionWatchers(ctx context.Context,
 			for keepRunning := true; keepRunning; {
 				select {
 				case <-ctx.Done():
-					o.logger.WithField("condition.kind", string(kind)).Info("stopping KV update listener")
+					o.logger.WithField("rctypes.kind", string(kind)).Info("stopping KV update listener")
 					keepRunning = false
 					//nolint:errcheck,gocritic
 					watcher.Stop()
 				case entry := <-watcher.Updates():
 					if entry == nil {
-						o.logger.WithField("condition.kind", string(kind)).Debug("nil KV update")
+						o.logger.WithField("rctypes.kind", string(kind)).Debug("nil KV update")
 						continue
 					}
 
 					o.logger.WithFields(logrus.Fields{
-						"condition.kind": string(kind),
-						"entry.key":      entry.Key(),
+						"rctypes.kind": string(kind),
+						"entry.key":    entry.Key(),
 					}).Debug("KV update")
 
 					evt, err := eventUpdateFromKV(ctx, entry, kind)
 					if err != nil {
-						o.logger.WithError(err).WithField("condition.kind", string(kind)).
+						o.logger.WithError(err).WithField("rctypes.kind", string(kind)).
 							Warn("error transforming status data")
 						continue
 					}
@@ -179,7 +179,7 @@ func parseStatusKVKey(key string) (*statusKey, error) {
 // ConditionOrchestrator-native type that ConditionOrc can more-easily use for its
 // own purposes.
 func eventUpdateFromKV(ctx context.Context, kve nats.KeyValueEntry,
-	kind condition.Kind,
+	kind rctypes.Kind,
 ) (*v1types.ConditionUpdateEvent, error) {
 	parsedKey, err := parseStatusKVKey(kve.Key())
 	if err != nil {
@@ -199,8 +199,8 @@ func eventUpdateFromKV(ctx context.Context, kve nats.KeyValueEntry,
 		return nil, errors.Wrap(err, "parsing target id")
 	}
 
-	convState := condition.State(cs.State)
-	if !condition.StateIsValid(convState) {
+	convState := rctypes.State(cs.State)
+	if !rctypes.StateIsValid(convState) {
 		return nil, errInvalidState
 	}
 
@@ -251,7 +251,7 @@ func (o *Orchestrator) getEventsToReconcile(ctx context.Context) []*v1types.Cond
 
 		entries, err := status.GetAllConditions(kind, o.facility)
 		if err != nil {
-			o.logger.WithError(err).WithField("condition.kind", string(kind)).
+			o.logger.WithError(err).WithField("rctypes.kind", string(kind)).
 				Warn("reconciler error on condition lookup")
 		}
 
@@ -259,15 +259,15 @@ func (o *Orchestrator) getEventsToReconcile(ctx context.Context) []*v1types.Cond
 			evt, err := eventUpdateFromKV(ctx, kve, kind)
 			if err != nil {
 				o.logger.WithError(err).WithFields(logrus.Fields{
-					"condition.kind": string(kind),
-					"kv.key":         kve.Key(),
+					"rctypes.kind": string(kind),
+					"kv.key":       kve.Key(),
 				}).Warn("reconciler skipping malformed update")
 				continue
 			}
 			if o.eventNeedsReconciliation(evt) {
-				if !condition.StateIsComplete(evt.ConditionUpdate.State) {
+				if !rctypes.StateIsComplete(evt.ConditionUpdate.State) {
 					// we need to deal with this event, so mark it failed
-					evt.ConditionUpdate.State = condition.Failed
+					evt.ConditionUpdate.State = rctypes.Failed
 					evt.ConditionUpdate.Status = failedByReconciler
 				}
 				evts = append(evts, evt)
@@ -282,7 +282,7 @@ func (o *Orchestrator) eventUpdate(ctx context.Context, evt *v1types.ConditionUp
 		return errors.Wrap(err, "updating condition")
 	}
 
-	if condition.StateIsComplete(evt.ConditionUpdate.State) {
+	if rctypes.StateIsComplete(evt.ConditionUpdate.State) {
 		err := status.DeleteCondition(evt.Kind, o.facility, evt.ConditionUpdate.ConditionID.String())
 		if err != nil {
 			return errors.Wrap(err, "deleting event KV data")
@@ -300,7 +300,7 @@ func (o *Orchestrator) eventNeedsReconciliation(evt *v1types.ConditionUpdateEven
 	}
 
 	// if the event is in a final state it should be handled
-	if condition.StateIsComplete(evt.ConditionUpdate.State) {
+	if rctypes.StateIsComplete(evt.ConditionUpdate.State) {
 		return true
 	}
 

@@ -6,14 +6,14 @@ import (
 	"testing"
 	"time"
 
-	condition "github.com/metal-toolbox/rivets/condition"
-
 	"github.com/nats-io/nats-server/v2/server"
 	srvtest "github.com/nats-io/nats-server/v2/test"
 	"github.com/nats-io/nats.go"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
 	"go.hollow.sh/toolbox/events"
+
+	rctypes "github.com/metal-toolbox/rivets/condition"
 )
 
 func init() {
@@ -74,36 +74,36 @@ func TestStatusKV(t *testing.T) {
 	js, testDone := startTestJetStream(t)
 	defer testDone()
 
-	defs := condition.Definitions{
-		&condition.Definition{
-			Kind:      condition.Kind("test-event"),
+	defs := rctypes.Definitions{
+		&rctypes.Definition{
+			Kind:      rctypes.Kind("test-event"),
 			Exclusive: true,
 		},
 	}
 
 	// pre-ready returns an error
 	require.False(t, kvReady)
-	_, err := WatchConditionStatus(context.TODO(), condition.Kind("bogus"), "my-facility")
+	_, err := WatchConditionStatus(context.TODO(), rctypes.Kind("bogus"), "my-facility")
 	require.ErrorIs(t, err, errNotReady, "wrong error")
 
-	_, err = GetConditionKV(condition.Kind("bogus"))
+	_, err = GetConditionKV(rctypes.Kind("bogus"))
 	require.ErrorIs(t, err, errNotReady, "wrong error")
 
 	ConnectToKVStores(js, &logrus.Logger{}, defs)
 	require.True(t, kvReady)
 
 	// bogus condition name returns an error
-	_, err = WatchConditionStatus(context.TODO(), condition.Kind("bogus"), "my-facility")
+	_, err = WatchConditionStatus(context.TODO(), rctypes.Kind("bogus"), "my-facility")
 	require.ErrorIs(t, err, errNoKV, "wrong error")
 
-	_, err = GetConditionKV(condition.Kind("bogus"))
+	_, err = GetConditionKV(rctypes.Kind("bogus"))
 	require.ErrorIs(t, err, errNoKV, "wrong error")
 
 	// use the configured kind and get a real object back
-	_, err = WatchConditionStatus(context.TODO(), condition.Kind("test-event"), "my-facility")
+	_, err = WatchConditionStatus(context.TODO(), rctypes.Kind("test-event"), "my-facility")
 	require.NoError(t, err)
 
-	testKind := condition.Kind("test-event")
+	testKind := rctypes.Kind("test-event")
 	handle, err := GetConditionKV(testKind)
 	require.NoError(t, err)
 
