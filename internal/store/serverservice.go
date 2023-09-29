@@ -43,7 +43,7 @@ var (
 	ErrServerserviceAttribute = errors.New("error in serverservice attribute")
 
 	// ServerserviceConditionsNSFmtStr attribute namespace format string value for server condition attributes.
-	ServerserviceConditionsNSFmtStr = "sh.hollow.rctypes.%s"
+	ServerserviceConditionsNSFmtStr = "sh.hollow.condition.%s"
 
 	pkgName = "internal/store"
 
