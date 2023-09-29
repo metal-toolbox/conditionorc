@@ -1,18 +1,30 @@
-### ConditionOrc
+# Condition API and Orchestrator
 
-ConditionOrc provides the [conditions](https://github.com/metal-toolbox/architecture/blob/firmware-install-service/firmware-install-service.md#conditions) construct,
-for consumers wanting to execute actions on server hardware.
+ConditionOrc provides the [conditions](https://github.com/metal-toolbox/architecture/blob/firmware-install-service/firmware-install-service.md#conditions) construct, to execute exclusive and non-exclusive actions on server hardware.
 
 It does this by,
- - Providing a CRUD API to setting conditions like `firmwareInstall`, `Inventory` on a server.
- - Follows up on with the controllers to nudge them to reconcile those conditions.
+ - Exposing an API to request actions like `firmwareInstall`, `inventory` on a server.
+ - Then validating and publishing the request to the NATS Jetstream, where controllers like [Alloy](https://github.com/metal-toolbox/alloy) and [Flasher](https://github.com/metal-toolbox/flasher) carry out the actual work to fulfill the request.
+ - Following the status of the request and notifying using the configured notifier.
 
-For more information on how this fits all together, see
-[here](https://github.com/metal-toolbox/architecture/blob/firmware-install-service/firmware-install-service.md)
 
-##### Purposes
+Diagram depicts flow of a `firmwareInstall` Condition request
+```mermaid
+graph LR
+  u((mctl)) -- 1. Request a firmwareInstall on a server --> a(Condition-API)
+  a(Condition-API)-- 2. Query server info, validate request -->ss[(Serverservice)]
+  a(Condition-API)-- 3. Publish request to NATS -->n{{NATS Jetstream}}
+  b(Condition-Orchestrator)<-- 4. Watch KV updates from <br> flasher -->n{{NATS Jetstream}}
+  a(Condition-API) ~~~ b(Condition-Orchestrator)
+  b(Condition-Orchestrator)-- 5. Update Condition status -->ss[(Serverservice)]
+  b(Condition-Orchestrator)-- 6. Notify Condition status -->s[Slack]
+```
 
-- Expose a CRUD API for server conditions with the conditions stored in Serverservice as server Attributes.
-- Keep track of controllers active per condition, redistributes work if a controller is unavailable.
-- Lookup un-finalized conditions in Serverservice and publishes them with a time interval until they are finalized level based triggers.
-- Garbage collect conditions in Serverservice that are found to be idle.
+
+## Development
+
+Checkout the following resources for development and testing,
+
+- Condition request, response payload - [example](./sample/firmwareInstall.md).
+- For more information on how this fits all together - [architecture doc](https://github.com/metal-toolbox/architecture/blob/firmware-install-service/firmware-install-service.md).
+- For local development and testing with NATS and the controllers - [sandbox](https://github.com/metal-toolbox/sandbox).
