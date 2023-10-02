@@ -60,13 +60,14 @@ func (ss *slackSender) Send(upd *v1types.ConditionUpdateEvent) error {
 
 	msgOpts := ss.optionsFromUpdate(&upd.ConditionUpdate, string(upd.Kind))
 
-	if entry.MsgTimestamp != "" {
-		// this is not the first time we've sent a notification, add
-		// the timestamp so we make a thread
-		msgOpts = append(msgOpts, slack.MsgOptionTS(entry.MsgTimestamp))
+	var err error
+	if entry.MsgTimestamp == "" {
+		_, entry.MsgTimestamp, err = ss.api.PostMessageContext(ctx, ss.ch, msgOpts...)
+	} else {
+		// this is not the first time we've sent a notification, so edit the message instead
+		msgOpts = append(msgOpts, slack.MsgOptionAsUser(true))
+		_, _, _, err = ss.api.UpdateMessageContext(ctx, ss.ch, entry.MsgTimestamp, msgOpts...)
 	}
-
-	_, ts, err := ss.api.PostMessageContext(ctx, ss.ch, msgOpts...)
 
 	// special handling for the last update
 	if rctypes.StateIsComplete(upd.State) {
@@ -76,26 +77,23 @@ func (ss *slackSender) Send(upd *v1types.ConditionUpdateEvent) error {
 
 	entry.ConditionState = string(upd.State)
 	entry.ConditionStatus = string(upd.Status)
-	// we only need the timestamp for making threaded replies
-	// from the initial message
-	if entry.MsgTimestamp == "" {
-		entry.MsgTimestamp = ts
-	}
 	ss.trk[upd.ConditionID] = entry
 
 	return err
 }
 
 func (ss *slackSender) optionsFromUpdate(upd *v1types.ConditionUpdate, kind string) []slack.MsgOption {
-	hdrStr := fmt.Sprintf("Condition: %s", upd.ConditionID.String())
+	hdrStr := fmt.Sprintf("%s: %s", kind, upd.ConditionID.String())
 	var emojiStr string
 	switch upd.State {
 	case rctypes.Succeeded:
 		emojiStr = ":white_check_mark:"
 	case rctypes.Failed:
 		emojiStr = ":exclamation:"
+	default:
+		emojiStr = ":hourglass:"
 	}
-	stateStr := fmt.Sprintf("Type: _%s_\nState: *%s* %s", kind, string(upd.State), emojiStr)
+	stateStr := fmt.Sprintf("State: *%s* %s", string(upd.State), emojiStr)
 
 	marshaledStatus, err := json.Marshal(upd.Status)
 	if err != nil {

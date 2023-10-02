@@ -27,14 +27,23 @@ func startServer() {
 }
 
 func TestSlackSend(t *testing.T) {
-	// var timestampExpected bool
+	var postCalled, updateCalled bool
 	http.DefaultServeMux = new(http.ServeMux)
 	http.HandleFunc("/chat.postMessage", func(rw http.ResponseWriter, r *http.Request) {
 		r.ParseForm()
 		r.Body.Close()
 		rw.Header().Set("Content-Type", "application/json")
-		response := []byte("{\"ok\": true}")
+		response := []byte("{\"ok\": true, \"ts\": \"timestamp\"}")
 		rw.Write(response)
+		postCalled = true
+	})
+	http.HandleFunc("/chat.update", func(rw http.ResponseWriter, r *http.Request) {
+		r.ParseForm()
+		r.Body.Close()
+		rw.Header().Set("Content-Type", "application/json")
+		response := []byte("{\"ok\": true, \"ts\": \"new_timestamp\"}")
+		rw.Write(response)
+		updateCalled = true
 	})
 
 	once.Do(startServer)
@@ -62,10 +71,12 @@ func TestSlackSend(t *testing.T) {
 	entry, ok := notifier.trk[condID]
 	require.True(t, ok)
 	require.Equal(t, string(rctypes.Pending), entry.ConditionState) // weak test >.>;
+	require.True(t, postCalled)
 
 	update.State = rctypes.Failed // oh no! :(
 	err = notifier.Send(update)
 	require.NoError(t, err)
 	entry, ok = notifier.trk[condID]
 	require.False(t, ok)
+	require.True(t, updateCalled)
 }
