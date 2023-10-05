@@ -50,7 +50,7 @@ func (r *Routes) serverConditionUpdate(c *gin.Context) (int, *v1types.ServerResp
 	otelCtx, span := otel.Tracer(pkgName).Start(c.Request.Context(), "Routes.serverConditionUpdate")
 	span.SetAttributes(
 		attribute.KeyValue{Key: "conditionKind", Value: attribute.StringValue(c.Param("conditionKind"))},
-		attribute.KeyValue{Key: "serverid", Value: attribute.StringValue(c.Param("uuid"))})
+		attribute.KeyValue{Key: "serverId", Value: attribute.StringValue(c.Param("uuid"))})
 	defer span.End()
 	// XXX: should "uuid" be "server-uuid" or something?
 	serverID, err := uuid.Parse(c.Param("uuid"))
@@ -189,7 +189,7 @@ func (r *Routes) serverConditionCreate(c *gin.Context) (int, *v1types.ServerResp
 	otelCtx, span := otel.Tracer(pkgName).Start(c.Request.Context(), "Routes.serverConditionCreate")
 	span.SetAttributes(
 		attribute.KeyValue{Key: "conditionKind", Value: attribute.StringValue(c.Param("conditionKind"))},
-		attribute.KeyValue{Key: "serverid", Value: attribute.StringValue(c.Param("uuid"))})
+		attribute.KeyValue{Key: "serverId", Value: attribute.StringValue(c.Param("uuid"))})
 	defer span.End()
 
 	serverID, err := uuid.Parse(c.Param("uuid"))
@@ -481,7 +481,7 @@ func (r *Routes) serverConditionDelete(c *gin.Context) (int, *v1types.ServerResp
 	otelCtx, span := otel.Tracer(pkgName).Start(c.Request.Context(), "Routes.serverConditionDelete")
 	span.SetAttributes(
 		attribute.KeyValue{Key: "conditionKind", Value: attribute.StringValue(c.Param("conditionKind"))},
-		attribute.KeyValue{Key: "serverid", Value: attribute.StringValue(c.Param("uuid"))})
+		attribute.KeyValue{Key: "serverId", Value: attribute.StringValue(c.Param("uuid"))})
 	defer span.End()
 	serverID, err := uuid.Parse(c.Param("uuid"))
 	if err != nil {
@@ -539,7 +539,7 @@ func (r *Routes) serverConditionList(c *gin.Context) (int, *v1types.ServerRespon
 	otelCtx, span := otel.Tracer(pkgName).Start(c.Request.Context(), "Routes.serverConditionList")
 	span.SetAttributes(
 		attribute.KeyValue{Key: "conditionState", Value: attribute.StringValue(c.Param("conditionState"))},
-		attribute.KeyValue{Key: "serverid", Value: attribute.StringValue(c.Param("uuid"))})
+		attribute.KeyValue{Key: "serverId", Value: attribute.StringValue(c.Param("uuid"))})
 	defer span.End()
 	serverID, err := uuid.Parse(c.Param("uuid"))
 	if err != nil {
@@ -592,7 +592,7 @@ func (r *Routes) serverConditionGet(c *gin.Context) (int, *v1types.ServerRespons
 	otelCtx, span := otel.Tracer(pkgName).Start(c.Request.Context(), "Routes.serverConditionGet")
 	span.SetAttributes(
 		attribute.KeyValue{Key: "conditionKind", Value: attribute.StringValue(c.Param("conditionKind"))},
-		attribute.KeyValue{Key: "serverid", Value: attribute.StringValue(c.Param("uuid"))})
+		attribute.KeyValue{Key: "serverId", Value: attribute.StringValue(c.Param("uuid"))})
 	defer span.End()
 	serverID, err := uuid.Parse(c.Param("uuid"))
 	if err != nil {
