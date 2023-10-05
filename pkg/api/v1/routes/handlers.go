@@ -48,6 +48,9 @@ func (r *Routes) conditionKindValid(kind rctypes.Kind) bool {
 // @Router /servers/{uuid}/condition/{conditionKind} [put]
 func (r *Routes) serverConditionUpdate(c *gin.Context) (int, *v1types.ServerResponse) {
 	otelCtx, span := otel.Tracer(pkgName).Start(c.Request.Context(), "Routes.serverConditionUpdate")
+	span.SetAttributes(
+		attribute.KeyValue{Key: "conditionKind", Value: attribute.StringValue(c.Param("conditionKind"))},
+		attribute.KeyValue{Key: "serverid", Value: attribute.StringValue(c.Param("uuid"))})
 	defer span.End()
 	// XXX: should "uuid" be "server-uuid" or something?
 	serverID, err := uuid.Parse(c.Param("uuid"))
@@ -184,6 +187,9 @@ func (r *Routes) serverConditionUpdate(c *gin.Context) (int, *v1types.ServerResp
 // @Router /servers/{uuid}/condition/{conditionKind} [post]
 func (r *Routes) serverConditionCreate(c *gin.Context) (int, *v1types.ServerResponse) {
 	otelCtx, span := otel.Tracer(pkgName).Start(c.Request.Context(), "Routes.serverConditionCreate")
+	span.SetAttributes(
+		attribute.KeyValue{Key: "conditionKind", Value: attribute.StringValue(c.Param("conditionKind"))},
+		attribute.KeyValue{Key: "serverid", Value: attribute.StringValue(c.Param("uuid"))})
 	defer span.End()
 
 	serverID, err := uuid.Parse(c.Param("uuid"))
@@ -473,6 +479,9 @@ func (r *Routes) publishCondition(ctx context.Context, serverID uuid.UUID, facil
 // @Router /servers/{uuid}/condition/{conditionKind} [delete]
 func (r *Routes) serverConditionDelete(c *gin.Context) (int, *v1types.ServerResponse) {
 	otelCtx, span := otel.Tracer(pkgName).Start(c.Request.Context(), "Routes.serverConditionDelete")
+	span.SetAttributes(
+		attribute.KeyValue{Key: "conditionKind", Value: attribute.StringValue(c.Param("conditionKind"))},
+		attribute.KeyValue{Key: "serverid", Value: attribute.StringValue(c.Param("uuid"))})
 	defer span.End()
 	serverID, err := uuid.Parse(c.Param("uuid"))
 	if err != nil {
@@ -528,6 +537,9 @@ func (r *Routes) serverConditionDelete(c *gin.Context) (int, *v1types.ServerResp
 // @Router /servers/{uuid}/state/{conditionState} [get]
 func (r *Routes) serverConditionList(c *gin.Context) (int, *v1types.ServerResponse) {
 	otelCtx, span := otel.Tracer(pkgName).Start(c.Request.Context(), "Routes.serverConditionList")
+	span.SetAttributes(
+		attribute.KeyValue{Key: "conditionState", Value: attribute.StringValue(c.Param("conditionState"))},
+		attribute.KeyValue{Key: "serverid", Value: attribute.StringValue(c.Param("uuid"))})
 	defer span.End()
 	serverID, err := uuid.Parse(c.Param("uuid"))
 	if err != nil {
@@ -578,6 +590,9 @@ func (r *Routes) serverConditionList(c *gin.Context) (int, *v1types.ServerRespon
 // @Router /servers/{uuid}/condition/{conditionKind} [get]
 func (r *Routes) serverConditionGet(c *gin.Context) (int, *v1types.ServerResponse) {
 	otelCtx, span := otel.Tracer(pkgName).Start(c.Request.Context(), "Routes.serverConditionGet")
+	span.SetAttributes(
+		attribute.KeyValue{Key: "conditionKind", Value: attribute.StringValue(c.Param("conditionKind"))},
+		attribute.KeyValue{Key: "serverid", Value: attribute.StringValue(c.Param("uuid"))})
 	defer span.End()
 	serverID, err := uuid.Parse(c.Param("uuid"))
 	if err != nil {
