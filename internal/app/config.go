@@ -39,13 +39,10 @@ type Configuration struct {
 	StoreKind model.StoreKind `mapstructure:"store_kind"`
 
 	// APIServerJWTAuth sets the JWT verification configuration for the conditionorc API service.
-	APIServerJWTAuth *ginjwt.AuthConfig `mapstructure:"ginjwt_auth"`
+	APIServerJWTAuth []ginjwt.AuthConfig `mapstructure:"ginjwt_auth"`
 
 	// ConditionDefinitions holds one or more condition definitions the conditionorc API, orchestrator support.
 	ConditionDefinitions rctypes.Definitions `mapstructure:"conditions"`
-
-	// APIOIDCOptions defines configuration to handle OIDC authn/authz for conditions API clients.
-	APIOIDCOptions APIOIDCOptions `mapstructure:"api_server_oidc"`
 
 	// ServerserviceOptions defines the serverservice client configuration parameters
 	//
@@ -66,17 +63,6 @@ type Configuration struct {
 	Notifications notify.Configuration `mapstructure:"notifications"`
 }
 
-// APIOIDCOptions defines configuration to handle OIDC authn/authz for conditions API clients.
-type APIOIDCOptions struct {
-	EnabledOAuth     bool   `mapstructure:"enable_oauth"`
-	IssuerEndpoint   string `mapstructure:"issuer_endpoint"`
-	AudienceEndpoint string `mapstructure:"audience_endpoint"`
-	JWKSURI          string `mapstructure:"jwksuri"`
-	RolesClaim       string `mapstructure:"roles_claim"`
-	UsernameClaim    string `mapstructure:"username_claim"`
-}
-
-// ServerserviceOptions defines configuration for the Serverservice client.
 // https://github.com/metal-toolbox/hollow-serverservice
 type ServerserviceOptions struct {
 	EndpointURL          *url.URL
@@ -173,41 +159,16 @@ var (
 )
 
 func (a *App) apiServerJWTAuthParams() error {
-	if !a.v.GetBool("api.oidc.enabled") {
+	if !a.v.GetBool("oidc.enabled") {
 		return nil
 	}
 
-	errOIDCAuthParams := errors.New("conditions API OIDC Auth params not defined")
-
-	required := []string{
-		"audience.endpoint",
-		"issuer.endpoint",
-		"jwksuri",
-		"claims.roles",
-		"claims.username",
+	cfgs, err := ginjwt.GetAuthConfigsFromFlags(a.v)
+	if err != nil {
+		return err
 	}
-
-	var unset []string
-
-	for _, k := range required {
-		if a.v.GetString("api.oidc."+k) == "" {
-			unset = append(unset, "api.oidc."+k)
-		}
-	}
-
-	if len(unset) > 0 {
-		return errors.Wrap(errOIDCAuthParams, strings.Join(unset, ","))
-	}
-
-	a.Config.APIServerJWTAuth = &ginjwt.AuthConfig{
-		Enabled:       true,
-		Audience:      a.v.GetString("api.oidc.audience.endpoint"),
-		Issuer:        a.v.GetString("api.oidc.issuer.endpoint"),
-		JWKSURI:       a.v.GetString("api.oidc.jwksuri"),
-		LogFields:     a.v.GetStringSlice("api.oidc.log"),
-		RolesClaim:    a.v.GetString("api.oidc.claims.roles"),
-		UsernameClaim: a.v.GetString("api.oidc.claims.username"),
-	}
+	a.Logger.WithField("config.length", len(cfgs)).Debug("oidc configurations found")
+	a.Config.APIServerJWTAuth = cfgs
 
 	return nil
 }
