@@ -91,5 +91,6 @@ var cmdServer = &cobra.Command{
 // install command flags
 func init() {
 	rootCmd.AddCommand(cmdServer)
-	ginjwt.RegisterViperOIDCFlags(viper.GetViper(), cmdServer)
+	cmdServer.Flags().Bool("oidc", true, "use oidc auth")
+	ginjwt.BindFlagFromViperInst(viper.GetViper(), "oidc.enabled", cmdServer.Flags().Lookup("oidc"))
 }
