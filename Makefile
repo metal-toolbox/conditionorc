@@ -92,6 +92,10 @@ multistage-image:
 		--build-arg BUILD_DATE=$(BUILD_DATE) --label org.label-schema.schema-version=1.0 \
 		--label org.label-schema.vcs-ref=$(GIT_COMMIT_FULL) --label=org.label-schema.vcs-url=$(REPO)
 
+push-ms-devel: multistage-image
+	docker tag ${DOCKER_IMAGE}:latest localhost:5001/conditionorc:latest
+	docker push localhost:5001/conditionorc:latest
+	kind load docker-image localhost:5001/conditionorc:latest
 
 # https://gist.github.com/prwhite/8168133
 # COLORS

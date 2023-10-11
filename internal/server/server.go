@@ -31,7 +31,7 @@ var (
 // Server type holds attributes of the condition orc server
 type Server struct {
 	// Logger is the app logger
-	authMWConfig         *ginjwt.AuthConfig
+	authMWConfigs        []ginjwt.AuthConfig
 	logger               *logrus.Logger
 	streamBroker         events.Stream
 	listenAddress        string
@@ -78,9 +78,9 @@ func WithConditionDefinitions(defs rctypes.Definitions) Option {
 }
 
 // WithAuthMiddlewareConfig sets the auth middleware configuration.
-func WithAuthMiddlewareConfig(authMWConfig *ginjwt.AuthConfig) Option {
+func WithAuthMiddlewareConfig(authMWConfigs []ginjwt.AuthConfig) Option {
 	return func(s *Server) {
-		s.authMWConfig = authMWConfig
+		s.authMWConfigs = authMWConfigs
 	}
 }
 
@@ -104,8 +104,8 @@ func New(opts ...Option) *http.Server {
 	}
 
 	// add auth middleware
-	if s.authMWConfig != nil && s.authMWConfig.Enabled {
-		authMW, err := ginjwt.NewAuthMiddleware(*s.authMWConfig)
+	if s.authMWConfigs != nil {
+		authMW, err := ginjwt.NewMultiTokenMiddlewareFromConfigs(s.authMWConfigs...)
 		if err != nil {
 			s.logger.Fatal("failed to initialize auth middleware: ", "error", err)
 		}

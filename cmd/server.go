@@ -15,7 +15,9 @@ import (
 	"github.com/metal-toolbox/conditionorc/internal/server"
 	"github.com/metal-toolbox/conditionorc/internal/store"
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 	"go.hollow.sh/toolbox/events"
+	"go.hollow.sh/toolbox/ginjwt"
 )
 
 var shutdownTimeout = 10 * time.Second
@@ -56,7 +58,13 @@ var cmdServer = &cobra.Command{
 			server.WithStore(repository),
 			server.WithStreamBroker(streamBroker),
 			server.WithConditionDefinitions(app.Config.ConditionDefinitions),
-			server.WithAuthMiddlewareConfig(app.Config.APIServerJWTAuth),
+		}
+
+		if viper.GetViper().GetBool("oidc.enabled") {
+			app.Logger.Info("enabling OIDC")
+			options = append(options, server.WithAuthMiddlewareConfig(app.Config.APIServerJWTAuth))
+		} else {
+			app.Logger.Info("OIDC disabled")
 		}
 
 		srv := server.New(options...)
@@ -83,4 +91,6 @@ var cmdServer = &cobra.Command{
 // install command flags
 func init() {
 	rootCmd.AddCommand(cmdServer)
+	cmdServer.Flags().Bool("oidc", true, "use oidc auth")
+	ginjwt.BindFlagFromViperInst(viper.GetViper(), "oidc.enabled", cmdServer.Flags().Lookup("oidc"))
 }

@@ -11,7 +11,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"go.hollow.sh/toolbox/events"
-	"go.hollow.sh/toolbox/ginjwt"
+	"go.hollow.sh/toolbox/ginauth"
 
 	v1types "github.com/metal-toolbox/conditionorc/pkg/api/v1/types"
 	rctypes "github.com/metal-toolbox/rivets/condition"
@@ -28,7 +28,7 @@ var ginNoOp = func(_ *gin.Context) {
 
 // Routes type sets up the conditionorc API  router routes.
 type Routes struct {
-	authMW               *ginjwt.Middleware
+	authMW               *ginauth.MultiTokenMiddleware
 	repository           store.Repository
 	streamBroker         events.Stream
 	conditionDefinitions rctypes.Definitions
@@ -60,7 +60,7 @@ func WithLogger(logger *logrus.Logger) Option {
 }
 
 // WithAuthMiddleware sets the auth middleware on the routes type.
-func WithAuthMiddleware(authMW *ginjwt.Middleware) Option {
+func WithAuthMiddleware(authMW *ginauth.MultiTokenMiddleware) Option {
 	return func(r *Routes) {
 		r.authMW = authMW
 	}
@@ -115,15 +115,10 @@ func (r *Routes) composeAuthHandler(scopes []string) gin.HandlerFunc {
 	if r.authMW == nil {
 		return ginNoOp
 	}
-	return r.authMW.RequiredScopes(scopes)
+	return r.authMW.AuthRequired(scopes)
 }
 
 func (r *Routes) Routes(g *gin.RouterGroup) {
-	// JWT token verification.
-	if r.authMW != nil {
-		g.Use(r.authMW.AuthRequired())
-	}
-
 	servers := g.Group("/servers/:uuid")
 	{
 		// /servers/:uuid/state/:conditionState
