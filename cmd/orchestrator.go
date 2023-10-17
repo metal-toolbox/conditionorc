@@ -47,17 +47,17 @@ var cmdOrchestrator = &cobra.Command{
 			cancelFunc()
 		}()
 
-		repository, err := store.NewStore(ctx, app.Config, app.Config.ConditionDefinitions, app.Logger)
-		if err != nil {
-			app.Logger.Fatal(err)
-		}
-
 		streamBroker, err := events.NewStream(app.Config.NatsOptions)
 		if err != nil {
 			app.Logger.Fatal(err)
 		}
 
 		if err := streamBroker.Open(); err != nil {
+			app.Logger.Fatal(err)
+		}
+
+		repository, err := store.NewStore(ctx, app.Config, app.Config.ConditionDefinitions, app.Logger, streamBroker)
+		if err != nil {
 			app.Logger.Fatal(err)
 		}
 

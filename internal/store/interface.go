@@ -64,7 +64,7 @@ func NewStore(config *app.Configuration, conditionDefs rctypes.Definitions,
 
 	switch config.StoreKind {
 	case model.ServerserviceStore:
-		return &ServerService{
+		return &Serverservice{
 			config:               ssOpts,
 			conditionDefinitions: conditionDefs,
 			logger:               logger,
@@ -77,7 +77,7 @@ func NewStore(config *app.Configuration, conditionDefs rctypes.Definitions,
 	}
 }
 
-func getServerServiceClient(cfg *app.ServerserviceOptions, log *logrus.Logger) (*sserver.Client, error) {
+func getServerServiceClient(cfg *app.ServerserviceOptions, log *logrus.Logger) (*sservice.Client, error) {
 	var client *sservice.Client
 	var err error
 

@@ -32,17 +32,17 @@ var cmdServer = &cobra.Command{
 			log.Fatal(err)
 		}
 
-		repository, err := store.NewStore(cmd.Context(), app.Config, app.Config.ConditionDefinitions, app.Logger)
-		if err != nil {
-			app.Logger.Fatal(err)
-		}
-
 		streamBroker, err := events.NewStream(app.Config.NatsOptions)
 		if err != nil {
 			app.Logger.Fatal(err)
 		}
 
 		if err := streamBroker.Open(); err != nil {
+			app.Logger.Fatal(err)
+		}
+
+		repository, err := store.NewStore(app.Config, app.Config.ConditionDefinitions, app.Logger, streamBroker)
+		if err != nil {
 			app.Logger.Fatal(err)
 		}
 
