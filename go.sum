@@ -719,6 +719,8 @@ go.hollow.sh/serverservice v0.16.1 h1:BlrwKOPim+RGqJ2Efz/CZvD/W2pvFkDfg9XI1AaQSW
 go.hollow.sh/serverservice v0.16.1/go.mod h1:Zr99vSFO++ZlDjEf9rtPWi3TiMgMswJCW3D6LIFmMDM=
 go.hollow.sh/toolbox v0.6.1 h1:3E6JofImSCe63XayczbGfDxIXUjmBziMBBmbwook8WA=
 go.hollow.sh/toolbox v0.6.1/go.mod h1:nl+5RDDyYY/+wukOUzHHX2mOyWKRjlTOXUcGxny+tns=
+go.hollow.sh/toolbox v0.6.2 h1:g0qKvo7rVgZ05dh7qxbAymPixumCd4MxVbq9gs90/3c=
+go.hollow.sh/toolbox v0.6.2/go.mod h1:nl+5RDDyYY/+wukOUzHHX2mOyWKRjlTOXUcGxny+tns=
 go.infratographer.com/x v0.3.7 h1:kkykoVtC8XrmvC4oZwHWa/15+dv9RhQHgSm8KoEb/Nc=
 go.opencensus.io v0.21.0/go.mod h1:mSImk1erAIZhrmZN+AvHh14ztQfjbGwt4TtuofqLduU=
 go.opencensus.io v0.22.0/go.mod h1:+kGneAE2xo2IficOXnaByMWTGM9T73dGwxeWcUqIpI8=
