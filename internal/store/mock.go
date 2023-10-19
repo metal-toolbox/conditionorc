@@ -110,35 +110,6 @@ func (mr *MockRepositoryMockRecorder) List(ctx, serverID, conditionState interfa
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "List", reflect.TypeOf((*MockRepository)(nil).List), ctx, serverID, conditionState)
 }
 
-// ListServersWithCondition mocks base method.
-func (m *MockRepository) ListServersWithCondition(ctx context.Context, conditionKind condition.Kind, conditionState condition.State) ([]*condition.ServerConditions, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ListServersWithCondition", ctx, conditionKind, conditionState)
-	ret0, _ := ret[0].([]*condition.ServerConditions)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// ListServersWithCondition indicates an expected call of ListServersWithCondition.
-func (mr *MockRepositoryMockRecorder) ListServersWithCondition(ctx, conditionKind, conditionState interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListServersWithCondition", reflect.TypeOf((*MockRepository)(nil).ListServersWithCondition), ctx, conditionKind, conditionState)
-}
-
-// Ping mocks base method.
-func (m *MockRepository) Ping(ctx context.Context) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Ping", ctx)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// Ping indicates an expected call of Ping.
-func (mr *MockRepositoryMockRecorder) Ping(ctx interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Ping", reflect.TypeOf((*MockRepository)(nil).Ping), ctx)
-}
-
 // Update mocks base method.
 func (m *MockRepository) Update(ctx context.Context, serverID uuid.UUID, condition *condition.Condition) error {
 	m.ctrl.T.Helper()

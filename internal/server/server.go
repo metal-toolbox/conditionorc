@@ -136,17 +136,9 @@ func New(opts ...Option) *http.Server {
 	}
 }
 
-// ping checks the server can reach its store repository
+// this is a placeholder for a more comprehensive readiness check
 func (s *Server) ping(c *gin.Context) {
-	if err := s.repository.Ping(c.Request.Context()); err != nil {
-		s.logger.Errorf("storage repository ping check failed: %s", err)
-		c.JSON(http.StatusServiceUnavailable, gin.H{
-			"status": "DOWN",
-		})
-
-		return
-	}
-
+	// XXX: the repository Ping method was removed because it returns a nil error unconditionally
 	c.JSON(http.StatusOK, gin.H{
 		"status": "UP",
 	})

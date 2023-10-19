@@ -53,11 +53,11 @@ type Repository interface {
 
 var ErrRepository = errors.New("storage repository error")
 
-func NewStore(config *app.Configuration, conditionDefs rctypes.Definitions,
+func NewStore(ctx context.Context, config *app.Configuration, conditionDefs rctypes.Definitions,
 	logger *logrus.Logger, stream events.Stream) (Repository, error) {
 
 	ssOpts := &config.ServerserviceOptions
-	client, err := getServerServiceClient(ssOpts, logger)
+	client, err := getServerServiceClient(ctx, ssOpts, logger)
 	if err != nil {
 		return nil, err
 	}
@@ -71,18 +71,18 @@ func NewStore(config *app.Configuration, conditionDefs rctypes.Definitions,
 			client:               client,
 		}, nil
 	case model.NATS:
-		return newNatsRepository(client, logger, stream)
+		return newNatsRepository(client, logger, stream, config.NatsOptions.KVReplicationFactor)
 	default:
 		return nil, errors.Wrap(ErrRepository, "storage kind not implemented: "+string(config.StoreKind))
 	}
 }
 
-func getServerServiceClient(cfg *app.ServerserviceOptions, log *logrus.Logger) (*sservice.Client, error) {
+func getServerServiceClient(ctx context.Context, cfg *app.ServerserviceOptions, log *logrus.Logger) (*sservice.Client, error) {
 	var client *sservice.Client
 	var err error
 
 	if !cfg.DisableOAuth {
-		client, err = newClientWithOAuth(context.Background(), cfg, log)
+		client, err = newClientWithOAuth(ctx, cfg, log)
 		if err != nil {
 			return nil, err
 		}

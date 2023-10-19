@@ -31,6 +31,9 @@ const (
 	// ServerserviceStore identifies a serverservice store.
 	ServerserviceStore StoreKind = "serverservice"
 
+	// NATS is a NATS kv-based store
+	NATS StoreKind = "nats"
+
 	// NatsEventsBroker identifies a NATS events broker.
 	NatsEventBroker EventBrokerKind = "nats"
 
