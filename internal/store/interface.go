@@ -3,6 +3,7 @@ package store
 import (
 	"context"
 	"net/url"
+	"strings"
 
 	"github.com/coreos/go-oidc"
 	"github.com/google/uuid"
@@ -62,7 +63,9 @@ func NewStore(ctx context.Context, config *app.Configuration, conditionDefs rcty
 		return nil, err
 	}
 
-	switch config.StoreKind {
+	storeKind := strings.ToLower(string(config.StoreKind))
+
+	switch model.StoreKind(storeKind) {
 	case model.ServerserviceStore:
 		return &Serverservice{
 			config:               ssOpts,
