@@ -175,9 +175,57 @@ func (n *natsStore) GetServer(ctx context.Context, serverID uuid.UUID) (*model.S
 	return &model.Server{ID: obj.UUID, FacilityCode: obj.FacilityCode}, nil
 }
 
-// List is deprecated and is not implemented here
-func (n *natsStore) List(_ context.Context, _ uuid.UUID, _ rctypes.State) ([]*rctypes.Condition, error) {
-	return nil, errors.New("unimplemented")
+// List retrieves any active conditions
+func (n *natsStore) List(ctx context.Context, srvID uuid.UUID, incState rctypes.State) ([]*rctypes.Condition, error) {
+	_, span := otel.Tracer(pkgName).Start(ctx, "NatsStore.List")
+	defer span.End()
+	le := n.log.WithFields(logrus.Fields{
+		"serverID": srvID.String(),
+	})
+
+	// ugh, so much copy-pasta
+	kve, err := n.bucket.Get(srvID.String())
+	switch {
+	case err == nil:
+	case errors.Is(nats.ErrKeyNotFound, err):
+		le.Debug("no active condition for device")
+		return nil, ErrConditionNotFound
+	default:
+		natsError("get")
+		le.WithError(err).Warn("looking up active condition")
+		return nil, errors.Wrap(ErrRepository, err.Error())
+	}
+
+	var cr conditionRecord
+	if err := cr.FromJSON(kve.Value()); err != nil {
+		le.WithError(err).Warn("bad condition data")
+		return nil, errors.Wrap(ErrRepository, err.Error())
+	}
+
+	var found bool
+	var outgoing rctypes.Condition
+	for _, c := range cr.Conditions {
+		if !rctypes.StateIsComplete(c.State) {
+			// The first incomplete condition is good enough
+			found = true
+			outgoing = *c
+			// make sure to match the requested parameters to short circuit the loops in the handler.
+			// we don't care what the actual state of the found condition is; the fact that it's incomplete
+			// is enough to signal to the API handler that it should *not* accept a new condition
+			// for this server
+			outgoing.Exclusive = true
+			outgoing.State = incState
+			break
+		}
+	}
+
+	if !found {
+		return nil, ErrConditionNotFound
+	}
+
+	return []*rctypes.Condition{
+		&outgoing,
+	}, nil
 }
 
 // Create a condition on a server.

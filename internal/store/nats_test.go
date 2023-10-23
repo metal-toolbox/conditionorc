@@ -76,7 +76,7 @@ func TestMain(m *testing.M) {
 	os.Exit(exitCode)
 }
 
-func TestCRUD(t *testing.T) {
+func TestCRUDL(t *testing.T) {
 	serverID := uuid.New()
 
 	kind := rctypes.Kind("test-kind")
@@ -101,11 +101,21 @@ func TestCRUD(t *testing.T) {
 	_, err = store.Get(context.TODO(), serverID, kind)
 	require.ErrorIs(t, err, ErrConditionNotFound)
 
+	// listing all conditions returns the expected
+	_, err = store.List(context.TODO(), serverID, rctypes.Pending)
+	require.ErrorIs(t, err, ErrConditionNotFound)
+
 	// add a condition
 	err = store.Create(context.TODO(), serverID, condition)
 	require.NoError(t, err)
 
-	// find the new condition
+	// list it, with all the idiosyncracies of the List API
+	conds, err := store.List(context.TODO(), serverID, rctypes.Active)
+	require.Equal(t, 1, len(conds))
+	require.Equal(t, rctypes.Active, conds[0].State)
+	require.True(t, conds[0].Exclusive)
+
+	// get the new condition
 	c, err := store.Get(context.TODO(), serverID, kind)
 	require.NoError(t, err)
 	require.Equal(t, condition.ID.String(), c.ID.String())
@@ -120,7 +130,7 @@ func TestCRUD(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, condition.State, c.State)
 
-	// OK, get rid of it
+	// try to delete an incomplete condition and fail
 	err = store.Delete(context.TODO(), serverID, kind)
 	require.ErrorIs(t, err, ErrConditionNotComplete)
 
@@ -128,10 +138,19 @@ func TestCRUD(t *testing.T) {
 	err = store.Update(context.TODO(), serverID, condition)
 	require.NoError(t, err)
 
+	// try to list it and get nothing back (intentionally)
+	_, err = store.List(context.TODO(), serverID, rctypes.Active)
+	require.ErrorIs(t, err, ErrConditionNotFound)
+
+	// OK, get rid of it
 	err = store.Delete(context.TODO(), serverID, kind)
 	require.NoError(t, err)
 
 	// And now it's not here anymore
 	_, err = store.Get(context.TODO(), serverID, kind)
 	require.ErrorIs(t, err, ErrConditionNotFound)
+
+	// And if you delete it again, it's fine.
+	err = store.Delete(context.TODO(), serverID, kind)
+	require.NoError(t, err)
 }
