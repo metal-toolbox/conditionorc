@@ -3,22 +3,16 @@ package store
 import (
 	"context"
 	"encoding/json"
-	"net/url"
 	"strings"
 	"time"
 
-	"github.com/coreos/go-oidc"
 	"github.com/google/uuid"
-	"github.com/hashicorp/go-retryablehttp"
 	"github.com/metal-toolbox/conditionorc/internal/app"
 	"github.com/metal-toolbox/conditionorc/internal/metrics"
 	"github.com/metal-toolbox/conditionorc/internal/model"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
-	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 	"go.opentelemetry.io/otel"
-	"golang.org/x/oauth2"
-	"golang.org/x/oauth2/clientcredentials"
 
 	rctypes "github.com/metal-toolbox/rivets/condition"
 	sservice "go.hollow.sh/serverservice/pkg/api/v1"
@@ -53,89 +47,6 @@ var (
 
 func serverServiceError(operation string) {
 	metrics.DependencyError("serverservice", operation)
-}
-
-func newServerserviceStore(ctx context.Context, config *app.ServerserviceOptions, conditionDefs rctypes.Definitions, logger *logrus.Logger) (Repository, error) {
-	s := &Serverservice{logger: logger, conditionDefinitions: conditionDefs, config: config}
-
-	var client *sservice.Client
-	var err error
-
-	if !config.DisableOAuth {
-		client, err = newClientWithOAuth(ctx, config, logger)
-		if err != nil {
-			return nil, err
-		}
-	} else {
-		client, err = sservice.NewClientWithToken("fake", config.Endpoint, nil)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	s.client = client
-
-	return s, nil
-}
-
-// returns a serverservice retryable http client with Otel and Oauth wrapped in
-func newClientWithOAuth(ctx context.Context, cfg *app.ServerserviceOptions, logger *logrus.Logger) (*sservice.Client, error) {
-	// init retryable http client
-	retryableClient := retryablehttp.NewClient()
-
-	// set retryable HTTP client to be the otel http client to collect telemetry
-	retryableClient.HTTPClient = otelhttp.DefaultClient
-
-	// disable default debug logging on the retryable client
-	if logger.Level < logrus.DebugLevel {
-		retryableClient.Logger = nil
-	} else {
-		retryableClient.Logger = logger
-	}
-
-	// setup oidc provider
-	provider, err := oidc.NewProvider(ctx, cfg.OidcIssuerEndpoint)
-	if err != nil {
-		return nil, err
-	}
-
-	clientID := "conditionorc-api"
-
-	if cfg.OidcClientID != "" {
-		clientID = cfg.OidcClientID
-	}
-
-	// setup oauth configuration
-	oauthConfig := clientcredentials.Config{
-		ClientID:       clientID,
-		ClientSecret:   cfg.OidcClientSecret,
-		TokenURL:       provider.Endpoint().TokenURL,
-		Scopes:         cfg.OidcClientScopes,
-		EndpointParams: url.Values{"audience": []string{cfg.OidcAudienceEndpoint}},
-		// with this the oauth client spends less time identifying the client grant mechanism.
-		AuthStyle: oauth2.AuthStyleInParams,
-	}
-
-	// wrap OAuth transport, cookie jar in the retryable client
-	oAuthclient := oauthConfig.Client(ctx)
-
-	retryableClient.HTTPClient.Transport = oAuthclient.Transport
-	retryableClient.HTTPClient.Jar = oAuthclient.Jar
-
-	httpClient := retryableClient.StandardClient()
-	httpClient.Timeout = connectionTimeout
-
-	return sservice.NewClientWithToken(
-		cfg.OidcClientSecret,
-		cfg.Endpoint,
-		httpClient,
-	)
-}
-
-// Ping tests the repository is available.
-func (s *Serverservice) Ping(_ context.Context) error {
-	// TODO: implement
-	return nil
 }
 
 // Get a condition set on a server.
@@ -327,35 +238,4 @@ func (s *Serverservice) Delete(ctx context.Context, serverID uuid.UUID, conditio
 		serverServiceError("delete-condition")
 	}
 	return err
-}
-
-// ListServersWithCondition lists servers with the given condition kind.
-func (s *Serverservice) ListServersWithCondition(ctx context.Context,
-	conditionKind rctypes.Kind, conditionState rctypes.State,
-) ([]*rctypes.ServerConditions, error) {
-	otelCtx, span := otel.Tracer(pkgName).Start(ctx, "Serverservice.ListServersWithCondition")
-	defer span.End()
-	params := &sservice.ServerListParams{
-		AttributeListParams: []sservice.AttributeListParams{
-			{
-				Namespace: s.conditionNS(conditionKind),
-				Keys:      []string{"state"},
-				Operator:  sservice.OperatorEqual,
-				Value:     string(conditionState),
-			},
-		},
-	}
-
-	_, _, err := s.client.List(otelCtx, params)
-	if err != nil {
-		s.logger.WithFields(logrus.Fields{
-			"kind":  conditionKind,
-			"state": conditionState,
-			"error": err,
-		}).Warn("error listing servers")
-		serverServiceError("list-servers-with-condition")
-		return nil, err
-	}
-
-	return nil, nil
 }

@@ -32,17 +32,20 @@ var cmdServer = &cobra.Command{
 			log.Fatal(err)
 		}
 
-		repository, err := store.NewStore(cmd.Context(), app.Config, app.Config.ConditionDefinitions, app.Logger)
-		if err != nil {
-			app.Logger.Fatal(err)
-		}
-
 		streamBroker, err := events.NewStream(app.Config.NatsOptions)
 		if err != nil {
 			app.Logger.Fatal(err)
 		}
 
-		if err := streamBroker.Open(); err != nil {
+		if err = streamBroker.Open(); err != nil {
+			app.Logger.Fatal(err)
+		}
+
+		// setup cancel context with cancel func
+		ctx, serverCancel := context.WithCancel(cmd.Context())
+
+		repository, err := store.NewStore(ctx, app.Config, app.Config.ConditionDefinitions, app.Logger, streamBroker)
+		if err != nil {
 			app.Logger.Fatal(err)
 		}
 
@@ -77,6 +80,7 @@ var cmdServer = &cobra.Command{
 		// sit around for term signal
 		<-termCh
 		app.Logger.Info("got TERM signal, shutting down server...")
+		serverCancel()
 
 		// call server shutdown with timeout
 		ctx, cancel := context.WithTimeout(cmd.Context(), shutdownTimeout)

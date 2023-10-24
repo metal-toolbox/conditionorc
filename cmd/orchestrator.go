@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"context"
+	"fmt"
 	"log"
 
 	"github.com/equinix-labs/otel-init-go/otelinit"
@@ -17,8 +18,7 @@ import (
 )
 
 var (
-	replicaCount int
-	facility     string
+	facility string
 )
 
 // install orchestrator command
@@ -47,17 +47,17 @@ var cmdOrchestrator = &cobra.Command{
 			cancelFunc()
 		}()
 
-		repository, err := store.NewStore(ctx, app.Config, app.Config.ConditionDefinitions, app.Logger)
-		if err != nil {
-			app.Logger.Fatal(err)
-		}
-
 		streamBroker, err := events.NewStream(app.Config.NatsOptions)
 		if err != nil {
 			app.Logger.Fatal(err)
 		}
 
-		if err := streamBroker.Open(); err != nil {
+		if err = streamBroker.Open(); err != nil {
+			app.Logger.Fatal(err)
+		}
+
+		repository, err := store.NewStore(ctx, app.Config, app.Config.ConditionDefinitions, app.Logger, streamBroker)
+		if err != nil {
 			app.Logger.Fatal(err)
 		}
 
@@ -73,8 +73,12 @@ var cmdOrchestrator = &cobra.Command{
 			orchestrator.WithConditionDefs(app.Config.ConditionDefinitions),
 		}
 
-		app.Logger.Info("configuring status KV support")
-		options = append(options, orchestrator.WithReplicas(replicaCount))
+		if app.Config.NatsOptions.KVReplicationFactor > 0 {
+			app.Logger.WithField("replication",
+				fmt.Sprintf("%d", app.Config.NatsOptions.KVReplicationFactor)).
+				Info("configuring status KV support")
+			options = append(options, orchestrator.WithReplicas(app.Config.NatsOptions.KVReplicationFactor))
+		}
 
 		orc := orchestrator.New(options...)
 		orc.Run(ctx)
@@ -84,9 +88,6 @@ var cmdOrchestrator = &cobra.Command{
 // install command flags
 func init() {
 	pflags := cmdOrchestrator.PersistentFlags()
-	pflags.IntVarP(&replicaCount, "replica-count", "r", 3,
-		"the number of replicas to configure for the NATS status KV store")
-
 	pflags.StringVarP(&facility, "facility", "f", "", "a site-specific token to focus this orchestrator's activities")
 
 	if err := cmdOrchestrator.MarkPersistentFlagRequired("facility"); err != nil {
