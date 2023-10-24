@@ -121,13 +121,6 @@ func (r *Routes) composeAuthHandler(scopes []string) gin.HandlerFunc {
 func (r *Routes) Routes(g *gin.RouterGroup) {
 	servers := g.Group("/servers/:uuid")
 	{
-		// /servers/:uuid/state/:conditionState
-		serverCondition := servers.Group("/state")
-
-		serverCondition.GET("/:conditionState",
-			r.composeAuthHandler(readScopes("condition")),
-			wrapAPICall(r.serverConditionList))
-
 		// /servers/:uuid/condition/:conditionKind
 		serverConditionBySlug := servers.Group("/condition")
 
@@ -141,16 +134,6 @@ func (r *Routes) Routes(g *gin.RouterGroup) {
 		serverConditionBySlug.POST("/:conditionKind",
 			r.composeAuthHandler(createScopes("condition")),
 			wrapAPICall(r.serverConditionCreate))
-
-		// Update an existing condition attributes on a server.
-		serverConditionBySlug.PUT("/:conditionKind",
-			r.composeAuthHandler(updateScopes("condition")),
-			wrapAPICall(r.serverConditionUpdate))
-
-		// Remove a condition from a server.
-		serverConditionBySlug.DELETE("/:conditionKind",
-			r.composeAuthHandler(deleteScopes("condition")),
-			wrapAPICall(r.serverConditionDelete))
 	}
 }
 
@@ -167,24 +150,6 @@ func readScopes(items ...string) []string {
 	s := []string{"read"}
 	for _, i := range items {
 		s = append(s, fmt.Sprintf("read:%s", i))
-	}
-
-	return s
-}
-
-func updateScopes(items ...string) []string {
-	s := []string{"write", "update"}
-	for _, i := range items {
-		s = append(s, fmt.Sprintf("update:%s", i))
-	}
-
-	return s
-}
-
-func deleteScopes(items ...string) []string {
-	s := []string{"write", "delete"}
-	for _, i := range items {
-		s = append(s, fmt.Sprintf("delete:%s", i))
 	}
 
 	return s
