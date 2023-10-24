@@ -81,13 +81,13 @@ func getServerServiceClient(ctx context.Context, cfg *app.ServerserviceOptions, 
 	var client *sservice.Client
 	var err error
 
-	if !cfg.DisableOAuth {
-		client, err = newClientWithOAuth(ctx, cfg, log)
+	if cfg.DisableOAuth {
+		client, err = sservice.NewClientWithToken("fake", cfg.Endpoint, nil)
 		if err != nil {
 			return nil, err
 		}
 	} else {
-		client, err = sservice.NewClientWithToken("fake", cfg.Endpoint, nil)
+		client, err = newClientWithOAuth(ctx, cfg, log)
 		if err != nil {
 			return nil, err
 		}
