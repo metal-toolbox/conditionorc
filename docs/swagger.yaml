@@ -2,6 +2,9 @@ basePath: /api/v1
 definitions:
   condition.Condition:
     properties:
+      client:
+        description: Client is the user/jwt user that requested the condition.
+        type: string
       createdAt:
         description: CreatedAt is when this object was created.
         type: string
@@ -79,14 +82,14 @@ definitions:
     type: object
   condition.Kind:
     enum:
-    - firmwareInstall
     - inventory
     - virtualMediaMount
+    - firmwareInstall
     type: string
     x-enum-varnames:
-    - FirmwareInstall
     - Inventory
     - VirtualMediaMount
+    - FirmwareInstall
   condition.State:
     enum:
     - pending
@@ -123,30 +126,6 @@ info:
   title: Condition orchestrator API
 paths:
   /servers/{uuid}/condition/{conditionKind}:
-    delete:
-      consumes:
-      - application/json
-      description: Deletes a condition on a server
-      operationId: serverConditionDelete
-      parameters:
-      - description: Server ID
-        in: path
-        name: uuid
-        required: true
-        type: string
-      - description: Condition Kind
-        in: path
-        name: conditionKind
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/types.ServerResponse'
-      summary: Condition Delete
     get:
       consumes:
       - application/json
@@ -196,53 +175,4 @@ paths:
           schema:
             $ref: '#/definitions/types.ServerResponse'
       summary: Condition Create
-    put:
-      consumes:
-      - application/json
-      description: Updates a condition on a server
-      operationId: serverConditionUpdate
-      parameters:
-      - description: Server ID
-        in: path
-        name: uuid
-        required: true
-        type: string
-      - description: Condition Kind
-        in: path
-        name: conditionKind
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/types.ServerResponse'
-      summary: Condition Update
-  /servers/{uuid}/state/{conditionState}:
-    get:
-      consumes:
-      - application/json
-      description: Returns all conditions set on a server by the condition state.
-      operationId: serverConditionList
-      parameters:
-      - description: Server ID
-        in: path
-        name: uuid
-        required: true
-        type: string
-      - description: Condition State
-        in: path
-        name: conditionState
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/types.ServerResponse'
-      summary: Condition List
 swagger: "2.0"

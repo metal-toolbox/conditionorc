@@ -51,41 +51,6 @@ const docTemplate = `{
                     }
                 }
             },
-            "put": {
-                "description": "Updates a condition on a server",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "summary": "Condition Update",
-                "operationId": "serverConditionUpdate",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Server ID",
-                        "name": "uuid",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "Condition Kind",
-                        "name": "conditionKind",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/types.ServerResponse"
-                        }
-                    }
-                }
-            },
             "post": {
                 "description": "Creates a condition on a server\nSample firmwareInstall payload, response: https://github.com/metal-toolbox/conditionorc/blob/main/sample/firmwareInstall.md",
                 "consumes": [
@@ -119,78 +84,6 @@ const docTemplate = `{
                         }
                     }
                 }
-            },
-            "delete": {
-                "description": "Deletes a condition on a server",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "summary": "Condition Delete",
-                "operationId": "serverConditionDelete",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Server ID",
-                        "name": "uuid",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "Condition Kind",
-                        "name": "conditionKind",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/types.ServerResponse"
-                        }
-                    }
-                }
-            }
-        },
-        "/servers/{uuid}/state/{conditionState}": {
-            "get": {
-                "description": "Returns all conditions set on a server by the condition state.",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "summary": "Condition List",
-                "operationId": "serverConditionList",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Server ID",
-                        "name": "uuid",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "Condition State",
-                        "name": "conditionState",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/types.ServerResponse"
-                        }
-                    }
-                }
             }
         }
     },
@@ -198,6 +91,10 @@ const docTemplate = `{
         "condition.Condition": {
             "type": "object",
             "properties": {
+                "client": {
+                    "description": "Client is the user/jwt user that requested the condition.",
+                    "type": "string"
+                },
                 "createdAt": {
                     "description": "CreatedAt is when this object was created.",
                     "type": "string"
@@ -286,14 +183,14 @@ const docTemplate = `{
         "condition.Kind": {
             "type": "string",
             "enum": [
-                "firmwareInstall",
                 "inventory",
-                "virtualMediaMount"
+                "virtualMediaMount",
+                "firmwareInstall"
             ],
             "x-enum-varnames": [
-                "FirmwareInstall",
                 "Inventory",
-                "VirtualMediaMount"
+                "VirtualMediaMount",
+                "FirmwareInstall"
             ]
         },
         "condition.State": {
