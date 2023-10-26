@@ -28,25 +28,6 @@ func (c *Client) get(ctx context.Context, path string) (*v1types.ServerResponse,
 	return c.do(req)
 }
 
-func (c *Client) put(ctx context.Context, path string, body interface{}) (*v1types.ServerResponse, error) {
-	requestURL, err := url.Parse(fmt.Sprintf("%s%s/%s", c.serverAddress, routes.PathPrefix, path))
-	if err != nil {
-		return nil, Error{Cause: err.Error()}
-	}
-
-	payload, err := json.Marshal(body)
-	if err != nil {
-		return nil, Error{Cause: "error in PUT JSON payload: " + err.Error()}
-	}
-
-	req, err := http.NewRequestWithContext(ctx, http.MethodPut, requestURL.String(), bytes.NewReader(payload))
-	if err != nil {
-		return nil, Error{Cause: "error in PUT request" + err.Error()}
-	}
-
-	return c.do(req)
-}
-
 func (c *Client) post(ctx context.Context, path string, body interface{}) (*v1types.ServerResponse, error) {
 	requestURL, err := url.Parse(fmt.Sprintf("%s%s/%s", c.serverAddress, routes.PathPrefix, path))
 	if err != nil {
@@ -61,20 +42,6 @@ func (c *Client) post(ctx context.Context, path string, body interface{}) (*v1ty
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, requestURL.String(), bytes.NewReader(payload))
 	if err != nil {
 		return nil, Error{Cause: "error in POST request" + err.Error()}
-	}
-
-	return c.do(req)
-}
-
-func (c *Client) delete(ctx context.Context, path string) (*v1types.ServerResponse, error) {
-	requestURL, err := url.Parse(fmt.Sprintf("%s%s/%s", c.serverAddress, routes.PathPrefix, path))
-	if err != nil {
-		return nil, Error{Cause: err.Error()}
-	}
-
-	req, err := http.NewRequestWithContext(ctx, http.MethodDelete, requestURL.String(), http.NoBody)
-	if err != nil {
-		return nil, Error{Cause: "error in DELETE request" + err.Error()}
 	}
 
 	return c.do(req)
