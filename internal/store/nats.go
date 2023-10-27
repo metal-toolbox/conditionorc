@@ -75,6 +75,7 @@ func newNatsRepository(client *sservice.Client, log *logrus.Logger, stream event
 
 	kvHandle, err := kv.CreateOrBindKVBucket(evJS, bucketName, kvOpts...)
 	if err != nil {
+		log.WithError(err).Debug("binding kv bucket")
 		return nil, errors.Wrap(err, "binding active conditions bucket")
 	}
 	return &natsStore{
