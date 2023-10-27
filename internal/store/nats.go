@@ -205,6 +205,7 @@ func (n *natsStore) List(ctx context.Context, srvID uuid.UUID, incState rctypes.
 	var found bool
 	var outgoing rctypes.Condition
 	for _, c := range cr.Conditions {
+		//nolint:gocritic // inverting this test is a moronic suggestion and you should feel bad about it
 		if !rctypes.StateIsComplete(c.State) {
 			// The first incomplete condition is good enough
 			found = true
