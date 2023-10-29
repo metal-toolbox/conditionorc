@@ -252,7 +252,11 @@ func (n *natsStore) Create(ctx context.Context, serverID uuid.UUID, condition *r
 		},
 	}
 
-	_, err := n.bucket.Create(serverID.String(), cr.MustJSON())
+	// XXX: We *should* be using Create() below, but we can't while we're in transition between Serverservice
+	// and NATS as repository implementations. Once we have a better story for how we handle any existing
+	// conditionRecord, we can revisit the decision to use the NATS Put API
+	// _, err := n.bucket.Create(serverID.String(), cr.MustJSON())
+	_, err := n.bucket.Put(serverID.String(), cr.MustJSON())
 	if err != nil {
 		natsError("create")
 		span.RecordError(err)
