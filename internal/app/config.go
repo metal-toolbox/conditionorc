@@ -137,13 +137,8 @@ func (a *App) envVarOverrides() error {
 		a.Config.Notifications.Token = a.v.GetString("notifications.token")
 	}
 
-	switch a.Config.StoreKind {
-	case model.ServerserviceStore:
-		if err := a.envVarServerserviceOverrides(); err != nil {
-			return err
-		}
-	default:
-		return errors.Wrap(ErrConfig, "no/unknown store kind parameter")
+	if err := a.envVarServerserviceOverrides(); err != nil {
+		return err
 	}
 
 	if err := a.apiServerJWTAuthParams(); err != nil {

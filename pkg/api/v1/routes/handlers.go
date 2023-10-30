@@ -241,6 +241,8 @@ func (r *Routes) serverFacilityCode(ctx context.Context, serverID uuid.UUID) (st
 func (r *Routes) exclusiveNonFinalConditionExists(ctx context.Context, serverID uuid.UUID) error {
 	otelCtx, span := otel.Tracer(pkgName).Start(ctx, "Routes.exclusiveNonFinalConditionExists")
 	defer span.End()
+	// XXX: Clean me up! We're looking for any active condition here, so don't list, do a store lookup
+	// here. Any active condition here is enough to block queuing a new one.
 	for _, state := range rctypes.States() {
 		if rctypes.StateIsComplete(state) {
 			continue

@@ -75,6 +75,7 @@ func newNatsRepository(client *sservice.Client, log *logrus.Logger, stream event
 
 	kvHandle, err := kv.CreateOrBindKVBucket(evJS, bucketName, kvOpts...)
 	if err != nil {
+		log.WithError(err).Debug("binding kv bucket")
 		return nil, errors.Wrap(err, "binding active conditions bucket")
 	}
 	return &natsStore{
@@ -174,9 +175,58 @@ func (n *natsStore) GetServer(ctx context.Context, serverID uuid.UUID) (*model.S
 	return &model.Server{ID: obj.UUID, FacilityCode: obj.FacilityCode}, nil
 }
 
-// List is deprecated and is not implemented here
-func (n *natsStore) List(_ context.Context, _ uuid.UUID, _ rctypes.State) ([]*rctypes.Condition, error) {
-	return nil, errors.New("unimplemented")
+// List retrieves any active conditions
+func (n *natsStore) List(ctx context.Context, srvID uuid.UUID, incState rctypes.State) ([]*rctypes.Condition, error) {
+	_, span := otel.Tracer(pkgName).Start(ctx, "NatsStore.List")
+	defer span.End()
+	le := n.log.WithFields(logrus.Fields{
+		"serverID": srvID.String(),
+	})
+
+	// ugh, so much copy-pasta
+	kve, err := n.bucket.Get(srvID.String())
+	switch {
+	case err == nil:
+	case errors.Is(nats.ErrKeyNotFound, err):
+		le.Debug("no active condition for device")
+		return nil, nil
+	default:
+		natsError("get")
+		le.WithError(err).Warn("looking up active condition")
+		return nil, errors.Wrap(ErrRepository, err.Error())
+	}
+
+	var cr conditionRecord
+	if err := cr.FromJSON(kve.Value()); err != nil {
+		le.WithError(err).Warn("bad condition data")
+		return nil, errors.Wrap(ErrRepository, err.Error())
+	}
+
+	var found bool
+	var outgoing rctypes.Condition
+	for _, c := range cr.Conditions {
+		//nolint:gocritic // inverting this test is a moronic suggestion and you should feel bad about it
+		if !rctypes.StateIsComplete(c.State) {
+			// The first incomplete condition is good enough
+			found = true
+			outgoing = *c
+			// make sure to match the requested parameters to short circuit the loops in the handler.
+			// we don't care what the actual state of the found condition is; the fact that it's incomplete
+			// is enough to signal to the API handler that it should *not* accept a new condition
+			// for this server
+			outgoing.Exclusive = true
+			outgoing.State = incState
+			break
+		}
+	}
+
+	if !found {
+		return nil, nil
+	}
+
+	return []*rctypes.Condition{
+		&outgoing,
+	}, nil
 }
 
 // Create a condition on a server.
@@ -202,7 +252,11 @@ func (n *natsStore) Create(ctx context.Context, serverID uuid.UUID, condition *r
 		},
 	}
 
-	_, err := n.bucket.Create(serverID.String(), cr.MustJSON())
+	// XXX: We *should* be using Create() below, but we can't while we're in transition between Serverservice
+	// and NATS as repository implementations. Once we have a better story for how we handle any existing
+	// conditionRecord, we can revisit the decision to use the NATS Put API
+	// _, err := n.bucket.Create(serverID.String(), cr.MustJSON())
+	_, err := n.bucket.Put(serverID.String(), cr.MustJSON())
 	if err != nil {
 		natsError("create")
 		span.RecordError(err)

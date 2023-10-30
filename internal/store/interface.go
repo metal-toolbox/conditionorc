@@ -3,6 +3,7 @@ package store
 import (
 	"context"
 	"net/url"
+	"strings"
 
 	"github.com/coreos/go-oidc"
 	"github.com/google/uuid"
@@ -59,10 +60,13 @@ func NewStore(ctx context.Context, config *app.Configuration, conditionDefs rcty
 	ssOpts := &config.ServerserviceOptions
 	client, err := getServerServiceClient(ctx, ssOpts, logger)
 	if err != nil {
+		logger.WithError(err).Debug("getting server-service client")
 		return nil, err
 	}
 
-	switch config.StoreKind {
+	storeKind := strings.ToLower(string(config.StoreKind))
+
+	switch model.StoreKind(storeKind) {
 	case model.ServerserviceStore:
 		return &Serverservice{
 			config:               ssOpts,
@@ -82,6 +86,7 @@ func getServerServiceClient(ctx context.Context, cfg *app.ServerserviceOptions, 
 	var err error
 
 	if cfg.DisableOAuth {
+		log.Debug("creating new server-service client with fake token")
 		client, err = sservice.NewClientWithToken("fake", cfg.Endpoint, nil)
 		if err != nil {
 			return nil, err
