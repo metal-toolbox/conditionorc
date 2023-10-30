@@ -102,15 +102,16 @@ func TestCRUDL(t *testing.T) {
 	require.ErrorIs(t, err, ErrConditionNotFound)
 
 	// listing all conditions returns the expected
-	_, err = store.List(context.TODO(), serverID, rctypes.Pending)
-	require.ErrorIs(t, err, ErrConditionNotFound)
+	conds, err := store.List(context.TODO(), serverID, rctypes.Pending)
+	require.NoError(t, err)
+	require.Equal(t, 0, len(conds))
 
 	// add a condition
 	err = store.Create(context.TODO(), serverID, condition)
 	require.NoError(t, err)
 
 	// list it, with all the idiosyncracies of the List API
-	conds, err := store.List(context.TODO(), serverID, rctypes.Active)
+	conds, err = store.List(context.TODO(), serverID, rctypes.Active)
 	require.Equal(t, 1, len(conds))
 	require.Equal(t, rctypes.Active, conds[0].State)
 	require.True(t, conds[0].Exclusive)
@@ -139,8 +140,9 @@ func TestCRUDL(t *testing.T) {
 	require.NoError(t, err)
 
 	// try to list it and get nothing back (intentionally)
-	_, err = store.List(context.TODO(), serverID, rctypes.Active)
-	require.ErrorIs(t, err, ErrConditionNotFound)
+	conds, err = store.List(context.TODO(), serverID, rctypes.Active)
+	require.NoError(t, err)
+	require.Equal(t, 0, len(conds))
 
 	// OK, get rid of it
 	err = store.Delete(context.TODO(), serverID, kind)

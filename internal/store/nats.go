@@ -189,7 +189,7 @@ func (n *natsStore) List(ctx context.Context, srvID uuid.UUID, incState rctypes.
 	case err == nil:
 	case errors.Is(nats.ErrKeyNotFound, err):
 		le.Debug("no active condition for device")
-		return nil, ErrConditionNotFound
+		return nil, nil
 	default:
 		natsError("get")
 		le.WithError(err).Warn("looking up active condition")
@@ -221,7 +221,7 @@ func (n *natsStore) List(ctx context.Context, srvID uuid.UUID, incState rctypes.
 	}
 
 	if !found {
-		return nil, ErrConditionNotFound
+		return nil, nil
 	}
 
 	return []*rctypes.Condition{
