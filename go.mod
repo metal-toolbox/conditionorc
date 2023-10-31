@@ -8,7 +8,7 @@ require (
 	github.com/equinix-labs/otel-init-go v0.0.9
 	github.com/gin-gonic/gin v1.9.1
 	github.com/golang/mock v1.6.0
-	github.com/google/uuid v1.3.1
+	github.com/google/uuid v1.4.0
 	github.com/hashicorp/go-retryablehttp v0.7.4
 	github.com/metal-toolbox/rivets v0.0.0-20231020103738-10fc2993b885
 	github.com/nats-io/nats-server/v2 v2.10.2
@@ -21,7 +21,6 @@ require (
 	github.com/spf13/viper v1.17.0
 	github.com/stretchr/testify v1.8.4
 	github.com/swaggo/files v1.0.1
-	github.com/swaggo/files/v2 v2.0.0
 	github.com/swaggo/gin-swagger v1.6.0
 	github.com/swaggo/swag v1.16.3-0.20230925065629-1460377e6729
 	github.com/volatiletech/null/v8 v8.1.2
