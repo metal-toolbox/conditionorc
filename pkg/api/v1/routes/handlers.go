@@ -15,6 +15,7 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 
+	"github.com/metal-toolbox/conditionorc/internal/fleetdb"
 	"github.com/metal-toolbox/conditionorc/internal/metrics"
 	"github.com/metal-toolbox/conditionorc/internal/store"
 	v1types "github.com/metal-toolbox/conditionorc/pkg/api/v1/types"
@@ -163,8 +164,75 @@ func (r *Routes) serverConditionCreate(c *gin.Context) (int, *v1types.ServerResp
 		}
 	}
 
+	return r.conditionCreate(otelCtx, newCondition, serverID, facilityCode)
+}
+
+func (r *Routes) serverEnroll(c *gin.Context) (int, *v1types.ServerResponse) {
+	id := c.Param("uuid")
+	ip := c.Param("ip")
+	username := c.Param("user")
+	password := c.Param("pwd")
+	facilityCode := c.Param("facility")
+
+	otelCtx, span := otel.Tracer(pkgName).Start(c.Request.Context(), "Routes.serverEnroll")
+	span.SetAttributes(
+		attribute.KeyValue{Key: "serverId", Value: attribute.StringValue(id)},
+		attribute.KeyValue{Key: "IP", Value: attribute.StringValue(ip)},
+		attribute.KeyValue{Key: "user", Value: attribute.StringValue(username)})
+	defer span.End()
+
+	var serverID uuid.UUID
+	var err error
+	if id != "" {
+		serverID, err = uuid.Parse(id)
+		if err != nil {
+			r.logger.WithFields(logrus.Fields{
+				"serverID": id,
+			}).Info("bad serverID")
+
+			return http.StatusBadRequest, &v1types.ServerResponse{
+				Message: err.Error(),
+			}
+		}
+	} else {
+		serverID = uuid.New()
+	}
+
+	// Creates a server record in FleetDB.
+	if err = r.fleetDBClient.AddServer(c.Request.Context(), serverID, facilityCode, ip, username, password); err != nil {
+		if errors.Is(err, fleetdb.ErrServerAlreadyExist) {
+			return http.StatusBadRequest, &v1types.ServerResponse{
+				Message: err.Error(),
+			}
+		}
+		return http.StatusInternalServerError, &v1types.ServerResponse{
+			Message: err.Error(),
+		}
+	}
+
+	// Reuse the inventory for server enrollment.
+	// May change in the future.
+	kind := rctypes.Kind(rctypes.Inventory)
+
+	var conditionCreate v1types.ConditionCreate
+	if err := c.ShouldBindJSON(&conditionCreate); err != nil {
+		r.logger.WithFields(logrus.Fields{
+			"error": err,
+		}).Info("invalid ConditionCreate payload")
+
+		return http.StatusBadRequest, &v1types.ServerResponse{
+			Message: "invalid ConditionCreate payload: " + err.Error(),
+		}
+	}
+
+	newCondition := conditionCreate.NewCondition(kind)
+
+	return r.conditionCreate(otelCtx, newCondition, serverID, facilityCode)
+}
+
+func (r *Routes) conditionCreate(otelCtx context.Context, newCondition *rctypes.Condition, serverID uuid.UUID, facilityCode string) (int, *v1types.ServerResponse) {
 	// Create the new condition
-	err = r.repository.Create(otelCtx, serverID, newCondition)
+	err := r.repository.Create(otelCtx, serverID, newCondition)
 	if err != nil {
 		r.logger.WithFields(logrus.Fields{
 			"error": err,

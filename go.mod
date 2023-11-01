@@ -21,7 +21,6 @@ require (
 	github.com/spf13/viper v1.17.0
 	github.com/stretchr/testify v1.8.4
 	github.com/swaggo/files v1.0.1
-	github.com/swaggo/files/v2 v2.0.0
 	github.com/swaggo/gin-swagger v1.6.0
 	github.com/swaggo/swag v1.16.3-0.20230925065629-1460377e6729
 	github.com/volatiletech/null/v8 v8.1.2
@@ -128,7 +127,6 @@ require (
 	go.opentelemetry.io/otel/metric v1.19.0 // indirect
 	go.opentelemetry.io/otel/sdk v1.19.0 // indirect
 	go.opentelemetry.io/proto/otlp v1.0.0 // indirect
-	go.uber.org/automaxprocs v1.5.3 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	go.uber.org/zap v1.26.0 // indirect
 	gocloud.dev v0.34.0 // indirect

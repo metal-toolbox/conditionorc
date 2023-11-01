@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/metal-toolbox/conditionorc/internal/fleetdb"
 	"github.com/metal-toolbox/conditionorc/internal/metrics"
 	"github.com/metal-toolbox/conditionorc/internal/store"
 	"github.com/pkg/errors"
@@ -29,6 +30,7 @@ var ginNoOp = func(_ *gin.Context) {
 // Routes type sets up the conditionorc API  router routes.
 type Routes struct {
 	authMW               *ginauth.MultiTokenMiddleware
+	fleetDBClient        fleetdb.FleetDB
 	repository           store.Repository
 	streamBroker         events.Stream
 	conditionDefinitions rctypes.Definitions
@@ -42,6 +44,13 @@ type Option func(*Routes)
 func WithStore(repository store.Repository) Option {
 	return func(r *Routes) {
 		r.repository = repository
+	}
+}
+
+// WithFleetDBClient sets the client communicating with fleet db.
+func WithFleetDBClient(client fleetdb.FleetDB) Option {
+	return func(r *Routes) {
+		r.fleetDBClient = client
 	}
 }
 
@@ -119,6 +128,9 @@ func (r *Routes) composeAuthHandler(scopes []string) gin.HandlerFunc {
 }
 
 func (r *Routes) Routes(g *gin.RouterGroup) {
+	serverEnroll := g.Group("/serverEnroll")
+	serverEnroll.POST("", r.composeAuthHandler(createScopes("server-enroll")), wrapAPICall(r.serverEnroll))
+
 	servers := g.Group("/servers/:uuid")
 	{
 		// /servers/:uuid/condition/:conditionKind

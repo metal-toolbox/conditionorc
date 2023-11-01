@@ -10,6 +10,7 @@ import (
 	"github.com/equinix-labs/otel-init-go/otelinit"
 
 	"github.com/metal-toolbox/conditionorc/internal/app"
+	"github.com/metal-toolbox/conditionorc/internal/fleetdb"
 	"github.com/metal-toolbox/conditionorc/internal/metrics"
 	"github.com/metal-toolbox/conditionorc/internal/model"
 	"github.com/metal-toolbox/conditionorc/internal/server"
@@ -49,6 +50,11 @@ var cmdServer = &cobra.Command{
 			app.Logger.Fatal(err)
 		}
 
+		fleetDBClient, err := fleetdb.NewFleetDBClient(ctx, app.Config, app.Config.ConditionDefinitions, app.Logger)
+		if err != nil {
+			app.Logger.Fatal(err)
+		}
+
 		// serve metrics on port 9090
 		metrics.ListenAndServe()
 
@@ -59,6 +65,7 @@ var cmdServer = &cobra.Command{
 			server.WithLogger(app.Logger),
 			server.WithListenAddress(app.Config.ListenAddress),
 			server.WithStore(repository),
+			server.WithFleetDBClient(fleetDBClient),
 			server.WithStreamBroker(streamBroker),
 			server.WithConditionDefinitions(app.Config.ConditionDefinitions),
 		}
