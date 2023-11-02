@@ -206,7 +206,7 @@ func (r *Routes) serverEnroll(c *gin.Context) (int, *v1types.ServerResponse) {
 	}
 
 	var params v1types.AddServerParams
-	if err := json.Unmarshal(conditionCreate.Parameters, &params); err != nil {
+	if err = json.Unmarshal(conditionCreate.Parameters, &params); err != nil {
 		return http.StatusBadRequest, &v1types.ServerResponse{
 			Message: "invalid params: " + err.Error(),
 		}
