@@ -85,9 +85,6 @@ func asJSONBytes(t *testing.T, s *v1types.ServerResponse) []byte {
 
 // nolint:gocyclo // cyclomatic tests are cyclomatic
 func TestAddServer(t *testing.T) {
-	// serverID := uuid.New()
-	// facilityCode := "foo-42"
-
 	// mock repository
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
@@ -227,6 +224,44 @@ func TestAddServer(t *testing.T) {
 			func(t *testing.T) *http.Request {
 				noUserParams := fmt.Sprintf(`{"facility":"%v","ip":"%v","pwd":"%v","some param":"1"}`, mockFacilityCode, mockIP, mockPwd)
 				payload, err := json.Marshal(&v1types.ConditionCreate{Parameters: []byte(noUserParams)})
+				if err != nil {
+					t.Error()
+				}
+
+				url := fmt.Sprintf("/api/v1/serverEnroll/%v", mockServerID)
+				request, err := http.NewRequestWithContext(context.TODO(), http.MethodPost, url, bytes.NewReader(payload))
+				if err != nil {
+					t.Fatal(err)
+				}
+
+				return request
+			},
+			func(t *testing.T, r *httptest.ResponseRecorder) {
+				assert.Equal(t, http.StatusInternalServerError, r.Code)
+				assert.Contains(t, string(asBytes(t, r.Body)), fleetdb.ErrBMCCredentials.Error())
+			},
+		},
+		{
+			"no bmc password",
+			nil,
+			func(r *fleetdb.MockFleetDB) {
+				// lookup for an existing condition
+				r.EXPECT().
+					AddServer(
+						gomock.Any(),
+						gomock.Eq(mockServerID),
+						gomock.Eq(mockFacilityCode),
+						gomock.Eq(mockIP),
+						gomock.Eq(mockUser),
+						gomock.Eq(""),
+					).
+					Return(fleetdb.ErrBMCCredentials). // no condition exists
+					Times(1)
+			},
+			nil,
+			func(t *testing.T) *http.Request {
+				noPwdParams := fmt.Sprintf(`{"facility":"%v","ip":"%v","user":"%v","some param":"1"}`, mockFacilityCode, mockIP, mockUser)
+				payload, err := json.Marshal(&v1types.ConditionCreate{Parameters: []byte(noPwdParams)})
 				if err != nil {
 					t.Error()
 				}
