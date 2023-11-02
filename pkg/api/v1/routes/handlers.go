@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -15,11 +16,14 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 
-	"github.com/metal-toolbox/conditionorc/internal/fleetdb"
 	"github.com/metal-toolbox/conditionorc/internal/metrics"
 	"github.com/metal-toolbox/conditionorc/internal/store"
 	v1types "github.com/metal-toolbox/conditionorc/pkg/api/v1/types"
 	rctypes "github.com/metal-toolbox/rivets/condition"
+)
+
+const (
+	badRequestErrMsg = "response code: 400"
 )
 
 var (
@@ -169,17 +173,20 @@ func (r *Routes) serverConditionCreate(c *gin.Context) (int, *v1types.ServerResp
 
 func (r *Routes) serverEnroll(c *gin.Context) (int, *v1types.ServerResponse) {
 	id := c.Param("uuid")
-	ip := c.Param("ip")
-	username := c.Param("user")
-	password := c.Param("pwd")
-	facilityCode := c.Param("facility")
-
 	otelCtx, span := otel.Tracer(pkgName).Start(c.Request.Context(), "Routes.serverEnroll")
-	span.SetAttributes(
-		attribute.KeyValue{Key: "serverId", Value: attribute.StringValue(id)},
-		attribute.KeyValue{Key: "IP", Value: attribute.StringValue(ip)},
-		attribute.KeyValue{Key: "user", Value: attribute.StringValue(username)})
+	span.SetAttributes(attribute.KeyValue{Key: "serverId", Value: attribute.StringValue(id)})
 	defer span.End()
+
+	var conditionCreate v1types.ConditionCreate
+	if err := c.ShouldBindJSON(&conditionCreate); err != nil {
+		r.logger.WithFields(logrus.Fields{
+			"error": err,
+		}).Info("invalid ConditionCreate payload")
+
+		return http.StatusBadRequest, &v1types.ServerResponse{
+			Message: "invalid ConditionCreate payload: " + err.Error(),
+		}
+	}
 
 	var serverID uuid.UUID
 	var err error
@@ -198,9 +205,16 @@ func (r *Routes) serverEnroll(c *gin.Context) (int, *v1types.ServerResponse) {
 		serverID = uuid.New()
 	}
 
+	var params v1types.AddServerParams
+	if err := json.Unmarshal(conditionCreate.Parameters, &params); err != nil {
+		return http.StatusBadRequest, &v1types.ServerResponse{
+			Message: "invalid params: " + err.Error(),
+		}
+	}
+
 	// Creates a server record in FleetDB.
-	if err = r.fleetDBClient.AddServer(c.Request.Context(), serverID, facilityCode, ip, username, password); err != nil {
-		if errors.Is(err, fleetdb.ErrServerAlreadyExist) {
+	if err = r.fleetDBClient.AddServer(c.Request.Context(), serverID, params.Facility, params.IP, params.Username, params.Password); err != nil {
+		if strings.Contains(err.Error(), badRequestErrMsg) {
 			return http.StatusBadRequest, &v1types.ServerResponse{
 				Message: err.Error(),
 			}
@@ -214,20 +228,9 @@ func (r *Routes) serverEnroll(c *gin.Context) (int, *v1types.ServerResponse) {
 	// May change in the future.
 	kind := rctypes.Kind(rctypes.Inventory)
 
-	var conditionCreate v1types.ConditionCreate
-	if err := c.ShouldBindJSON(&conditionCreate); err != nil {
-		r.logger.WithFields(logrus.Fields{
-			"error": err,
-		}).Info("invalid ConditionCreate payload")
-
-		return http.StatusBadRequest, &v1types.ServerResponse{
-			Message: "invalid ConditionCreate payload: " + err.Error(),
-		}
-	}
-
 	newCondition := conditionCreate.NewCondition(kind)
 
-	return r.conditionCreate(otelCtx, newCondition, serverID, facilityCode)
+	return r.conditionCreate(otelCtx, newCondition, serverID, params.Facility)
 }
 
 func (r *Routes) conditionCreate(otelCtx context.Context, newCondition *rctypes.Condition, serverID uuid.UUID, facilityCode string) (int, *v1types.ServerResponse) {

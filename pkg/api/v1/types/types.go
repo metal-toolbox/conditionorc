@@ -38,6 +38,14 @@ type ConditionCreate struct {
 	Fault      *rctypes.Fault  `json:"fault,omitempty"`
 }
 
+// AddServerParams is the request payload to add a server to fleetdb.
+type AddServerParams struct {
+	Facility string `json:"facility"`
+	IP       string `json:"ip"`
+	Username string `json:"user"`
+	Password string `json:"pwd"`
+}
+
 // NewCondition returns a new Condition type.
 func (c *ConditionCreate) NewCondition(kind rctypes.Kind) *rctypes.Condition {
 	return &rctypes.Condition{

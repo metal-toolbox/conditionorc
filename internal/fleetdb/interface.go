@@ -19,6 +19,7 @@ import (
 )
 
 // FleetDB handles traffics between conditionorc and fleet db.
+// NOTE: when updating this interface, run make gen-store-mock to make sure the mocks are updated.
 type FleetDB interface {
 	// AddServer creates a server in fleet db.
 	AddServer(ctx context.Context, serverID uuid.UUID, facilityCode, bmcAddr, bmcUser, bmcPass string) error

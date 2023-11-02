@@ -4,12 +4,10 @@ import (
 	"context"
 	"fmt"
 	"net/netip"
-	"strings"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/metal-toolbox/conditionorc/internal/app"
-	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 
 	rctypes "github.com/metal-toolbox/rivets/condition"
@@ -23,10 +21,6 @@ type fleetDBImpl struct {
 	client               *sservice.Client
 	logger               *logrus.Logger
 }
-
-const (
-	badRequestErrMsg = "response code: 400"
-)
 
 var (
 	// connectionTimeout is the maximum amount of time spent on each http connection to FleetDBClient.
@@ -48,9 +42,6 @@ func (s *fleetDBImpl) AddServer(ctx context.Context, serverID uuid.UUID, facilit
 	server := sservice.Server{UUID: serverID, Name: serverID.String(), FacilityCode: facilityCode}
 	_, _, err = s.client.Create(ctx, server)
 	if err != nil {
-		if strings.Contains(err.Error(), badRequestErrMsg) {
-			return errors.Wrap(ErrServerAlreadyExist, err.Error())
-		}
 		return err
 	}
 

@@ -129,7 +129,7 @@ func (r *Routes) composeAuthHandler(scopes []string) gin.HandlerFunc {
 
 func (r *Routes) Routes(g *gin.RouterGroup) {
 	serverEnroll := g.Group("/serverEnroll")
-	serverEnroll.POST("", r.composeAuthHandler(createScopes("server-enroll")), wrapAPICall(r.serverEnroll))
+	serverEnroll.POST("/:uuid", r.composeAuthHandler(createScopes("server-enroll")), wrapAPICall(r.serverEnroll))
 
 	servers := g.Group("/servers/:uuid")
 	{
