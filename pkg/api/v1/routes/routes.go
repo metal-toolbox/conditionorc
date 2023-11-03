@@ -35,6 +35,7 @@ type Routes struct {
 	streamBroker         events.Stream
 	conditionDefinitions rctypes.Definitions
 	logger               *logrus.Logger
+	enableServerEnroll   bool
 }
 
 // Option type sets a parameter on the Routes type.
@@ -51,6 +52,13 @@ func WithStore(repository store.Repository) Option {
 func WithFleetDBClient(client fleetdb.FleetDB) Option {
 	return func(r *Routes) {
 		r.fleetDBClient = client
+	}
+}
+
+// EnableServerEnroll enables server enroll API.
+func EnableServerEnroll(enable bool) Option {
+	return func(r *Routes) {
+		r.enableServerEnroll = enable
 	}
 }
 
@@ -128,8 +136,10 @@ func (r *Routes) composeAuthHandler(scopes []string) gin.HandlerFunc {
 }
 
 func (r *Routes) Routes(g *gin.RouterGroup) {
-	serverEnroll := g.Group("/serverEnroll")
-	serverEnroll.POST("/:uuid", r.composeAuthHandler(createScopes("server-enroll")), wrapAPICall(r.serverEnroll))
+	if r.enableServerEnroll {
+		serverEnroll := g.Group("/serverEnroll")
+		serverEnroll.POST("/:uuid", r.composeAuthHandler(createScopes("server-enroll")), wrapAPICall(r.serverEnroll))
+	}
 
 	servers := g.Group("/servers/:uuid")
 	{

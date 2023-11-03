@@ -66,6 +66,7 @@ var cmdServer = &cobra.Command{
 			server.WithListenAddress(app.Config.ListenAddress),
 			server.WithStore(repository),
 			server.WithFleetDBClient(fleetDBClient),
+			server.EnableServerEnroll(app.Config.EnableServerEnroll),
 			server.WithStreamBroker(streamBroker),
 			server.WithConditionDefinitions(app.Config.ConditionDefinitions),
 		}

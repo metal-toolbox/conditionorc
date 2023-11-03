@@ -224,11 +224,21 @@ func (r *Routes) serverEnroll(c *gin.Context) (int, *v1types.ServerResponse) {
 		}
 	}
 
-	// Reuse the inventory for server enrollment.
-	// May change in the future.
-	kind := rctypes.Kind(rctypes.Inventory)
-
-	newCondition := conditionCreate.NewCondition(kind)
+	// Delete params related to add servers.
+	var inventoryArgs rctypes.InventoryTaskParameters
+	if err = json.Unmarshal(conditionCreate.Parameters, &inventoryArgs); err != nil {
+		return http.StatusBadRequest, &v1types.ServerResponse{
+			Message: "invalid inventory params: " + err.Error(),
+		}
+	}
+	inventoryParams, err := json.Marshal(inventoryArgs)
+	if err != nil {
+		return http.StatusBadRequest, &v1types.ServerResponse{
+			Message: err.Error(),
+		}
+	}
+	conditionCreate.Parameters = inventoryParams
+	newCondition := conditionCreate.NewCondition(rctypes.Inventory)
 
 	return r.conditionCreate(otelCtx, newCondition, serverID, params.Facility)
 }

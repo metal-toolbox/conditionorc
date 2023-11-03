@@ -36,6 +36,7 @@ func mockserver(t *testing.T, logger *logrus.Logger, fleetDBClient fleetdb.Fleet
 		WithLogger(logger),
 		WithStore(repository),
 		WithFleetDBClient(fleetDBClient),
+		EnableServerEnroll(true),
 		WithConditionDefinitions(
 			[]*rctypes.Definition{
 				{Kind: rctypes.FirmwareInstall},
@@ -111,7 +112,9 @@ func TestAddServer(t *testing.T) {
 	mockIP := "mock-ip"
 	mockUser := "mock-user"
 	mockPwd := "mock-pwd"
-	validParams := fmt.Sprintf(`{"facility":"%v","ip":"%v","user":"%v","pwd":"%v","some param":"1"}`, mockFacilityCode, mockIP, mockUser, mockPwd)
+	validParams := fmt.Sprintf(`{"facility":"%v","ip":"%v","user":"%v","pwd":"%v","some param":"1","asset_id":"%v","collect_firmware_status":true,"inventory_method":"outofband"}`, mockFacilityCode, mockIP, mockUser, mockPwd, mockServerID)
+	// collect_bios_cfg is default to false since we don't set it in validParams.
+	expectedInventoryParams := fmt.Sprintf(`{"collect_bios_cfg":false,"collect_firmware_status":true,"inventory_method":"outofband","asset_id":"%v"}`, mockServerID)
 
 	testcases := []struct {
 		name              string
@@ -135,7 +138,7 @@ func TestAddServer(t *testing.T) {
 					DoAndReturn(func(_ context.Context, _ uuid.UUID, c *rctypes.Condition) error {
 						assert.Equal(t, rctypes.ConditionStructVersion, c.Version, "condition version mismatch")
 						assert.Equal(t, rctypes.Inventory, c.Kind, "condition kind mismatch")
-						assert.Equal(t, json.RawMessage(validParams), c.Parameters, "condition parameters mismatch")
+						assert.Equal(t, json.RawMessage(expectedInventoryParams), c.Parameters, "condition parameters mismatch")
 						assert.Equal(t, rctypes.Pending, c.State, "condition state mismatch")
 						return nil
 					}).

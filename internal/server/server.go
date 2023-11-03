@@ -39,6 +39,7 @@ type Server struct {
 	conditionDefinitions rctypes.Definitions
 	repository           store.Repository
 	fleetDBClient        fleetdb.FleetDB
+	enableServerEnroll   bool
 }
 
 // Option type sets a parameter on the Server type.
@@ -55,6 +56,13 @@ func WithStore(repository store.Repository) Option {
 func WithFleetDBClient(client fleetdb.FleetDB) Option {
 	return func(s *Server) {
 		s.fleetDBClient = client
+	}
+}
+
+// EnableServerEnroll enables server enroll API.
+func EnableServerEnroll(enable bool) Option {
+	return func(s *Server) {
+		s.enableServerEnroll = enable
 	}
 }
 
@@ -109,6 +117,7 @@ func New(opts ...Option) *http.Server {
 		routes.WithLogger(s.logger),
 		routes.WithStore(s.repository),
 		routes.WithFleetDBClient(s.fleetDBClient),
+		routes.EnableServerEnroll(s.enableServerEnroll),
 		routes.WithStreamBroker(s.streamBroker),
 		routes.WithConditionDefinitions(s.conditionDefinitions),
 	}
