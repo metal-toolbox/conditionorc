@@ -35,7 +35,7 @@ type Configuration struct {
 	Concurrency int `mapstructure:"concurrency"`
 
 	// StoreKind indicates the kind of store to store server conditions
-	// supported parameter value - serverservice
+	// supported parameter value - NATS
 	StoreKind model.StoreKind `mapstructure:"store_kind"`
 
 	// APIServerJWTAuth sets the JWT verification configuration for the conditionorc API service.

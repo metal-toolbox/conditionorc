@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/url"
 	"strings"
+	"time"
 
 	"github.com/coreos/go-oidc"
 	"github.com/google/uuid"
@@ -52,7 +53,11 @@ type Repository interface {
 	Delete(ctx context.Context, serverID uuid.UUID, conditionKind rctypes.Kind) error
 }
 
-var ErrRepository = errors.New("storage repository error")
+var (
+	pkgName        = "internal/store"
+	ErrRepository  = errors.New("storage repository error")
+	fleetDBTimeout = 30 * time.Second
+)
 
 func NewStore(ctx context.Context, config *app.Configuration, conditionDefs rctypes.Definitions,
 	logger *logrus.Logger, stream events.Stream) (Repository, error) {
@@ -67,13 +72,6 @@ func NewStore(ctx context.Context, config *app.Configuration, conditionDefs rcty
 	storeKind := strings.ToLower(string(config.StoreKind))
 
 	switch model.StoreKind(storeKind) {
-	case model.ServerserviceStore:
-		return &Serverservice{
-			config:               ssOpts,
-			conditionDefinitions: conditionDefs,
-			logger:               logger,
-			client:               client,
-		}, nil
 	case model.NATS:
 		return newNatsRepository(client, logger, stream, config.NatsOptions.KVReplicationFactor)
 	default:
@@ -146,7 +144,7 @@ func newClientWithOAuth(ctx context.Context, cfg *app.ServerserviceOptions, logg
 	retryableClient.HTTPClient.Jar = oAuthclient.Jar
 
 	httpClient := retryableClient.StandardClient()
-	httpClient.Timeout = connectionTimeout
+	httpClient.Timeout = fleetDBTimeout
 
 	return sservice.NewClientWithToken(
 		cfg.OidcClientSecret,

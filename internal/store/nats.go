@@ -31,6 +31,7 @@ var (
 		kv.WithDescription("tracking active conditions on servers"),
 		kv.WithTTL(10 * 24 * time.Hour), // XXX: we could keep more history here, but might need more storage
 	}
+	errServerLookup = errors.New("unable to retrieve server")
 )
 
 type natsStore struct {
@@ -55,6 +56,10 @@ func (c conditionRecord) MustJSON() json.RawMessage {
 
 func (c *conditionRecord) FromJSON(rm json.RawMessage) error {
 	return json.Unmarshal(rm, c)
+}
+
+func serverServiceError(operation string) {
+	metrics.DependencyError("serverservice", operation)
 }
 
 func natsError(op string) {
@@ -169,7 +174,7 @@ func (n *natsStore) GetServer(ctx context.Context, serverID uuid.UUID) (*model.S
 
 		serverServiceError("get-server")
 
-		return nil, errors.Wrap(ErrServerserviceQuery, err.Error())
+		return nil, errors.Wrap(errServerLookup, err.Error())
 	}
 
 	return &model.Server{ID: obj.UUID, FacilityCode: obj.FacilityCode}, nil

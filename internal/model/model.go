@@ -28,9 +28,6 @@ const (
 	// AppKindServer identifies a condition API service.
 	AppKindServer AppKind = "server"
 
-	// ServerserviceStore identifies a serverservice store.
-	ServerserviceStore StoreKind = "serverservice"
-
 	// NATS is a NATS kv-based store
 	NATS StoreKind = "nats"
 
