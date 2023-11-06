@@ -52,7 +52,7 @@ func (s *fleetDBImpl) AddServer(ctx context.Context, serverID uuid.UUID, facilit
 	}
 
 	// Add server BMC IP attribute
-	addrAttr := fmt.Sprintf(`{"address": "%q"}`, addr.String())
+	addrAttr := fmt.Sprintf(`{"address": %q}`, addr.String())
 	bmcIPAttr := sservice.Attributes{Namespace: rservice.ServerAttributeNSBmcAddress, Data: []byte(addrAttr)}
 	_, err = s.client.CreateAttributes(ctx, serverID, bmcIPAttr)
 	return err
