@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -19,6 +20,10 @@ import (
 	"github.com/metal-toolbox/conditionorc/internal/store"
 	v1types "github.com/metal-toolbox/conditionorc/pkg/api/v1/types"
 	rctypes "github.com/metal-toolbox/rivets/condition"
+)
+
+const (
+	badRequestErrMsg = "response code: 400"
 )
 
 var (
@@ -163,8 +168,84 @@ func (r *Routes) serverConditionCreate(c *gin.Context) (int, *v1types.ServerResp
 		}
 	}
 
+	return r.conditionCreate(otelCtx, newCondition, serverID, facilityCode)
+}
+
+func (r *Routes) serverEnroll(c *gin.Context) (int, *v1types.ServerResponse) {
+	id := c.Param("uuid")
+	otelCtx, span := otel.Tracer(pkgName).Start(c.Request.Context(), "Routes.serverEnroll")
+	span.SetAttributes(attribute.KeyValue{Key: "serverId", Value: attribute.StringValue(id)})
+	defer span.End()
+
+	var conditionCreate v1types.ConditionCreate
+	if err := c.ShouldBindJSON(&conditionCreate); err != nil {
+		r.logger.WithFields(logrus.Fields{
+			"error": err,
+		}).Info("invalid ConditionCreate payload")
+
+		return http.StatusBadRequest, &v1types.ServerResponse{
+			Message: "invalid ConditionCreate payload: " + err.Error(),
+		}
+	}
+
+	var serverID uuid.UUID
+	var err error
+	if id != "" {
+		serverID, err = uuid.Parse(id)
+		if err != nil {
+			r.logger.WithFields(logrus.Fields{
+				"serverID": id,
+			}).Info("bad serverID")
+
+			return http.StatusBadRequest, &v1types.ServerResponse{
+				Message: err.Error(),
+			}
+		}
+	} else {
+		serverID = uuid.New()
+	}
+
+	var params v1types.AddServerParams
+	if err = json.Unmarshal(conditionCreate.Parameters, &params); err != nil {
+		return http.StatusBadRequest, &v1types.ServerResponse{
+			Message: "invalid params: " + err.Error(),
+		}
+	}
+
+	// Creates a server record in FleetDB.
+	if err = r.fleetDBClient.AddServer(c.Request.Context(), serverID, params.Facility, params.IP, params.Username, params.Password); err != nil {
+		if strings.Contains(err.Error(), badRequestErrMsg) {
+			return http.StatusBadRequest, &v1types.ServerResponse{
+				Message: err.Error(),
+			}
+		}
+		return http.StatusInternalServerError, &v1types.ServerResponse{
+			Message: err.Error(),
+		}
+	}
+
+	// Delete params related to add servers.
+	var inventoryArgs rctypes.InventoryTaskParameters
+	if err = json.Unmarshal(conditionCreate.Parameters, &inventoryArgs); err != nil {
+		return http.StatusBadRequest, &v1types.ServerResponse{
+			Message: "invalid inventory params: " + err.Error(),
+		}
+	}
+	inventoryParams, err := json.Marshal(inventoryArgs)
+	if err != nil {
+		return http.StatusBadRequest, &v1types.ServerResponse{
+			Message: err.Error(),
+		}
+	}
+	conditionCreate.Parameters = inventoryParams
+	newCondition := conditionCreate.NewCondition(rctypes.Inventory)
+
+	return r.conditionCreate(otelCtx, newCondition, serverID, params.Facility)
+}
+
+func (r *Routes) conditionCreate(otelCtx context.Context, newCondition *rctypes.Condition, serverID uuid.UUID, facilityCode string) (int, *v1types.ServerResponse) {
 	// Create the new condition
-	err = r.repository.Create(otelCtx, serverID, newCondition)
+	err := r.repository.Create(otelCtx, serverID, newCondition)
 	if err != nil {
 		r.logger.WithFields(logrus.Fields{
 			"error": err,

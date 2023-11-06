@@ -9,6 +9,7 @@ import (
 	ginSwagger "github.com/swaggo/gin-swagger"
 
 	"github.com/gin-gonic/gin"
+	"github.com/metal-toolbox/conditionorc/internal/fleetdb"
 	"github.com/metal-toolbox/conditionorc/internal/store"
 	"github.com/metal-toolbox/conditionorc/pkg/api/v1/routes"
 	"github.com/pkg/errors"
@@ -37,6 +38,8 @@ type Server struct {
 	listenAddress        string
 	conditionDefinitions rctypes.Definitions
 	repository           store.Repository
+	fleetDBClient        fleetdb.FleetDB
+	enableServerEnroll   bool
 }
 
 // Option type sets a parameter on the Server type.
@@ -46,6 +49,20 @@ type Option func(*Server)
 func WithStore(repository store.Repository) Option {
 	return func(s *Server) {
 		s.repository = repository
+	}
+}
+
+// WithFleetDBClient sets the client communicating with the fleet db.
+func WithFleetDBClient(client fleetdb.FleetDB) Option {
+	return func(s *Server) {
+		s.fleetDBClient = client
+	}
+}
+
+// EnableServerEnroll enables server enroll API.
+func EnableServerEnroll(enable bool) Option {
+	return func(s *Server) {
+		s.enableServerEnroll = enable
 	}
 }
 
@@ -99,6 +116,8 @@ func New(opts ...Option) *http.Server {
 	options := []routes.Option{
 		routes.WithLogger(s.logger),
 		routes.WithStore(s.repository),
+		routes.WithFleetDBClient(s.fleetDBClient),
+		routes.EnableServerEnroll(s.enableServerEnroll),
 		routes.WithStreamBroker(s.streamBroker),
 		routes.WithConditionDefinitions(s.conditionDefinitions),
 	}

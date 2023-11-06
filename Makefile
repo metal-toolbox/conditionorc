@@ -25,6 +25,7 @@ test: lint
 gen-store-mock:
 	go install github.com/golang/mock/mockgen@v1.6.0
 	mockgen -package=store -source=internal/store/interface.go > internal/store/mock.go
+	mockgen -package=fleetdb -source=internal/fleetdb/interface.go > internal/fleetdb/mock.go
 
 ## build osx bin
 build-osx:
