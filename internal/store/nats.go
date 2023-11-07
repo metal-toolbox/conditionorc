@@ -8,17 +8,14 @@ package store
 import (
 	"context"
 	"encoding/json"
-	"strings"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/metal-toolbox/conditionorc/internal/metrics"
-	"github.com/metal-toolbox/conditionorc/internal/model"
 	rctypes "github.com/metal-toolbox/rivets/condition"
 	"github.com/nats-io/nats.go"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
-	sservice "go.hollow.sh/serverservice/pkg/api/v1"
 	"go.hollow.sh/toolbox/events"
 	"go.hollow.sh/toolbox/events/pkg/kv"
 	"go.opentelemetry.io/otel"
@@ -31,11 +28,9 @@ var (
 		kv.WithDescription("tracking active conditions on servers"),
 		kv.WithTTL(10 * 24 * time.Hour), // XXX: we could keep more history here, but might need more storage
 	}
-	errServerLookup = errors.New("unable to retrieve server")
 )
 
 type natsStore struct {
-	client *sservice.Client
 	log    *logrus.Logger
 	bucket nats.KeyValue
 }
@@ -58,15 +53,11 @@ func (c *conditionRecord) FromJSON(rm json.RawMessage) error {
 	return json.Unmarshal(rm, c)
 }
 
-func serverServiceError(operation string) {
-	metrics.DependencyError("serverservice", operation)
-}
-
 func natsError(op string) {
 	metrics.DependencyError("nats-active-conditions", op)
 }
 
-func newNatsRepository(client *sservice.Client, log *logrus.Logger, stream events.Stream, replicaCount int) (*natsStore, error) {
+func newNatsRepository(log *logrus.Logger, stream events.Stream, replicaCount int) (*natsStore, error) {
 	evJS, ok := stream.(*events.NatsJetstream)
 	if !ok {
 		// play stupid games, win stupid prizes
@@ -84,7 +75,6 @@ func newNatsRepository(client *sservice.Client, log *logrus.Logger, stream event
 		return nil, errors.Wrap(err, "binding active conditions bucket")
 	}
 	return &natsStore{
-		client: client,
 		log:    log,
 		bucket: kvHandle,
 	}, nil
@@ -153,42 +143,19 @@ func (n *natsStore) Get(ctx context.Context, serverID uuid.UUID, kind rctypes.Ki
 	return condition, nil
 }
 
-// GetServer returns the facility for the requested server id.
-// XXX: this doesn't belong in this interface. We use it *only* to get a facility code.
-func (n *natsStore) GetServer(ctx context.Context, serverID uuid.UUID) (*model.Server, error) {
-	otelCtx, span := otel.Tracer(pkgName).Start(ctx, "NatsStore.GetServer")
+// GetActiveCondition returns any condition for the given server-id that is not in a final state.
+// This is a locking mechanism to ensure that conditions (or sets of condtions) are only executed
+// one-at-a-time. That is, even though "Pending" condition isn't "Active" per se, it is still
+// just waiting on a controller and it's equivalent for the purposes of checking if another condition
+// can be started.
+func (n *natsStore) GetActiveCondition(ctx context.Context, srvID uuid.UUID) (*rctypes.Condition, error) {
+	_, span := otel.Tracer(pkgName).Start(ctx, "NatsStore.GetActiveCondition")
 	defer span.End()
 
-	// list attributes on a server
-	obj, _, err := n.client.Get(otelCtx, serverID)
-	if err != nil {
-		if strings.Contains(err.Error(), "404") {
-			return nil, ErrServerNotFound
-		}
-
-		n.log.WithFields(logrus.Fields{
-			"serverID": serverID.String(),
-			"error":    err,
-			"method":   "GetServer",
-		}).Warn("error reaching serverservice")
-
-		serverServiceError("get-server")
-
-		return nil, errors.Wrap(errServerLookup, err.Error())
-	}
-
-	return &model.Server{ID: obj.UUID, FacilityCode: obj.FacilityCode}, nil
-}
-
-// List retrieves any active conditions
-func (n *natsStore) List(ctx context.Context, srvID uuid.UUID, incState rctypes.State) ([]*rctypes.Condition, error) {
-	_, span := otel.Tracer(pkgName).Start(ctx, "NatsStore.List")
-	defer span.End()
 	le := n.log.WithFields(logrus.Fields{
 		"serverID": srvID.String(),
 	})
 
-	// ugh, so much copy-pasta
 	kve, err := n.bucket.Get(srvID.String())
 	switch {
 	case err == nil:
@@ -207,31 +174,23 @@ func (n *natsStore) List(ctx context.Context, srvID uuid.UUID, incState rctypes.
 		return nil, errors.Wrap(ErrRepository, err.Error())
 	}
 
-	var found bool
-	var outgoing rctypes.Condition
-	for _, c := range cr.Conditions {
-		//nolint:gocritic // inverting this test is a moronic suggestion and you should feel bad about it
-		if !rctypes.StateIsComplete(c.State) {
-			// The first incomplete condition is good enough
-			found = true
-			outgoing = *c
-			// make sure to match the requested parameters to short circuit the loops in the handler.
-			// we don't care what the actual state of the found condition is; the fact that it's incomplete
-			// is enough to signal to the API handler that it should *not* accept a new condition
-			// for this server
-			outgoing.Exclusive = true
-			outgoing.State = incState
+	if rctypes.StateIsComplete(cr.State) {
+		return nil, nil
+	}
+
+	var active *rctypes.Condition
+	for _, cond := range cr.Conditions {
+		if !rctypes.StateIsComplete(cond.State) {
+			le.WithFields(logrus.Fields{
+				"condition.id":    cond.ID,
+				"condition.state": string(cond.State),
+			}).Debug("found active condition for server")
+			active = cond
 			break
 		}
 	}
 
-	if !found {
-		return nil, nil
-	}
-
-	return []*rctypes.Condition{
-		&outgoing,
-	}, nil
+	return active, nil
 }
 
 // Create a condition on a server.
@@ -292,6 +251,12 @@ func (n *natsStore) Update(ctx context.Context, serverID uuid.UUID, condition *r
 		span.RecordError(err)
 		le.WithError(err).Warn("condition lookup failure on update")
 		return err
+	}
+
+	// stupid games, stupid prizes sanity check
+	if cr.ID != condition.ID {
+		le.WithField("record.ID", cr.ID.String()).Warn("condition id mismatch")
+		return errors.Wrap(ErrRepository, "condition id mismatch")
 	}
 
 	cr.State = condition.State

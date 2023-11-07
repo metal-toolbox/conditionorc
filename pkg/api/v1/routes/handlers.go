@@ -95,78 +95,26 @@ func (r *Routes) serverConditionCreate(c *gin.Context) (int, *v1types.ServerResp
 		}
 	}
 
-	newCondition := conditionCreate.NewCondition(kind)
-
-	// check the condition doesn't already exist in an incomplete state
-	existing, err := r.repository.Get(otelCtx, serverID, kind)
-	if err != nil && !errors.Is(err, store.ErrConditionNotFound) {
-		r.logger.WithFields(logrus.Fields{
-			"error":    err,
-			"serverID": serverID.String(),
-			"kind":     kind,
-		}).Info("condition lookup failed")
-
-		return http.StatusServiceUnavailable, &v1types.ServerResponse{
-			Message: err.Error(),
-		}
-	}
-
-	if existing != nil && !existing.IsComplete() {
-		r.logger.WithFields(logrus.Fields{
-			"serverID":    serverID.String(),
-			"conditionID": existing.ID.String(),
-			"kind":        kind,
-		}).Info("existing server condition found")
-
-		return http.StatusBadRequest, &v1types.ServerResponse{
-			Message: "condition present in an incomplete state: " + string(existing.State),
-		}
-	}
-
-	// purge the existing condition
-	if existing != nil {
-		err = r.repository.Delete(otelCtx, serverID, kind)
-		if err != nil && !errors.Is(err, store.ErrConditionNotFound) {
-			r.logger.WithFields(logrus.Fields{
-				"error": err,
-			}).Info("unable to remove existing, finalized condition")
-
-			return http.StatusInternalServerError, &v1types.ServerResponse{
-				Message: err.Error(),
-			}
-		}
-	}
-
-	// XXX: if this is a check for another condition holding a lock is there a way to do this without
-	// iterating all conditions?
-	// check if any condition with exclusive set is in incomplete states
-	if errEx := r.exclusiveNonFinalConditionExists(otelCtx, serverID); errEx != nil {
-		if errors.Is(errEx, ErrConditionExclusive) {
-			r.logger.WithFields(logrus.Fields{
-				"error": err,
-				// XXX: would be nice to have the id of the exclusive condition here too
-			}).Info("active, exclusive condition on this server")
-
-			return http.StatusBadRequest, &v1types.ServerResponse{
-				Message: errEx.Error(),
-			}
-		}
-
-		r.logger.WithFields(logrus.Fields{
-			"error": err,
-		}).Info("error checking for exclusive conditions")
-
-		return http.StatusInternalServerError, &v1types.ServerResponse{
-			Message: errEx.Error(),
-		}
-	}
-
 	facilityCode, err := r.serverFacilityCode(otelCtx, serverID)
 	if err != nil {
 		return http.StatusInternalServerError, &v1types.ServerResponse{
 			Message: err.Error(),
 		}
 	}
+
+	active, err := r.repository.GetActiveCondition(otelCtx, serverID)
+	if err != nil {
+		return http.StatusServiceUnavailable, &v1types.ServerResponse{
+			Message: "error checking server state: " + err.Error(),
+		}
+	}
+	if active != nil {
+		return http.StatusBadRequest, &v1types.ServerResponse{
+			Message: "server has an active condition",
+		}
+	}
+
+	newCondition := conditionCreate.NewCondition(kind)
 
 	return r.conditionCreate(otelCtx, newCondition, serverID, facilityCode)
 }
@@ -300,7 +248,7 @@ func (r *Routes) conditionCreate(otelCtx context.Context, newCondition *rctypes.
 
 // look up server for facility code
 func (r *Routes) serverFacilityCode(ctx context.Context, serverID uuid.UUID) (string, error) {
-	server, err := r.repository.GetServer(ctx, serverID)
+	server, err := r.fleetDBClient.GetServer(ctx, serverID)
 	if err != nil {
 		r.logger.WithFields(logrus.Fields{
 			"error": err,
@@ -317,45 +265,6 @@ func (r *Routes) serverFacilityCode(ctx context.Context, serverID uuid.UUID) (st
 	}
 
 	return server.FacilityCode, nil
-}
-
-func (r *Routes) exclusiveNonFinalConditionExists(ctx context.Context, serverID uuid.UUID) error {
-	otelCtx, span := otel.Tracer(pkgName).Start(ctx, "Routes.exclusiveNonFinalConditionExists")
-	defer span.End()
-	// XXX: Clean me up! We're looking for any active condition here, so don't list, do a store lookup
-	// here. Any active condition here is enough to block queuing a new one.
-	for _, state := range rctypes.States() {
-		if rctypes.StateIsComplete(state) {
-			continue
-		}
-
-		existing, err := r.repository.List(otelCtx, serverID, state)
-		if err != nil && !errors.Is(err, store.ErrConditionNotFound) {
-			r.logger.WithFields(logrus.Fields{
-				"serverID": serverID.String(),
-				"state":    state,
-			}).Info("existing condition lookup failed")
-			return err
-		}
-
-		for _, existingCondition := range existing {
-			if existingCondition.Exclusive && existingCondition.State == state {
-				r.logger.WithFields(logrus.Fields{
-					"serverID":    serverID.String(),
-					"conditionID": existingCondition.ID.String(),
-					"kind":        existingCondition.Kind,
-					"state":       existingCondition.State,
-				}).Info("existing exclusive server condition found")
-				return errors.Wrap(
-					ErrConditionExclusive,
-					fmt.Sprintf("%s:%s condition exists in an incomplete state - %s",
-						existingCondition.ID.String(), existingCondition.Kind, string(existingCondition.State)),
-				)
-			}
-		}
-	}
-
-	return nil
 }
 
 func RegisterSpanEvent(span trace.Span, serverID, conditionID, conditionKind, event string) {

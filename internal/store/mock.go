@@ -10,7 +10,6 @@ import (
 
 	gomock "github.com/golang/mock/gomock"
 	uuid "github.com/google/uuid"
-	model "github.com/metal-toolbox/conditionorc/internal/model"
 	condition "github.com/metal-toolbox/rivets/condition"
 )
 
@@ -80,34 +79,19 @@ func (mr *MockRepositoryMockRecorder) Get(ctx, serverID, conditionKind interface
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Get", reflect.TypeOf((*MockRepository)(nil).Get), ctx, serverID, conditionKind)
 }
 
-// GetServer mocks base method.
-func (m *MockRepository) GetServer(ctx context.Context, serverID uuid.UUID) (*model.Server, error) {
+// GetActiveCondition mocks base method.
+func (m *MockRepository) GetActiveCondition(ctx context.Context, serverID uuid.UUID) (*condition.Condition, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetServer", ctx, serverID)
-	ret0, _ := ret[0].(*model.Server)
+	ret := m.ctrl.Call(m, "GetActiveCondition", ctx, serverID)
+	ret0, _ := ret[0].(*condition.Condition)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// GetServer indicates an expected call of GetServer.
-func (mr *MockRepositoryMockRecorder) GetServer(ctx, serverID interface{}) *gomock.Call {
+// GetActiveCondition indicates an expected call of GetActiveCondition.
+func (mr *MockRepositoryMockRecorder) GetActiveCondition(ctx, serverID interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetServer", reflect.TypeOf((*MockRepository)(nil).GetServer), ctx, serverID)
-}
-
-// List mocks base method.
-func (m *MockRepository) List(ctx context.Context, serverID uuid.UUID, conditionState condition.State) ([]*condition.Condition, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "List", ctx, serverID, conditionState)
-	ret0, _ := ret[0].([]*condition.Condition)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// List indicates an expected call of List.
-func (mr *MockRepositoryMockRecorder) List(ctx, serverID, conditionState interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "List", reflect.TypeOf((*MockRepository)(nil).List), ctx, serverID, conditionState)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetActiveCondition", reflect.TypeOf((*MockRepository)(nil).GetActiveCondition), ctx, serverID)
 }
 
 // Update mocks base method.

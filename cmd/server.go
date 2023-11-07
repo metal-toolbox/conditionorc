@@ -45,7 +45,7 @@ var cmdServer = &cobra.Command{
 		// setup cancel context with cancel func
 		ctx, serverCancel := context.WithCancel(cmd.Context())
 
-		repository, err := store.NewStore(ctx, app.Config, app.Config.ConditionDefinitions, app.Logger, streamBroker)
+		repository, err := store.NewStore(app.Config, app.Logger, streamBroker)
 		if err != nil {
 			app.Logger.Fatal(err)
 		}
