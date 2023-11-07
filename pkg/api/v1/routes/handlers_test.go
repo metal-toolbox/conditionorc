@@ -317,25 +317,32 @@ func TestServerConditionCreate(t *testing.T) {
 
 	repository := store.NewMockRepository(ctrl)
 
+	fleetDBCtrl := gomock.NewController(t)
+	defer fleetDBCtrl.Finish()
+
+	fleetDBClient := fleetdb.NewMockFleetDB(fleetDBCtrl)
+
 	streamCtrl := gomock.NewController(t)
 	defer streamCtrl.Finish()
 
 	stream := mockevents.NewMockStream(streamCtrl)
 
-	server, err := mockserver(t, logrus.New(), nil, repository, stream)
+	server, err := mockserver(t, logrus.New(), fleetDBClient, repository, stream)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	testcases := []struct {
-		name           string
-		mockStore      func(r *store.MockRepository)
-		mockStream     func(r *mockevents.MockStream)
-		request        func(t *testing.T) *http.Request
-		assertResponse func(t *testing.T, r *httptest.ResponseRecorder)
+		name              string
+		mockStore         func(r *store.MockRepository)
+		mockFleetDBClient func(f *fleetdb.MockFleetDB)
+		mockStream        func(r *mockevents.MockStream)
+		request           func(t *testing.T) *http.Request
+		assertResponse    func(t *testing.T, r *httptest.ResponseRecorder)
 	}{
 		{
 			"invalid server ID error",
+			nil,
 			nil,
 			nil,
 			func(t *testing.T) *http.Request {
@@ -356,6 +363,7 @@ func TestServerConditionCreate(t *testing.T) {
 			"invalid server condition state",
 			nil,
 			nil,
+			nil,
 			func(t *testing.T) *http.Request {
 				url := fmt.Sprintf("/api/v1/servers/%s/condition/%s", uuid.New().String(), "asdasd")
 				request, err := http.NewRequestWithContext(context.TODO(), http.MethodPost, url, http.NoBody)
@@ -374,6 +382,7 @@ func TestServerConditionCreate(t *testing.T) {
 			"invalid server condition payload returns error",
 			nil,
 			nil,
+			nil,
 			func(t *testing.T) *http.Request {
 				url := fmt.Sprintf("/api/v1/servers/%s/condition/%s", serverID.String(), rctypes.FirmwareInstall)
 				request, err := http.NewRequestWithContext(context.TODO(), http.MethodPost, url, bytes.NewReader([]byte(``)))
@@ -390,29 +399,10 @@ func TestServerConditionCreate(t *testing.T) {
 		},
 		{
 			"server with no facility code returns error",
-			// mock repository
-			func(r *store.MockRepository) {
-				// lookup for an existing condition
-				r.EXPECT().
-					Get(
-						gomock.Any(),
-						gomock.Eq(serverID),
-						gomock.Eq(rctypes.FirmwareInstall),
-					).
-					Return(nil, nil). // no condition exists
-					Times(1)
-
-				r.EXPECT().
-					List(
-						gomock.Any(),
-						gomock.Any(),
-						gomock.Any(),
-					).
-					Return(nil, nil).
-					Times(2)
-
+			nil,
+			func(m *fleetdb.MockFleetDB) {
 				// facility code lookup
-				r.EXPECT().
+				m.EXPECT().
 					GetServer(
 						gomock.Any(),
 						gomock.Eq(serverID),
@@ -451,35 +441,12 @@ func TestServerConditionCreate(t *testing.T) {
 
 				// lookup for an existing condition
 				r.EXPECT().
-					Get(
+					GetActiveCondition(
 						gomock.Any(),
 						gomock.Eq(serverID),
-						gomock.Eq(rctypes.FirmwareInstall),
 					).
 					Return(nil, nil). // no condition exists
 					Times(1)
-
-				r.EXPECT().
-					List(
-						gomock.Any(),
-						gomock.Any(),
-						gomock.Any(),
-					).
-					Return(nil, nil).
-					Times(2)
-
-				// facility code lookup
-				r.EXPECT().
-					GetServer(
-						gomock.Any(),
-						gomock.Eq(serverID),
-					).
-					Return(
-						&model.Server{ID: serverID, FacilityCode: facilityCode},
-						nil,
-					).
-					Times(1)
-
 				// create condition query
 				r.EXPECT().
 					Create(
@@ -496,6 +463,21 @@ func TestServerConditionCreate(t *testing.T) {
 					}).
 					Times(1)
 			},
+
+			func(m *fleetdb.MockFleetDB) {
+				// facility code lookup
+				m.EXPECT().
+					GetServer(
+						gomock.Any(),
+						gomock.Eq(serverID),
+					).
+					Return(
+						&model.Server{ID: serverID, FacilityCode: facilityCode},
+						nil,
+					).
+					Times(1)
+			},
+
 			func(r *mockevents.MockStream) {
 				r.EXPECT().
 					Publish(
@@ -535,33 +517,11 @@ func TestServerConditionCreate(t *testing.T) {
 			func(r *store.MockRepository) {
 				// lookup for an existing condition
 				r.EXPECT().
-					Get(
+					GetActiveCondition(
 						gomock.Any(),
 						gomock.Eq(serverID),
-						gomock.Eq(rctypes.FirmwareInstall),
 					).
 					Return(nil, nil). // no condition exists
-					Times(1)
-
-				r.EXPECT().
-					List(
-						gomock.Any(),
-						gomock.Any(),
-						gomock.Any(),
-					).
-					Return(nil, nil).
-					Times(2)
-
-				// facility code lookup
-				r.EXPECT().
-					GetServer(
-						gomock.Any(),
-						gomock.Eq(serverID),
-					).
-					Return(
-						&model.Server{ID: serverID, FacilityCode: facilityCode},
-						nil,
-					).
 					Times(1)
 
 				// create condition query
@@ -578,6 +538,20 @@ func TestServerConditionCreate(t *testing.T) {
 					}).
 					Times(1)
 			},
+			func(m *fleetdb.MockFleetDB) {
+				// facility code lookup
+				m.EXPECT().
+					GetServer(
+						gomock.Any(),
+						gomock.Eq(serverID),
+					).
+					Return(
+						&model.Server{ID: serverID, FacilityCode: facilityCode},
+						nil,
+					).
+					Times(1)
+			},
+
 			func(r *mockevents.MockStream) {
 				r.EXPECT().
 					Publish(
@@ -613,47 +587,25 @@ func TestServerConditionCreate(t *testing.T) {
 			},
 		},
 		{
-			"new condition replaces existing finalized condition",
+			"server condition exists in non-finalized state",
 			// mock repository
 			func(r *store.MockRepository) {
-				parametersJSON, err := json.Marshal(json.RawMessage(`{"some param": "1"}`))
-				if err != nil {
-					t.Error()
-				}
-
-				// lookup for an existing condition
+				// lookup existing condition
 				r.EXPECT().
-					Get(
+					GetActiveCondition(
 						gomock.Any(),
 						gomock.Eq(serverID),
-						gomock.Eq(rctypes.FirmwareInstall),
 					).
-					Return(&rctypes.Condition{
-						Kind:  rctypes.FirmwareInstall,
-						State: rctypes.Succeeded,
-					}, nil). // no condition exists
+					Return(&rctypes.Condition{ // condition present
+						Kind:       rctypes.FirmwareInstall,
+						State:      rctypes.Pending,
+						Parameters: []byte(`{"hello":"world"}`),
+					}, nil).
 					Times(1)
-
-				r.EXPECT().
-					List(
-						gomock.Any(),
-						gomock.Any(),
-						gomock.Any(),
-					).
-					Return(nil, nil).
-					Times(2)
-
-				r.EXPECT().
-					Delete(
-						gomock.Any(),
-						gomock.Eq(serverID),
-						gomock.Eq(rctypes.FirmwareInstall),
-					).
-					Return(nil).
-					Times(1)
-
+			},
+			func(m *fleetdb.MockFleetDB) {
 				// facility code lookup
-				r.EXPECT().
+				m.EXPECT().
 					GetServer(
 						gomock.Any(),
 						gomock.Eq(serverID),
@@ -663,77 +615,8 @@ func TestServerConditionCreate(t *testing.T) {
 						nil,
 					).
 					Times(1)
-
-				// create condition query
-				r.EXPECT().
-					Create(
-						gomock.Any(),
-						gomock.Eq(serverID),
-						gomock.Any(),
-					).
-					DoAndReturn(func(_ context.Context, _ uuid.UUID, c *rctypes.Condition) error {
-						assert.Equal(t, rctypes.ConditionStructVersion, c.Version, "condition version mismatch")
-						assert.Equal(t, rctypes.FirmwareInstall, c.Kind, "condition kind mismatch")
-						assert.Equal(t, json.RawMessage(parametersJSON), c.Parameters, "condition parameters mismatch")
-						assert.Equal(t, rctypes.Pending, c.State, "condition state mismatch")
-						return nil
-					}).
-					Times(1)
 			},
-			func(r *mockevents.MockStream) {
-				r.EXPECT().
-					Publish(
-						gomock.Any(),
-						gomock.Eq(fmt.Sprintf("%s.servers.%s", facilityCode, rctypes.FirmwareInstall)),
-						gomock.Any(),
-					).
-					Return(nil).
-					Times(1)
-			},
-			func(t *testing.T) *http.Request {
-				payload, err := json.Marshal(&v1types.ConditionCreate{Parameters: []byte(`{"some param": "1"}`)})
-				if err != nil {
-					t.Error()
-				}
-
-				url := fmt.Sprintf("/api/v1/servers/%s/condition/%s", serverID.String(), rctypes.FirmwareInstall)
-				request, err := http.NewRequestWithContext(context.TODO(), http.MethodPost, url, bytes.NewReader(payload))
-				if err != nil {
-					t.Fatal(err)
-				}
-
-				return request
-			},
-			func(t *testing.T, r *httptest.ResponseRecorder) {
-				assert.Equal(t, http.StatusOK, r.Code)
-				var resp v1types.ServerResponse
-				err := json.Unmarshal(r.Body.Bytes(), &resp)
-				assert.NoError(t, err, "malformed response body")
-				assert.Equal(t, "condition set", resp.Message)
-				assert.Equal(t, 1, len(resp.Records.Conditions), "bad length of return conditions")
-			},
-		},
-
-		{
-			"server condition exists in non-finalized state",
-			// mock repository
-			func(r *store.MockRepository) {
-				// lookup existing condition
-				r.EXPECT().
-					Get(
-						gomock.Any(),
-						gomock.Eq(serverID),
-						gomock.Eq(rctypes.FirmwareInstall),
-					).
-					Return(&rctypes.Condition{ // condition present
-						Kind:       rctypes.FirmwareInstall,
-						State:      rctypes.Pending,
-						Parameters: []byte(`{"hello":"world"}`),
-					}, nil).
-					Times(1)
-			},
-			func(r *mockevents.MockStream) {
-			},
+			nil,
 			func(t *testing.T) *http.Request {
 				url := fmt.Sprintf("/api/v1/servers/%s/condition/%s", serverID.String(), rctypes.FirmwareInstall)
 				request, err := http.NewRequestWithContext(context.TODO(), http.MethodPost, url, bytes.NewReader([]byte(`{"hello":"world"}`)))
@@ -745,52 +628,7 @@ func TestServerConditionCreate(t *testing.T) {
 			},
 			func(t *testing.T, r *httptest.ResponseRecorder) {
 				assert.Equal(t, http.StatusBadRequest, r.Code)
-				assert.Contains(t, string(asBytes(t, r.Body)), "condition present in an incomplete state")
-			},
-		},
-		{
-			"exclusive condition exists in non-finalized state",
-			// mock repository
-			func(r *store.MockRepository) {
-				// lookup existing condition
-				r.EXPECT().
-					Get(
-						gomock.Any(),
-						gomock.Eq(serverID),
-						gomock.Eq(rctypes.FirmwareInstall),
-					).
-					Return(nil, nil).
-					Times(1)
-
-				r.EXPECT().
-					List(
-						gomock.Any(),
-						gomock.Eq(serverID),
-						gomock.Eq(rctypes.Active),
-					).
-					Return([]*rctypes.Condition{
-						{
-							Kind:      rctypes.Inventory,
-							Exclusive: true,
-							State:     rctypes.Active,
-						},
-					}, nil).
-					Times(1)
-			},
-			func(r *mockevents.MockStream) {
-			},
-			func(t *testing.T) *http.Request {
-				url := fmt.Sprintf("/api/v1/servers/%s/condition/%s", serverID.String(), rctypes.FirmwareInstall)
-				request, err := http.NewRequestWithContext(context.TODO(), http.MethodPost, url, bytes.NewReader([]byte(`{"hello":"world"}`)))
-				if err != nil {
-					t.Fatal(err)
-				}
-
-				return request
-			},
-			func(t *testing.T, r *httptest.ResponseRecorder) {
-				assert.Equal(t, http.StatusBadRequest, r.Code)
-				assert.Contains(t, string(asBytes(t, r.Body)), "exclusive condition present")
+				assert.Contains(t, string(asBytes(t, r.Body)), "server has an active condition")
 			},
 		},
 		{
@@ -801,35 +639,12 @@ func TestServerConditionCreate(t *testing.T) {
 
 				// lookup for an existing condition
 				r.EXPECT().
-					Get(
+					GetActiveCondition(
 						gomock.Any(),
 						gomock.Eq(serverID),
-						gomock.Eq(rctypes.FirmwareInstall),
 					).
 					Return(nil, nil). // no condition exists
 					Times(1)
-
-				r.EXPECT().
-					List(
-						gomock.Any(),
-						gomock.Any(),
-						gomock.Any(),
-					).
-					Return(nil, nil).
-					Times(2)
-
-				// facility code lookup
-				r.EXPECT().
-					GetServer(
-						gomock.Any(),
-						gomock.Eq(serverID),
-					).
-					Return(
-						&model.Server{ID: serverID, FacilityCode: facilityCode},
-						nil,
-					).
-					Times(1)
-
 				// create condition query
 				r.EXPECT().
 					Create(
@@ -852,6 +667,21 @@ func TestServerConditionCreate(t *testing.T) {
 					Times(1).
 					Return(nil)
 			},
+
+			func(m *fleetdb.MockFleetDB) {
+				// facility code lookup
+				m.EXPECT().
+					GetServer(
+						gomock.Any(),
+						gomock.Eq(serverID),
+					).
+					Return(
+						&model.Server{ID: serverID, FacilityCode: facilityCode},
+						nil,
+					).
+					Times(1)
+			},
+
 			func(r *mockevents.MockStream) {
 				r.EXPECT().
 					Publish(
@@ -894,6 +724,10 @@ func TestServerConditionCreate(t *testing.T) {
 
 			if tc.mockStream != nil {
 				tc.mockStream(stream)
+			}
+
+			if tc.mockFleetDBClient != nil {
+				tc.mockFleetDBClient(fleetDBClient)
 			}
 
 			recorder := httptest.NewRecorder()

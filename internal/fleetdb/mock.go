@@ -10,6 +10,7 @@ import (
 
 	gomock "github.com/golang/mock/gomock"
 	uuid "github.com/google/uuid"
+	model "github.com/metal-toolbox/conditionorc/internal/model"
 )
 
 // MockFleetDB is a mock of FleetDB interface.
@@ -47,4 +48,19 @@ func (m *MockFleetDB) AddServer(ctx context.Context, serverID uuid.UUID, facilit
 func (mr *MockFleetDBMockRecorder) AddServer(ctx, serverID, facilityCode, bmcAddr, bmcUser, bmcPass interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AddServer", reflect.TypeOf((*MockFleetDB)(nil).AddServer), ctx, serverID, facilityCode, bmcAddr, bmcUser, bmcPass)
+}
+
+// GetServer mocks base method.
+func (m *MockFleetDB) GetServer(ctx context.Context, serverID uuid.UUID) (*model.Server, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetServer", ctx, serverID)
+	ret0, _ := ret[0].(*model.Server)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetServer indicates an expected call of GetServer.
+func (mr *MockFleetDBMockRecorder) GetServer(ctx, serverID interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetServer", reflect.TypeOf((*MockFleetDB)(nil).GetServer), ctx, serverID)
 }

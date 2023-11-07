@@ -56,7 +56,7 @@ var cmdOrchestrator = &cobra.Command{
 			app.Logger.Fatal(err)
 		}
 
-		repository, err := store.NewStore(ctx, app.Config, app.Config.ConditionDefinitions, app.Logger, streamBroker)
+		repository, err := store.NewStore(app.Config, app.Logger, streamBroker)
 		if err != nil {
 			app.Logger.Fatal(err)
 		}

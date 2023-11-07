@@ -8,13 +8,13 @@ import (
 	"github.com/google/uuid"
 	"github.com/hashicorp/go-retryablehttp"
 	"github.com/metal-toolbox/conditionorc/internal/app"
+	"github.com/metal-toolbox/conditionorc/internal/model"
 	rctypes "github.com/metal-toolbox/rivets/condition"
 	sservice "go.hollow.sh/serverservice/pkg/api/v1"
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/clientcredentials"
 
-	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
 
@@ -23,9 +23,10 @@ import (
 type FleetDB interface {
 	// AddServer creates a server in fleet db.
 	AddServer(ctx context.Context, serverID uuid.UUID, facilityCode, bmcAddr, bmcUser, bmcPass string) error
+	// Get Server attributes.
+	// @serverID: required
+	GetServer(ctx context.Context, serverID uuid.UUID) (*model.Server, error)
 }
-
-var ErrRepository = errors.New("storage repository error")
 
 func NewFleetDBClient(ctx context.Context, config *app.Configuration, conditionDefs rctypes.Definitions,
 	logger *logrus.Logger) (FleetDB, error) {
@@ -43,8 +44,6 @@ func NewFleetDBClient(ctx context.Context, config *app.Configuration, conditionD
 	}, nil
 }
 
-// getServerServiceClient is copied from store/interface.go. We may refactor store/interface.go thus
-// it may be cleaner to have it's own serverservice connection for FleetDB.
 func getServerServiceClient(ctx context.Context, cfg *app.ServerserviceOptions, log *logrus.Logger) (*sservice.Client, error) {
 	var client *sservice.Client
 	var err error
