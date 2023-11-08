@@ -15,6 +15,7 @@ import (
 	"github.com/metal-toolbox/conditionorc/internal/model"
 	"github.com/metal-toolbox/conditionorc/internal/server"
 	"github.com/metal-toolbox/conditionorc/internal/store"
+	"github.com/metal-toolbox/conditionorc/internal/version"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"go.hollow.sh/toolbox/events"
@@ -77,6 +78,8 @@ var cmdServer = &cobra.Command{
 		} else {
 			app.Logger.Info("OIDC disabled")
 		}
+
+		app.Logger.Info(version.Current().String())
 
 		srv := server.New(options...)
 		go func() {

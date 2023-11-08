@@ -146,7 +146,7 @@ func (r *Routes) serverEnroll(c *gin.Context) (int, *v1types.ServerResponse) {
 			}).Info("bad serverID")
 
 			return http.StatusBadRequest, &v1types.ServerResponse{
-				Message: err.Error(),
+				Message: "server id: " + err.Error(),
 			}
 		}
 	} else {
@@ -166,11 +166,11 @@ func (r *Routes) serverEnroll(c *gin.Context) (int, *v1types.ServerResponse) {
 		rollbackErr := rollback()
 		if strings.Contains(err.Error(), badRequestErrMsg) {
 			return http.StatusBadRequest, &v1types.ServerResponse{
-				Message: err.Error() + fmt.Sprintf("server rollback err: %v", rollbackErr),
+				Message: "add server: " + err.Error() + fmt.Sprintf("server rollback err: %v", rollbackErr),
 			}
 		}
 		return http.StatusInternalServerError, &v1types.ServerResponse{
-			Message: err.Error() + fmt.Sprintf("server rollback err: %v", rollbackErr),
+			Message: "add server: " + err.Error() + fmt.Sprintf("server rollback err: %v", rollbackErr),
 		}
 	}
 
@@ -206,7 +206,7 @@ func (r *Routes) conditionCreate(otelCtx context.Context, newCondition *rctypes.
 		}).Info("condition create failed")
 
 		return http.StatusInternalServerError, &v1types.ServerResponse{
-			Message: err.Error(),
+			Message: "condition create: " + err.Error(),
 		}
 	}
 
@@ -228,7 +228,7 @@ func (r *Routes) conditionCreate(otelCtx context.Context, newCondition *rctypes.
 			}).Info("condition deletion failed")
 
 			return http.StatusInternalServerError, &v1types.ServerResponse{
-				Message: deleteErr.Error(),
+				Message: "condition create cleanup: " + deleteErr.Error(),
 			}
 		}
 
