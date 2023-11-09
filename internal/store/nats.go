@@ -229,6 +229,66 @@ func (n *natsStore) Create(ctx context.Context, serverID uuid.UUID, condition *r
 	return err
 }
 
+// CreateMultiple crafts a condition-record that is comprised of multiple individual conditions. Unlike Create
+// it checks for an existing, active conditionRecord prior to queuing the new one, and will return an error if
+// it finds one.
+func (n *natsStore) CreateMultiple(ctx context.Context, serverID uuid.UUID, work ...*rctypes.Condition) error {
+	_, span := otel.Tracer(pkgName).Start(ctx, "NatsStore.CreateMultiple")
+	defer span.End()
+
+	le := n.log.WithFields(logrus.Fields{
+		"serverID": serverID.String(),
+	})
+
+	if len(work) == 0 {
+		le.Info("no work to be done")
+		return nil
+	}
+
+	kve, err := n.bucket.Get(serverID.String())
+	switch {
+	case err == nil:
+	case errors.Is(nats.ErrKeyNotFound, err):
+		le.Debug("no active condition for device")
+	default:
+		natsError("get")
+		le.WithError(err).Warn("looking up active condition")
+		return errors.Wrap(ErrRepository, err.Error())
+	}
+
+	if kve != nil {
+		var cr conditionRecord
+		if err = cr.FromJSON(kve.Value()); err != nil {
+			le.WithError(err).Warn("bad condition data")
+			return errors.Wrap(ErrRepository, err.Error())
+		}
+
+		if !rctypes.StateIsComplete(cr.State) {
+			activeID := cr.ID.String()
+			le.WithField("active.condition.ID", activeID).Warn("existing active condition")
+			return errors.Wrap(ErrActiveCondition, cr.ID.String())
+		}
+	}
+
+	id := uuid.New()
+	cr := &conditionRecord{
+		ID:    id,
+		State: rctypes.Pending,
+	}
+	for _, condition := range work {
+		condition.ID = id
+		cr.Conditions = append(cr.Conditions, condition)
+	}
+
+	_, err = n.bucket.Put(serverID.String(), cr.MustJSON())
+	if err != nil {
+		natsError("create-multiple")
+		span.RecordError(err)
+		le.WithError(err).Warn("writing condition to storage")
+	}
+	return err
+}
+
 // Update a condition on a server.
 // @id: required
 // @condition: required
@@ -236,17 +296,17 @@ func (n *natsStore) Create(ctx context.Context, serverID uuid.UUID, condition *r
 // Note: it's up to the caller to validate the condition update payload. The condition to update must
 // exist, and it must be in a non-final state. The existing condition will be replaced by the incoming
 // parameter. If applicable, the state of the conditionRecord will be updated as well.
-func (n *natsStore) Update(ctx context.Context, serverID uuid.UUID, condition *rctypes.Condition) error {
+func (n *natsStore) Update(ctx context.Context, serverID uuid.UUID, updated *rctypes.Condition) error {
 	_, span := otel.Tracer(pkgName).Start(ctx, "NatsStore.Update")
 	defer span.End()
 
 	le := n.log.WithFields(logrus.Fields{
 		"serverID":      serverID.String(),
-		"conditionKind": condition.Kind,
-		"conditionID":   condition.ID.String(),
+		"conditionKind": updated.Kind,
+		"conditionID":   updated.ID.String(),
 	})
 
-	cr, orig, err := n.findConditionRecord(serverID, condition.Kind)
+	cr, orig, err := n.findConditionRecord(serverID, updated.Kind)
 	if err != nil {
 		span.RecordError(err)
 		le.WithError(err).Warn("condition lookup failure on update")
@@ -254,20 +314,30 @@ func (n *natsStore) Update(ctx context.Context, serverID uuid.UUID, condition *r
 	}
 
 	// stupid games, stupid prizes sanity check
-	if cr.ID != condition.ID {
+	if cr.ID != updated.ID {
 		le.WithField("record.ID", cr.ID.String()).Warn("condition id mismatch")
 		return errors.Wrap(ErrRepository, "condition id mismatch")
 	}
 
-	cr.State = condition.State
-
+	var lastCondition bool
+	lastConditionPosition := len(cr.Conditions) - 1
 	for idx, cond := range cr.Conditions {
 		i := idx
 		c := cond
 		if c == orig {
-			cr.Conditions[i] = condition
+			cr.Conditions[i] = updated
+			if i == lastConditionPosition {
+				lastCondition = true
+			}
 			break
 		}
+	}
+
+	// XXX: is there a better way to OR 3 mostly independent conditions
+	switch {
+	case cr.State == rctypes.Pending, updated.State == rctypes.Failed, lastCondition:
+		cr.State = updated.State
+	default:
 	}
 
 	_, err = n.bucket.Put(serverID.String(), cr.MustJSON())

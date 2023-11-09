@@ -50,6 +50,25 @@ func (mr *MockRepositoryMockRecorder) Create(ctx, serverID, condition interface{
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Create", reflect.TypeOf((*MockRepository)(nil).Create), ctx, serverID, condition)
 }
 
+// CreateMultiple mocks base method.
+func (m *MockRepository) CreateMultiple(ctx context.Context, serverID uuid.UUID, conditions ...*condition.Condition) error {
+	m.ctrl.T.Helper()
+	varargs := []interface{}{ctx, serverID}
+	for _, a := range conditions {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "CreateMultiple", varargs...)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// CreateMultiple indicates an expected call of CreateMultiple.
+func (mr *MockRepositoryMockRecorder) CreateMultiple(ctx, serverID interface{}, conditions ...interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	varargs := append([]interface{}{ctx, serverID}, conditions...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateMultiple", reflect.TypeOf((*MockRepository)(nil).CreateMultiple), varargs...)
+}
+
 // Delete mocks base method.
 func (m *MockRepository) Delete(ctx context.Context, serverID uuid.UUID, conditionKind condition.Kind) error {
 	m.ctrl.T.Helper()

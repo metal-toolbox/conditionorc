@@ -30,6 +30,11 @@ type Repository interface {
 	// @condition: required
 	Create(ctx context.Context, serverID uuid.UUID, condition *rctypes.Condition) error
 
+	// Create a condition record that encapsulates a unit of work encompassing multiple conditions
+	// If you create a condition record with 0 conditions, you don't actually create anything, but
+	// no error is returned.
+	CreateMultiple(ctx context.Context, serverID uuid.UUID, conditions ...*rctypes.Condition) error
+
 	// Update a condition on a server
 	// @serverID: required
 	// @condition: required
@@ -42,8 +47,9 @@ type Repository interface {
 }
 
 var (
-	pkgName       = "internal/store"
-	ErrRepository = errors.New("storage repository error")
+	pkgName            = "internal/store"
+	ErrRepository      = errors.New("storage repository error")
+	ErrActiveCondition = errors.New("server has an active condition")
 )
 
 func NewStore(config *app.Configuration, logger *logrus.Logger, stream events.Stream) (Repository, error) {
