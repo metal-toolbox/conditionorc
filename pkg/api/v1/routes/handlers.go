@@ -161,34 +161,41 @@ func (r *Routes) serverEnroll(c *gin.Context) (int, *v1types.ServerResponse) {
 	}
 
 	// Creates a server record in FleetDB.
-	if err = r.fleetDBClient.AddServer(c.Request.Context(), serverID, params.Facility, params.IP, params.Username, params.Password); err != nil {
+	rollback, err := r.fleetDBClient.AddServer(c.Request.Context(), serverID, params.Facility, params.IP, params.Username, params.Password)
+	if err != nil {
+		rollbackErr := rollback()
 		if strings.Contains(err.Error(), badRequestErrMsg) {
 			return http.StatusBadRequest, &v1types.ServerResponse{
-				Message: err.Error(),
+				Message: err.Error() + fmt.Sprintf("server rollback err: %v", rollbackErr),
 			}
 		}
 		return http.StatusInternalServerError, &v1types.ServerResponse{
-			Message: err.Error(),
+			Message: err.Error() + fmt.Sprintf("server rollback err: %v", rollbackErr),
 		}
 	}
 
-	// Delete params related to add servers.
-	var inventoryArgs rctypes.InventoryTaskParameters
-	if err = json.Unmarshal(conditionCreate.Parameters, &inventoryArgs); err != nil {
-		return http.StatusBadRequest, &v1types.ServerResponse{
-			Message: "invalid inventory params: " + err.Error(),
-		}
+	inventoryArgs := &rctypes.InventoryTaskParameters{
+		AssetID:               serverID,
+		Method:                rctypes.OutofbandInventory,
+		CollectBiosCfg:        true,
+		CollectFirwmareStatus: true,
 	}
 	inventoryParams, err := json.Marshal(inventoryArgs)
 	if err != nil {
+		rollbackErr := rollback()
 		return http.StatusBadRequest, &v1types.ServerResponse{
-			Message: err.Error(),
+			Message: err.Error() + fmt.Sprintf("server rollback err: %v", rollbackErr),
 		}
 	}
 	conditionCreate.Parameters = inventoryParams
 	newCondition := conditionCreate.NewCondition(rctypes.Inventory)
 
-	return r.conditionCreate(otelCtx, newCondition, serverID, params.Facility)
+	st, resp := r.conditionCreate(otelCtx, newCondition, serverID, params.Facility)
+	if st != http.StatusOK {
+		rollbackErr := rollback()
+		resp.Message += fmt.Sprintf("server rollback err: %v", rollbackErr)
+	}
+	return st, resp
 }
 
 func (r *Routes) conditionCreate(otelCtx context.Context, newCondition *rctypes.Condition, serverID uuid.UUID, facilityCode string) (int, *v1types.ServerResponse) {
