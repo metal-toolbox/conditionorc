@@ -37,11 +37,12 @@ func (m *MockFleetDB) EXPECT() *MockFleetDBMockRecorder {
 }
 
 // AddServer mocks base method.
-func (m *MockFleetDB) AddServer(ctx context.Context, serverID uuid.UUID, facilityCode, bmcAddr, bmcUser, bmcPass string) error {
+func (m *MockFleetDB) AddServer(ctx context.Context, serverID uuid.UUID, facilityCode, bmcAddr, bmcUser, bmcPass string) (func() error, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "AddServer", ctx, serverID, facilityCode, bmcAddr, bmcUser, bmcPass)
-	ret0, _ := ret[0].(error)
-	return ret0
+	ret0, _ := ret[0].(func() error)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
 }
 
 // AddServer indicates an expected call of AddServer.

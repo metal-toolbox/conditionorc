@@ -84,9 +84,7 @@ func asJSONBytes(t *testing.T, s *v1types.ServerResponse) []byte {
 	return b
 }
 
-// nolint:gocyclo // cyclomatic tests are cyclomatic
-func TestAddServer(t *testing.T) {
-	// mock repository
+func setupTestServer(t *testing.T) (*store.MockRepository, *fleetdb.MockFleetDB, *mockevents.MockStream, *gin.Engine, error) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
@@ -103,6 +101,13 @@ func TestAddServer(t *testing.T) {
 	stream := mockevents.NewMockStream(streamCtrl)
 
 	server, err := mockserver(t, logrus.New(), fleetDBClient, repository, stream)
+
+	return repository, fleetDBClient, stream, server, err
+}
+
+// nolint:gocyclo // cyclomatic tests are cyclomatic
+func TestAddServer(t *testing.T) {
+	repository, fleetDBClient, stream, server, err := setupTestServer(t)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -114,7 +119,10 @@ func TestAddServer(t *testing.T) {
 	mockPwd := "mock-pwd"
 	validParams := fmt.Sprintf(`{"facility":"%v","ip":"%v","user":"%v","pwd":"%v","some param":"1","asset_id":"%v","collect_firmware_status":true,"inventory_method":"outofband"}`, mockFacilityCode, mockIP, mockUser, mockPwd, mockServerID)
 	// collect_bios_cfg is default to false since we don't set it in validParams.
-	expectedInventoryParams := fmt.Sprintf(`{"collect_bios_cfg":false,"collect_firmware_status":true,"inventory_method":"outofband","asset_id":"%v"}`, mockServerID)
+	expectedInventoryParams := fmt.Sprintf(`{"collect_bios_cfg":true,"collect_firmware_status":true,"inventory_method":"outofband","asset_id":"%v"}`, mockServerID)
+	nopRollback := func() error {
+		return nil
+	}
 
 	testcases := []struct {
 		name              string
@@ -155,7 +163,7 @@ func TestAddServer(t *testing.T) {
 						gomock.Eq(mockUser),
 						gomock.Eq(mockPwd),
 					).
-					Return(nil). // no condition exists
+					Return(nopRollback, nil). // no condition exists
 					Times(1)
 			},
 			func(r *mockevents.MockStream) {
@@ -220,7 +228,7 @@ func TestAddServer(t *testing.T) {
 						gomock.Eq(""),
 						gomock.Eq(mockPwd),
 					).
-					Return(fleetdb.ErrBMCCredentials). // no condition exists
+					Return(nopRollback, fleetdb.ErrBMCCredentials). // no condition exists
 					Times(1)
 			},
 			nil,
@@ -258,7 +266,7 @@ func TestAddServer(t *testing.T) {
 						gomock.Eq(mockUser),
 						gomock.Eq(""),
 					).
-					Return(fleetdb.ErrBMCCredentials). // no condition exists
+					Return(nopRollback, fleetdb.ErrBMCCredentials). // no condition exists
 					Times(1)
 			},
 			nil,
@@ -302,6 +310,168 @@ func TestAddServer(t *testing.T) {
 			server.ServeHTTP(recorder, tc.request(t))
 
 			tc.assertResponse(t, recorder)
+		})
+	}
+}
+
+// nolint:gocyclo // cyclomatic tests are cyclomatic
+func TestAddServerRollback(t *testing.T) {
+	repository, fleetDBClient, stream, server, err := setupTestServer(t)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	rollbackCallCounter := 0
+	rollback := func() error {
+		rollbackCallCounter += 1
+		return nil
+	}
+
+	mockServerID := uuid.New()
+	validParams := fmt.Sprintf(`{"facility":"%v","ip":"192.168.0.1","user":"foo","pwd":"bar"}`, mockServerID)
+	payload, err := json.Marshal(&v1types.ConditionCreate{Parameters: []byte(validParams)})
+	if err != nil {
+		t.Error()
+	}
+
+	requestFunc := func(t *testing.T) *http.Request {
+		url := fmt.Sprintf("/api/v1/serverEnroll/%v", mockServerID)
+		request, err := http.NewRequestWithContext(context.TODO(), http.MethodPost, url, bytes.NewReader(payload))
+		if err != nil {
+			t.Fatal(err)
+		}
+		return request
+	}
+
+	type mockError struct {
+		calledTime int
+		err        error
+	}
+
+	testcases := []struct {
+		name                 string
+		mockStoreCreateErr   mockError
+		mockFleetDBClientErr mockError
+		mockStreamErr        mockError
+		mockStoreDeleteErr   mockError
+		request              func(t *testing.T) *http.Request
+		assertResponse       func(t *testing.T, r *httptest.ResponseRecorder)
+		expectRollback       int
+	}{
+		{
+			"no error",
+			mockError{1, nil},
+			mockError{1, nil},
+			mockError{1, nil},
+			mockError{0, nil},
+			requestFunc,
+			func(t *testing.T, r *httptest.ResponseRecorder) {
+				assert.Equal(t, http.StatusOK, r.Code)
+			},
+			0,
+		},
+		{
+			"fleetdb error",
+			mockError{0, nil},
+			mockError{1, fmt.Errorf("fake fleetdb error")},
+			mockError{0, nil},
+			mockError{0, nil},
+			requestFunc,
+			func(t *testing.T, r *httptest.ResponseRecorder) {
+				assert.Equal(t, http.StatusInternalServerError, r.Code)
+			},
+			1,
+		},
+		{
+			"repository create error",
+			mockError{1, fmt.Errorf("fake repository create error")},
+			mockError{1, nil},
+			mockError{0, nil},
+			mockError{0, nil},
+			requestFunc,
+			func(t *testing.T, r *httptest.ResponseRecorder) {
+				assert.Equal(t, http.StatusInternalServerError, r.Code)
+			},
+			1,
+		},
+		{
+			"stream error",
+			mockError{1, nil},
+			mockError{1, nil},
+			mockError{1, fmt.Errorf("fake stream error")},
+			mockError{1, nil},
+			requestFunc,
+			func(t *testing.T, r *httptest.ResponseRecorder) {
+				assert.Equal(t, http.StatusInternalServerError, r.Code)
+			},
+			1,
+		},
+		{
+			"stream delete error",
+			mockError{1, nil},
+			mockError{1, nil},
+			mockError{1, fmt.Errorf("fake stream error")},
+			mockError{1, fmt.Errorf("fake repository delete error")},
+			requestFunc,
+			func(t *testing.T, r *httptest.ResponseRecorder) {
+				assert.Equal(t, http.StatusInternalServerError, r.Code)
+			},
+			1,
+		},
+	}
+
+	for _, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+			rollbackCallCounter = 0
+
+			repository.EXPECT().
+				Create(
+					gomock.Any(),
+					gomock.Any(),
+					gomock.Any(),
+				).
+				DoAndReturn(func(_ context.Context, _ uuid.UUID, c *rctypes.Condition) error {
+					return tc.mockStoreCreateErr.err
+				}).
+				Times(tc.mockStoreCreateErr.calledTime)
+
+			fleetDBClient.EXPECT().
+				AddServer(
+					gomock.Any(),
+					gomock.Any(),
+					gomock.Any(),
+					gomock.Any(),
+					gomock.Any(),
+					gomock.Any(),
+				).
+				Return(rollback, tc.mockFleetDBClientErr.err). // no condition exists
+				Times(tc.mockFleetDBClientErr.calledTime)
+
+			stream.EXPECT().
+				Publish(
+					gomock.Any(),
+					gomock.Any(),
+					gomock.Any(),
+				).
+				Return(tc.mockStreamErr.err).
+				Times(tc.mockStreamErr.calledTime)
+
+			repository.EXPECT().
+				Delete(
+					gomock.Any(),
+					gomock.Any(),
+					gomock.Any(),
+				).
+				Return(tc.mockStoreDeleteErr.err).
+				Times(tc.mockStoreDeleteErr.calledTime)
+
+			recorder := httptest.NewRecorder()
+			server.ServeHTTP(recorder, tc.request(t))
+
+			tc.assertResponse(t, recorder)
+			if rollbackCallCounter != tc.expectRollback {
+				t.Errorf("rollback called %v times, expect %v", rollbackCallCounter, tc.expectRollback)
+			}
 		})
 	}
 }
