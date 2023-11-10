@@ -182,10 +182,8 @@ func (r *Routes) serverEnroll(c *gin.Context) (int, *v1types.ServerResponse) {
 	}
 	inventoryParams, err := json.Marshal(inventoryArgs)
 	if err != nil {
-		rollbackErr := rollback()
-		return http.StatusBadRequest, &v1types.ServerResponse{
-			Message: err.Error() + fmt.Sprintf("server rollback err: %v", rollbackErr),
-		}
+		_ = rollback()
+		panic(err)
 	}
 	conditionCreate.Parameters = inventoryParams
 	newCondition := conditionCreate.NewCondition(rctypes.Inventory)
