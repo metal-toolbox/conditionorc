@@ -183,6 +183,7 @@ func (r *Routes) serverEnroll(c *gin.Context) (int, *v1types.ServerResponse) {
 	inventoryParams, err := json.Marshal(inventoryArgs)
 	if err != nil {
 		_ = rollback()
+		r.logger.WithError(err).Warning("bad condition inventoryParams serialize")
 		panic(err)
 	}
 	conditionCreate.Parameters = inventoryParams
