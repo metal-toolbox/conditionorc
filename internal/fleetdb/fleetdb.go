@@ -57,6 +57,7 @@ func (s *fleetDBImpl) AddServer(ctx context.Context, serverID uuid.UUID, facilit
 			server := sservice.Server{UUID: serverID, Name: serverID.String(), FacilityCode: facilityCode}
 			_, err := s.client.Delete(ctx, server)
 			if err != nil {
+				s.logger.WithError(err).Warning("server enroll failed to rollback server")
 				return err
 			}
 		}
@@ -64,6 +65,7 @@ func (s *fleetDBImpl) AddServer(ctx context.Context, serverID uuid.UUID, facilit
 		if createStatus.credentialCreated {
 			_, err := s.client.DeleteCredential(ctx, serverID, secretSlug)
 			if err != nil {
+				s.logger.WithError(err).Warning("server enroll failed to rollback credential")
 				return err
 			}
 		}
@@ -71,6 +73,7 @@ func (s *fleetDBImpl) AddServer(ctx context.Context, serverID uuid.UUID, facilit
 		if createStatus.attributesCreated {
 			_, err := s.client.DeleteAttributes(ctx, serverID, rservice.ServerAttributeNSBmcAddress)
 			if err != nil {
+				s.logger.WithError(err).Warning("server enroll failed to rollback attributes")
 				return err
 			}
 		}
