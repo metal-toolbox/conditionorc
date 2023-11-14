@@ -16,7 +16,7 @@ var (
 	errResourceVersionMismatch error = errors.New("resource version mismatch, retry request with current resourceVersion")
 	errInvalidStateTransition  error = errors.New("invalid state transition")
 
-	errUpdatePayload error = errors.New("invalid payload for update")
+	ErrUpdatePayload error = errors.New("invalid payload for update")
 )
 
 type ServerResponse struct {
@@ -61,28 +61,23 @@ func (c *ConditionCreate) NewCondition(kind rctypes.Kind) *rctypes.Condition {
 
 // ConditionUpdate is the request payload to update an existing rctypes.
 type ConditionUpdate struct {
-	ConditionID     uuid.UUID       `json:"conditionID"`
-	ServerID        uuid.UUID       `json:"serverID"`
-	State           rctypes.State   `json:"state,omitempty"`
-	Status          json.RawMessage `json:"status,omitempty"`
-	ResourceVersion int64           `json:"resourceVersion"`
+	ConditionID uuid.UUID       `json:"conditionID"`
+	ServerID    uuid.UUID       `json:"serverID"`
+	State       rctypes.State   `json:"state,omitempty"`
+	Status      json.RawMessage `json:"status,omitempty"`
 }
 
 func (c *ConditionUpdate) Validate() error {
 	if c.ConditionID == uuid.Nil {
-		return errors.Wrap(errUpdatePayload, "ConditionID not set")
+		return errors.Wrap(ErrUpdatePayload, "ConditionID not set")
 	}
 
 	if c.ServerID == uuid.Nil {
-		return errors.Wrap(errUpdatePayload, "ServerID not set")
-	}
-
-	if c.ResourceVersion == 0 {
-		return errors.Wrap(errUpdatePayload, "ResourceVersion not set")
+		return errors.Wrap(ErrUpdatePayload, "ServerID not set")
 	}
 
 	if c.State == "" || c.Status == nil {
-		return errors.Wrap(errUpdatePayload, "state and status attributes are expected")
+		return errors.Wrap(ErrUpdatePayload, "state and status attributes are expected")
 	}
 
 	return nil
@@ -115,14 +110,10 @@ type ConditionUpdateEvent struct {
 // TODO: move this note into the messaging architecture doc.
 func (c *ConditionUpdateEvent) Validate() error {
 	if c.Kind == "" {
-		return errors.Wrap(errUpdatePayload, "Kind attribute expected")
+		return errors.Wrap(ErrUpdatePayload, "Kind attribute expected")
 	}
 
-	if c.State == "" || c.Status == nil {
-		return errors.Wrap(errUpdatePayload, "state and status attributes are expected")
-	}
-
-	return nil
+	return c.ConditionUpdate.Validate()
 }
 
 // MergeExisting when given an existing condition, validates the update based on existing values
@@ -142,11 +133,6 @@ func (c *ConditionUpdate) MergeExisting(existing *rctypes.Condition, compareReso
 		return nil, errBadUpdateTarget
 	}
 
-	if compareResourceVersion && existing.ResourceVersion != c.ResourceVersion {
-		// resourceVersion must match
-		return nil, errResourceVersionMismatch
-	}
-
 	// transition is valid
 	if !existing.State.TransitionValid(c.State) {
 		return nil, errInvalidStateTransition
@@ -161,7 +147,6 @@ func (c *ConditionUpdate) MergeExisting(existing *rctypes.Condition, compareReso
 		Status:                c.Status,
 		FailOnCheckpointError: existing.FailOnCheckpointError,
 		Exclusive:             existing.Exclusive,
-		ResourceVersion:       existing.ResourceVersion,
 		UpdatedAt:             existing.UpdatedAt,
 		CreatedAt:             existing.CreatedAt,
 	}, nil
