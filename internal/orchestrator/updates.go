@@ -236,9 +236,9 @@ func eventUpdateFromKV(ctx context.Context, kve nats.KeyValueEntry,
 			ServerID:    serverID,
 			State:       convState,
 			Status:      cs.Status,
+			UpdatedAt:   cs.UpdatedAt,
 		},
 		Kind:         kind,
-		UpdatedAt:    cs.UpdatedAt,
 		ControllerID: controllerID,
 	}
 
@@ -313,6 +313,12 @@ func (o *Orchestrator) eventUpdate(ctx context.Context, evt *v1types.ConditionUp
 				"condition.kind": active.Kind,
 			}).Debug("published next condition in chain")
 		}
+		if rctypes.StateIsComplete(evt.ConditionUpdate.State) {
+			err := status.DeleteCondition(evt.Kind, o.facility, evt.ConditionUpdate.ConditionID.String())
+			if err != nil {
+				return errors.Wrap(err, "deleting event KV data")
+			}
+		}
 	}
 
 	return nil
@@ -321,7 +327,7 @@ func (o *Orchestrator) eventUpdate(ctx context.Context, evt *v1types.ConditionUp
 func (o *Orchestrator) eventNeedsReconciliation(evt *v1types.ConditionUpdateEvent) bool {
 	// the last update should be later than our internal threshold
 	// this might still be actively worked
-	if time.Since(evt.UpdatedAt) < staleEventThreshold {
+	if time.Since(evt.ConditionUpdate.UpdatedAt) < staleEventThreshold {
 		return false
 	}
 

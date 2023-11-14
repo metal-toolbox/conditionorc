@@ -88,7 +88,7 @@ func TestConditionUpdate_mergeExisting(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := tt.update.MergeExisting(tt.existing, true)
+			got, err := tt.update.MergeExisting(tt.existing)
 			if tt.wantErr != nil {
 				require.Error(t, err, "no error when one is expected")
 				require.Equal(t, tt.wantErr, err, "error does not match expectation")

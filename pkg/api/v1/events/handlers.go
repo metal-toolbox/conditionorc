@@ -101,7 +101,7 @@ func (h *Handler) UpdateCondition(ctx context.Context, updEvt *v1types.Condition
 	}
 
 	// merge update with existing
-	revisedCondition, err := updEvt.MergeExisting(existing, false)
+	revisedCondition, err := updEvt.MergeExisting(existing)
 	if err != nil {
 		h.logger.WithError(err).WithFields(logrus.Fields{
 			"serverID":         updEvt.ConditionUpdate.ServerID,

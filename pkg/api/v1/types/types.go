@@ -12,9 +12,8 @@ import (
 )
 
 var (
-	errBadUpdateTarget         error = errors.New("no existing condition found for update")
-	errResourceVersionMismatch error = errors.New("resource version mismatch, retry request with current resourceVersion")
-	errInvalidStateTransition  error = errors.New("invalid state transition")
+	errBadUpdateTarget        error = errors.New("no existing condition found for update")
+	errInvalidStateTransition error = errors.New("invalid state transition")
 
 	ErrUpdatePayload error = errors.New("invalid payload for update")
 )
@@ -66,6 +65,7 @@ type ConditionUpdate struct {
 	ServerID    uuid.UUID       `json:"serverID"`
 	State       rctypes.State   `json:"state,omitempty"`
 	Status      json.RawMessage `json:"status,omitempty"`
+	UpdatedAt   time.Time       `json:"updatedAt,omitempty"`
 }
 
 func (c *ConditionUpdate) Validate() error {
@@ -88,7 +88,6 @@ func (c *ConditionUpdate) Validate() error {
 type ConditionUpdateEvent struct {
 	ConditionUpdate
 	Kind                  rctypes.Kind `json:"kind"`
-	UpdatedAt             time.Time    `json:"updatedAt"`
 	registry.ControllerID `json:"controllerID"`
 }
 
@@ -123,7 +122,7 @@ func (c *ConditionUpdateEvent) Validate() error {
 // The resourceVersion is not updated here and is left for the repository Store to update.
 //
 // This method makes sure that update does not overwrite existing data inadvertently.
-func (c *ConditionUpdate) MergeExisting(existing *rctypes.Condition, compareResourceVersion bool) (*rctypes.Condition, error) {
+func (c *ConditionUpdate) MergeExisting(existing *rctypes.Condition) (*rctypes.Condition, error) {
 	// 1. condition must already exist for update.
 	if existing == nil {
 		return nil, errBadUpdateTarget
@@ -148,7 +147,7 @@ func (c *ConditionUpdate) MergeExisting(existing *rctypes.Condition, compareReso
 		Status:                c.Status,
 		FailOnCheckpointError: existing.FailOnCheckpointError,
 		Exclusive:             existing.Exclusive,
-		UpdatedAt:             existing.UpdatedAt,
+		UpdatedAt:             c.UpdatedAt,
 		CreatedAt:             existing.CreatedAt,
 	}, nil
 }
