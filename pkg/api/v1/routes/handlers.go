@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -195,6 +196,73 @@ func (r *Routes) serverEnroll(c *gin.Context) (int, *v1types.ServerResponse) {
 		resp.Message += fmt.Sprintf("server rollback err: %v", rollbackErr)
 	}
 	return st, resp
+}
+
+// @Summary Firmware Install
+// @Tag Conditions
+// @Description Installs firmware on a device and validates with a subsequent inventory
+// @Description Sample firmwareInstall payload, response: https://github.com/metal-toolbox/conditionorc/blob/main/sample/firmwareInstall.md
+// @Param uuid path string true "Server ID"
+// @Accept json
+// @Produce json
+// @Success 200 {object} v1types.ServerResponse
+// Failure 400 {object} v1types.ServerResponse
+// Failure 500 {object} v1types.ServerResponse
+// Failure 503 {object} v1types.ServerResponse
+// @Router /servers/{uuid}/firmwareInstall [post]
+func (r *Routes) firmwareInstall(c *gin.Context) (int, *v1types.ServerResponse) {
+	id := c.Param("uuid")
+	otelCtx, span := otel.Tracer(pkgName).Start(c.Request.Context(), "Routes.serverEnroll")
+	span.SetAttributes(attribute.KeyValue{Key: "serverId", Value: attribute.StringValue(id)})
+	defer span.End()
+
+	serverID, err := uuid.Parse(id)
+	if err != nil {
+		r.logger.WithError(err).WithField("serverID", id).Warn("bad serverID")
+
+		return http.StatusBadRequest, &v1types.ServerResponse{
+			Message: "server id: " + err.Error(),
+		}
+	}
+
+	var fw rctypes.FirmwareInstallTaskParameters
+	if err := c.ShouldBindJSON(&fw); err != nil {
+		r.logger.WithError(err).Warn("unmarshal firmwareInstall payload")
+
+		return http.StatusBadRequest, &v1types.ServerResponse{
+			Message: "invalid firmware install payload: " + err.Error(),
+		}
+	}
+
+	createTime := time.Now()
+
+	fwCondition := &rctypes.Condition{
+		Kind:                  rctypes.FirmwareInstall,
+		Version:               rctypes.ConditionStructVersion,
+		Parameters:            fw.MustJSON(),
+		State:                 rctypes.Pending,
+		FailOnCheckpointError: true,
+		CreatedAt:             createTime,
+	}
+
+	invCondition := &rctypes.Condition{
+		Kind:                  rctypes.Inventory,
+		Version:               rctypes.ConditionStructVersion,
+		Parameters:            rctypes.MustDefaultInventoryJSON(serverID),
+		State:                 rctypes.Pending,
+		FailOnCheckpointError: true,
+		CreatedAt:             createTime,
+	}
+
+	if err := r.repository.CreateMultiple(otelCtx, serverID, fwCondition, invCondition); err != nil {
+		return http.StatusInternalServerError, &v1types.ServerResponse{
+			Message: "scheduling condition: " + err.Error(),
+		}
+	}
+
+	return http.StatusOK, &v1types.ServerResponse{
+		Message: "firmware install scheduled",
+	}
 }
 
 func (r *Routes) conditionCreate(otelCtx context.Context, newCondition *rctypes.Condition, serverID uuid.UUID, facilityCode string) (int, *v1types.ServerResponse) {

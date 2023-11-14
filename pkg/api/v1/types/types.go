@@ -56,6 +56,7 @@ func (c *ConditionCreate) NewCondition(kind rctypes.Kind) *rctypes.Condition {
 		Exclusive:  c.Exclusive,
 		Parameters: c.Parameters,
 		Fault:      c.Fault,
+		CreatedAt:  time.Now(),
 	}
 }
 
