@@ -125,17 +125,6 @@ func (r *Routes) serverEnroll(c *gin.Context) (int, *v1types.ServerResponse) {
 	span.SetAttributes(attribute.KeyValue{Key: "serverId", Value: attribute.StringValue(id)})
 	defer span.End()
 
-	var conditionCreate v1types.ConditionCreate
-	if err := c.ShouldBindJSON(&conditionCreate); err != nil {
-		r.logger.WithFields(logrus.Fields{
-			"error": err,
-		}).Info("invalid ConditionCreate payload")
-
-		return http.StatusBadRequest, &v1types.ServerResponse{
-			Message: "invalid ConditionCreate payload: " + err.Error(),
-		}
-	}
-
 	var serverID uuid.UUID
 	var err error
 	if id != "" {
@@ -151,6 +140,18 @@ func (r *Routes) serverEnroll(c *gin.Context) (int, *v1types.ServerResponse) {
 		}
 	} else {
 		serverID = uuid.New()
+		span.SetAttributes(attribute.KeyValue{Key: "NewServerId", Value: attribute.StringValue(serverID.String())})
+	}
+
+	var conditionCreate v1types.ConditionCreate
+	if err = c.ShouldBindJSON(&conditionCreate); err != nil {
+		r.logger.WithFields(logrus.Fields{
+			"error": err,
+		}).Info("invalid ConditionCreate payload")
+
+		return http.StatusBadRequest, &v1types.ServerResponse{
+			Message: "invalid ConditionCreate payload: " + err.Error(),
+		}
 	}
 
 	var params v1types.AddServerParams
