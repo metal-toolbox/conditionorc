@@ -285,6 +285,17 @@ func (o *Orchestrator) eventUpdate(ctx context.Context, evt *v1types.ConditionUp
 	}
 
 	if rctypes.StateIsComplete(evt.ConditionUpdate.State) {
+		delErr := status.DeleteCondition(evt.Kind, o.facility, evt.ConditionUpdate.ConditionID.String())
+		if delErr != nil {
+			// if we fail to delete this event from the KV, the reconciler will catch it later
+			// and walk this code, so return early.
+			o.logger.WithError(delErr).WithFields(logrus.Fields{
+				"condition.id":   evt.ConditionUpdate.ConditionID,
+				"server.id":      evt.ConditionUpdate.ServerID,
+				"condition.kind": evt.Kind,
+			}).Warn("removing completed condition data")
+			return errors.Wrap(errCompleteEvent, delErr.Error())
+		}
 		active, err := o.repository.GetActiveCondition(ctx, evt.ConditionUpdate.ServerID)
 		if err != nil {
 			o.logger.WithError(err).WithFields(logrus.Fields{
@@ -312,12 +323,6 @@ func (o *Orchestrator) eventUpdate(ctx context.Context, evt *v1types.ConditionUp
 				"server.id":      evt.ConditionUpdate.ServerID,
 				"condition.kind": active.Kind,
 			}).Debug("published next condition in chain")
-		}
-		if rctypes.StateIsComplete(evt.ConditionUpdate.State) {
-			err := status.DeleteCondition(evt.Kind, o.facility, evt.ConditionUpdate.ConditionID.String())
-			if err != nil {
-				return errors.Wrap(err, "deleting event KV data")
-			}
 		}
 	}
 
