@@ -39,11 +39,6 @@ type Repository interface {
 	// @serverID: required
 	// @condition: required
 	Update(ctx context.Context, serverID uuid.UUID, condition *rctypes.Condition) error
-
-	// Delete a condition from a server.
-	// @serverID: required
-	// @conditionKind: required
-	Delete(ctx context.Context, serverID uuid.UUID, conditionKind rctypes.Kind) error
 }
 
 var (

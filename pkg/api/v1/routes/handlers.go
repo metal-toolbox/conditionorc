@@ -30,6 +30,7 @@ const (
 var (
 	ErrConditionParameter = errors.New("error in condition parameter")
 	ErrConditionExclusive = errors.New("exclusive condition present")
+	failedPublishStatus   = json.RawMessage(`{ "msg": "failed to publish condition to controller" }`)
 )
 
 func (r *Routes) conditionKindValid(kind rctypes.Kind) bool {
@@ -233,7 +234,7 @@ func (r *Routes) firmwareInstall(c *gin.Context) (int, *v1types.ServerResponse) 
 	}
 
 	var fw rctypes.FirmwareInstallTaskParameters
-	if err := c.ShouldBindJSON(&fw); err != nil {
+	if err = c.ShouldBindJSON(&fw); err != nil {
 		r.logger.WithError(err).Warn("unmarshal firmwareInstall payload")
 
 		return http.StatusBadRequest, &v1types.ServerResponse{
@@ -261,7 +262,7 @@ func (r *Routes) firmwareInstall(c *gin.Context) (int, *v1types.ServerResponse) 
 		CreatedAt:             createTime,
 	}
 
-	if err := r.repository.CreateMultiple(otelCtx, serverID, fwCondition, invCondition); err != nil {
+	if err = r.repository.CreateMultiple(otelCtx, serverID, fwCondition, invCondition); err != nil {
 		return http.StatusInternalServerError, &v1types.ServerResponse{
 			Message: "scheduling condition: " + err.Error(),
 		}
@@ -271,7 +272,7 @@ func (r *Routes) firmwareInstall(c *gin.Context) (int, *v1types.ServerResponse) 
 		r.logger.WithError(err).Warn("publishing firmware-install condition")
 		// mark firmwareInstall as failed
 		fwCondition.State = rctypes.Failed
-		fwCondition.Status = json.RawMessage(`{ "msg": "failed to publish condition to controller" }`)
+		fwCondition.Status = failedPublishStatus
 		if markErr := r.repository.Update(otelCtx, serverID, fwCondition); markErr != nil {
 			// an operator is going to have to sort this out
 			r.logger.WithError(err).Warn("marking unpublished condition failed")
@@ -290,9 +291,7 @@ func (r *Routes) conditionCreate(otelCtx context.Context, newCondition *rctypes.
 	// Create the new condition
 	err := r.repository.Create(otelCtx, serverID, newCondition)
 	if err != nil {
-		r.logger.WithFields(logrus.Fields{
-			"error": err,
-		}).Info("condition create failed")
+		r.logger.WithError(err).Info("condition create failed")
 
 		return http.StatusInternalServerError, &v1types.ServerResponse{
 			Message: "condition create: " + err.Error(),
@@ -302,23 +301,18 @@ func (r *Routes) conditionCreate(otelCtx context.Context, newCondition *rctypes.
 	// publish the condition and in case of publish failure - revert.
 	err = r.publishCondition(otelCtx, serverID, facilityCode, newCondition)
 	if err != nil {
-		r.logger.WithFields(logrus.Fields{
-			"error": err,
-		}).Info("condition create failed")
+		r.logger.WithError(err).Warn("condition create failed to publish")
 
 		metrics.PublishErrors.With(
 			prometheus.Labels{"conditionKind": string(newCondition.Kind)},
 		).Inc()
 
-		deleteErr := r.repository.Delete(otelCtx, serverID, newCondition.Kind)
-		if deleteErr != nil {
-			r.logger.WithFields(logrus.Fields{
-				"error": deleteErr,
-			}).Info("condition deletion failed")
+		newCondition.State = rctypes.Failed
+		newCondition.Status = failedPublishStatus
 
-			return http.StatusInternalServerError, &v1types.ServerResponse{
-				Message: "condition create cleanup: " + deleteErr.Error(),
-			}
+		updateErr := r.repository.Update(otelCtx, serverID, newCondition)
+		if updateErr != nil {
+			r.logger.WithError(updateErr).Warn("condition deletion failed")
 		}
 
 		return http.StatusInternalServerError, &v1types.ServerResponse{

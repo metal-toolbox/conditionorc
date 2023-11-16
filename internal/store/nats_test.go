@@ -84,7 +84,7 @@ func TestMain(m *testing.M) {
 	os.Exit(exitCode)
 }
 
-func TestCRUDL(t *testing.T) {
+func TestCreateReadUpdate(t *testing.T) {
 	t.Parallel()
 	serverID := uuid.New()
 
@@ -131,11 +131,12 @@ func TestCRUDL(t *testing.T) {
 	// read the new condition
 	c, err = store.Get(context.TODO(), serverID, kind)
 	require.NoError(t, err)
-	require.Equal(t, condition.State, c.State)
+	require.Equal(t, rctypes.Active, c.State)
 
-	// try to delete an incomplete condition and fail
-	err = store.Delete(context.TODO(), serverID, kind)
-	require.ErrorIs(t, err, ErrConditionNotComplete)
+	// make sure that we updated the container too
+	cr, err := store.getCurrentConditionRecord(context.TODO(), serverID)
+	require.NoError(t, err)
+	require.Equal(t, rctypes.Active, cr.State)
 
 	condition.State = rctypes.Succeeded
 	err = store.Update(context.TODO(), serverID, condition)
@@ -145,23 +146,13 @@ func TestCRUDL(t *testing.T) {
 	require.NoError(t, err)
 	require.Nil(t, active)
 
-	// OK, get rid of it
-	err = store.Delete(context.TODO(), serverID, kind)
+	cr, err = store.getCurrentConditionRecord(context.TODO(), serverID)
 	require.NoError(t, err)
-
-	// And now it's not here anymore
-	_, err = store.Get(context.TODO(), serverID, kind)
-	require.ErrorIs(t, err, ErrConditionNotFound)
-
-	// And if you delete it again, it's fine.
-	err = store.Delete(context.TODO(), serverID, kind)
-	require.NoError(t, err)
+	require.Equal(t, rctypes.Succeeded, cr.State)
 }
 
 // Given a conditionRecord with multiple conditions, walk through some common
 // scenarios around CreateMultiple/Update/Get/GetActive
-// XXX: I don't love accepting conditions as the input to CreateMultiple, but changing
-// that behavior is something for later.
 func TestMultipleConditionUpdate(t *testing.T) {
 	t.Parallel()
 
