@@ -225,6 +225,13 @@ func (r *Routes) firmwareInstall(c *gin.Context) (int, *v1types.ServerResponse) 
 		}
 	}
 
+	facilityCode, err := r.serverFacilityCode(otelCtx, serverID)
+	if err != nil {
+		return http.StatusInternalServerError, &v1types.ServerResponse{
+			Message: "server facility: " + err.Error(),
+		}
+	}
+
 	var fw rctypes.FirmwareInstallTaskParameters
 	if err := c.ShouldBindJSON(&fw); err != nil {
 		r.logger.WithError(err).Warn("unmarshal firmwareInstall payload")
@@ -257,6 +264,20 @@ func (r *Routes) firmwareInstall(c *gin.Context) (int, *v1types.ServerResponse) 
 	if err := r.repository.CreateMultiple(otelCtx, serverID, fwCondition, invCondition); err != nil {
 		return http.StatusInternalServerError, &v1types.ServerResponse{
 			Message: "scheduling condition: " + err.Error(),
+		}
+	}
+
+	if err = r.publishCondition(otelCtx, serverID, facilityCode, fwCondition); err != nil {
+		r.logger.WithError(err).Warn("publishing firmware-install condition")
+		// mark firmwareInstall as failed
+		fwCondition.State = rctypes.Failed
+		fwCondition.Status = json.RawMessage(`{ "msg": "failed to publish condition to controller" }`)
+		if markErr := r.repository.Update(otelCtx, serverID, fwCondition); markErr != nil {
+			// an operator is going to have to sort this out
+			r.logger.WithError(err).Warn("marking unpublished condition failed")
+		}
+		return http.StatusInternalServerError, &v1types.ServerResponse{
+			Message: "publishing condition" + err.Error(),
 		}
 	}
 
