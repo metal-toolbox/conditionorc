@@ -69,20 +69,6 @@ func (mr *MockRepositoryMockRecorder) CreateMultiple(ctx, serverID interface{}, 
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateMultiple", reflect.TypeOf((*MockRepository)(nil).CreateMultiple), varargs...)
 }
 
-// Delete mocks base method.
-func (m *MockRepository) Delete(ctx context.Context, serverID uuid.UUID, conditionKind condition.Kind) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Delete", ctx, serverID, conditionKind)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// Delete indicates an expected call of Delete.
-func (mr *MockRepositoryMockRecorder) Delete(ctx, serverID, conditionKind interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Delete", reflect.TypeOf((*MockRepository)(nil).Delete), ctx, serverID, conditionKind)
-}
-
 // Get mocks base method.
 func (m *MockRepository) Get(ctx context.Context, serverID uuid.UUID, conditionKind condition.Kind) (*condition.Condition, error) {
 	m.ctrl.T.Helper()
