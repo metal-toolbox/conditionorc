@@ -139,6 +139,8 @@ func (r *Routes) Routes(g *gin.RouterGroup) {
 	if r.enableServerEnroll {
 		serverEnroll := g.Group("/serverEnroll")
 		serverEnroll.POST("/:uuid", r.composeAuthHandler(createScopes("server-enroll")), wrapAPICall(r.serverEnroll))
+		// Create a new server ID when uuid is not provided.
+		serverEnroll.POST("/", r.composeAuthHandler(createScopes("server-enroll")), wrapAPICall(r.serverEnroll))
 	}
 
 	servers := g.Group("/servers/:uuid")

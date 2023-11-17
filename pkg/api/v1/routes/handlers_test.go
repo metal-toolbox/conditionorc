@@ -119,11 +119,14 @@ func TestAddServer(t *testing.T) {
 	mockPwd := "mock-pwd"
 	validParams := fmt.Sprintf(`{"facility":"%v","ip":"%v","user":"%v","pwd":"%v","some param":"1","asset_id":"%v","collect_firmware_status":true,"inventory_method":"outofband"}`, mockFacilityCode, mockIP, mockUser, mockPwd, mockServerID)
 	// collect_bios_cfg is default to false since we don't set it in validParams.
-	expectedInventoryParams := fmt.Sprintf(`{"collect_bios_cfg":true,"collect_firmware_status":true,"inventory_method":"outofband","asset_id":"%v"}`, mockServerID)
+	expectedInventoryParams := func(id string) string {
+		return fmt.Sprintf(`{"collect_bios_cfg":true,"collect_firmware_status":true,"inventory_method":"outofband","asset_id":"%v"}`, id)
+	}
 	nopRollback := func() error {
 		return nil
 	}
-
+	validParamsNoAssetID := fmt.Sprintf(`{"facility":"%v","ip":"%v","user":"%v","pwd":"%v","some param":"1","collect_firmware_status":true,"inventory_method":"outofband"}`, mockFacilityCode, mockIP, mockUser, mockPwd)
+	var generatedServerID uuid.UUID
 	testcases := []struct {
 		name              string
 		mockStore         func(r *store.MockRepository)
@@ -146,7 +149,7 @@ func TestAddServer(t *testing.T) {
 					DoAndReturn(func(_ context.Context, _ uuid.UUID, c *rctypes.Condition) error {
 						assert.Equal(t, rctypes.ConditionStructVersion, c.Version, "condition version mismatch")
 						assert.Equal(t, rctypes.Inventory, c.Kind, "condition kind mismatch")
-						assert.Equal(t, json.RawMessage(expectedInventoryParams), c.Parameters, "condition parameters mismatch")
+						assert.Equal(t, json.RawMessage(expectedInventoryParams(mockServerID.String())), c.Parameters, "condition parameters mismatch")
 						assert.Equal(t, rctypes.Pending, c.State, "condition state mismatch")
 						return nil
 					}).
@@ -288,6 +291,72 @@ func TestAddServer(t *testing.T) {
 			func(t *testing.T, r *httptest.ResponseRecorder) {
 				assert.Equal(t, http.StatusInternalServerError, r.Code)
 				assert.Contains(t, string(asBytes(t, r.Body)), fleetdb.ErrBMCCredentials.Error())
+			},
+		},
+		{
+			"add server success no uuid param",
+			// mock repository
+			func(r *store.MockRepository) {
+				// create condition query
+				r.EXPECT().
+					Create(
+						gomock.Any(),
+						gomock.Any(),
+						gomock.Any(),
+					).
+					DoAndReturn(func(_ context.Context, id uuid.UUID, c *rctypes.Condition) error {
+						assert.Equal(t, generatedServerID, id, "server ID mismatch")
+						assert.Equal(t, json.RawMessage(expectedInventoryParams(generatedServerID.String())), c.Parameters, "condition parameters mismatch")
+						assert.Equal(t, rctypes.ConditionStructVersion, c.Version, "condition version mismatch")
+						assert.Equal(t, rctypes.Inventory, c.Kind, "condition kind mismatch")
+						assert.Equal(t, rctypes.Pending, c.State, "condition state mismatch")
+						return nil
+					}).
+					Times(1)
+			},
+			func(r *fleetdb.MockFleetDB) {
+				// lookup for an existing condition
+				r.EXPECT().
+					AddServer(
+						gomock.Any(),
+						gomock.Any(),
+						gomock.Eq(mockFacilityCode),
+						gomock.Eq(mockIP),
+						gomock.Eq(mockUser),
+						gomock.Eq(mockPwd),
+					).
+					DoAndReturn(func(ctx context.Context, serverID uuid.UUID, _, _, _, _ string) (func() error, error) {
+						generatedServerID = serverID
+						return nopRollback, nil
+					}).
+					Times(1)
+			},
+			func(r *mockevents.MockStream) {
+				r.EXPECT().
+					Publish(
+						gomock.Any(),
+						gomock.Eq(fmt.Sprintf("%s.servers.%s", mockFacilityCode, rctypes.Inventory)),
+						gomock.Any(),
+					).
+					Return(nil).
+					Times(1)
+			},
+			func(t *testing.T) *http.Request {
+				payload, err := json.Marshal(&v1types.ConditionCreate{Parameters: []byte(validParamsNoAssetID)})
+				if err != nil {
+					t.Error()
+				}
+
+				url := "/api/v1/serverEnroll/"
+				request, err := http.NewRequestWithContext(context.TODO(), http.MethodPost, url, bytes.NewReader(payload))
+				if err != nil {
+					t.Fatal(err)
+				}
+
+				return request
+			},
+			func(t *testing.T, r *httptest.ResponseRecorder) {
+				assert.Equal(t, http.StatusOK, r.Code)
 			},
 		},
 	}

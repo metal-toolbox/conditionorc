@@ -122,19 +122,7 @@ func (r *Routes) serverConditionCreate(c *gin.Context) (int, *v1types.ServerResp
 func (r *Routes) serverEnroll(c *gin.Context) (int, *v1types.ServerResponse) {
 	id := c.Param("uuid")
 	otelCtx, span := otel.Tracer(pkgName).Start(c.Request.Context(), "Routes.serverEnroll")
-	span.SetAttributes(attribute.KeyValue{Key: "serverId", Value: attribute.StringValue(id)})
 	defer span.End()
-
-	var conditionCreate v1types.ConditionCreate
-	if err := c.ShouldBindJSON(&conditionCreate); err != nil {
-		r.logger.WithFields(logrus.Fields{
-			"error": err,
-		}).Info("invalid ConditionCreate payload")
-
-		return http.StatusBadRequest, &v1types.ServerResponse{
-			Message: "invalid ConditionCreate payload: " + err.Error(),
-		}
-	}
 
 	var serverID uuid.UUID
 	var err error
@@ -151,6 +139,18 @@ func (r *Routes) serverEnroll(c *gin.Context) (int, *v1types.ServerResponse) {
 		}
 	} else {
 		serverID = uuid.New()
+	}
+
+	span.SetAttributes(attribute.KeyValue{Key: "serverId", Value: attribute.StringValue(id)})
+	var conditionCreate v1types.ConditionCreate
+	if err = c.ShouldBindJSON(&conditionCreate); err != nil {
+		r.logger.WithFields(logrus.Fields{
+			"error": err,
+		}).Info("invalid ConditionCreate payload")
+
+		return http.StatusBadRequest, &v1types.ServerResponse{
+			Message: "invalid ConditionCreate payload: " + err.Error(),
+		}
 	}
 
 	var params v1types.AddServerParams
