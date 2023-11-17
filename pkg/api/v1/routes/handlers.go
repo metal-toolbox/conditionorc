@@ -122,7 +122,6 @@ func (r *Routes) serverConditionCreate(c *gin.Context) (int, *v1types.ServerResp
 func (r *Routes) serverEnroll(c *gin.Context) (int, *v1types.ServerResponse) {
 	id := c.Param("uuid")
 	otelCtx, span := otel.Tracer(pkgName).Start(c.Request.Context(), "Routes.serverEnroll")
-	span.SetAttributes(attribute.KeyValue{Key: "serverId", Value: attribute.StringValue(id)})
 	defer span.End()
 
 	var serverID uuid.UUID
@@ -140,9 +139,9 @@ func (r *Routes) serverEnroll(c *gin.Context) (int, *v1types.ServerResponse) {
 		}
 	} else {
 		serverID = uuid.New()
-		span.SetAttributes(attribute.KeyValue{Key: "NewServerId", Value: attribute.StringValue(serverID.String())})
 	}
 
+	span.SetAttributes(attribute.KeyValue{Key: "serverId", Value: attribute.StringValue(id)})
 	var conditionCreate v1types.ConditionCreate
 	if err = c.ShouldBindJSON(&conditionCreate); err != nil {
 		r.logger.WithFields(logrus.Fields{
