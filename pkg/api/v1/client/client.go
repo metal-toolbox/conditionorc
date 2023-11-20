@@ -83,3 +83,10 @@ func (c *Client) ServerConditionCreate(ctx context.Context, serverID uuid.UUID, 
 
 	return c.post(ctx, path, conditionCreate)
 }
+
+func (c *Client) ServerEnroll(ctx context.Context, serverID string, conditionCreate v1types.ConditionCreate) (*v1types.ServerResponse, error) {
+	// Empty server ID is allowed. Conditionorc will create a new server ID if it is empty.
+	path := fmt.Sprintf("serverEnroll/%s", serverID)
+
+	return c.post(ctx, path, conditionCreate)
+}
