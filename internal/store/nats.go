@@ -318,6 +318,14 @@ func (n *natsStore) Update(ctx context.Context, serverID uuid.UUID, updated *rct
 		return errors.Wrap(ErrRepository, "condition id mismatch")
 	}
 
+	// XXX: Having multiple conditions composed together into a single unit of work makes
+	// managing the state of that unit a little more complicated than merely following the
+	// state of the consitutent conditions. The state of the unit starts as Pending,
+	// transitions to Active when the first update to Active for any condition arrives,
+	// transitions to Failed if any condition fails, and transitions to Success when the
+	// last condition is completed successfully. So to know whether a given success should
+	// be applied to the unit, we need to know if this condition is the last.
+
 	var lastCondition bool
 	lastConditionPosition := len(cr.Conditions) - 1
 	for idx, cond := range cr.Conditions {
