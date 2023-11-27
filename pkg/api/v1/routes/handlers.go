@@ -98,7 +98,7 @@ func (r *Routes) serverConditionCreate(c *gin.Context) (int, *v1types.ServerResp
 	facilityCode, err := r.serverFacilityCode(otelCtx, serverID)
 	if err != nil {
 		return http.StatusInternalServerError, &v1types.ServerResponse{
-			Message: err.Error(),
+			Message: "error looking up facility on non-existence server: " + err.Error(),
 		}
 	}
 
@@ -117,6 +117,53 @@ func (r *Routes) serverConditionCreate(c *gin.Context) (int, *v1types.ServerResp
 	newCondition := conditionCreate.NewCondition(kind)
 
 	return r.conditionCreate(otelCtx, newCondition, serverID, facilityCode)
+}
+
+func (r *Routes) serverDelete(c *gin.Context) (int, *v1types.ServerResponse) {
+	otelCtx, span := otel.Tracer(pkgName).Start(c.Request.Context(), "Routes.serverDelete")
+	id := c.Param("uuid")
+	span.SetAttributes(attribute.KeyValue{Key: "serverId", Value: attribute.StringValue(id)})
+	defer span.End()
+
+	if id == "" {
+		return http.StatusBadRequest, &v1types.ServerResponse{
+			Message: "empty server ID",
+		}
+	}
+
+	serverID, err := uuid.Parse(id)
+	if err != nil {
+		r.logger.WithFields(logrus.Fields{
+			"serverID": id,
+		}).Info("bad serverID")
+
+		return http.StatusBadRequest, &v1types.ServerResponse{
+			Message: err.Error(),
+		}
+	}
+
+	active, err := r.repository.GetActiveCondition(otelCtx, serverID)
+	if err != nil {
+		return http.StatusServiceUnavailable, &v1types.ServerResponse{
+			Message: "error checking server state: " + err.Error(),
+		}
+	}
+	if active != nil {
+		return http.StatusBadRequest, &v1types.ServerResponse{
+			Message: "failed to delete server because it has an active condition",
+		}
+	}
+
+	if err := r.fleetDBClient.DeleteServer(c.Request.Context(), serverID); err != nil {
+		return http.StatusInternalServerError, &v1types.ServerResponse{
+			Message: err.Error(),
+		}
+	}
+
+	return http.StatusOK, &v1types.ServerResponse{
+		Message: "server detele",
+		Records: &v1types.ConditionsResponse{ServerID: serverID},
+	}
 }
 
 func (r *Routes) serverEnroll(c *gin.Context) (int, *v1types.ServerResponse) {

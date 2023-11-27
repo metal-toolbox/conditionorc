@@ -142,3 +142,12 @@ func (s *fleetDBImpl) GetServer(ctx context.Context, serverID uuid.UUID) (*model
 
 	return &model.Server{ID: obj.UUID, FacilityCode: obj.FacilityCode}, nil
 }
+
+// DeleteServer creates a server record in FleetDB
+func (s *fleetDBImpl) DeleteServer(ctx context.Context, serverID uuid.UUID) error {
+	otelCtx, span := otel.Tracer(pkgName).Start(ctx, "FleetDB.GetServer")
+	defer span.End()
+
+	_, err := s.client.Delete(otelCtx, sservice.Server{UUID: serverID})
+	return err
+}

@@ -138,7 +138,9 @@ func (r *Routes) composeAuthHandler(scopes []string) gin.HandlerFunc {
 func (r *Routes) Routes(g *gin.RouterGroup) {
 	if r.enableServerEnroll {
 		serverEnroll := g.Group("/serverEnroll")
-		serverEnroll.POST("/:uuid", r.composeAuthHandler(createScopes("server-enroll")), wrapAPICall(r.serverEnroll))
+		serverEnroll.POST("/:uuid", r.composeAuthHandler(createScopes("server")), wrapAPICall(r.serverEnroll))
+		serverDelete := g.Group("/serverDelete")
+		serverDelete.DELETE("/:uuid", r.composeAuthHandler(createScopes("server")), wrapAPICall(r.serverDelete))
 		// Create a new server ID when uuid is not provided.
 		serverEnroll.POST("/", r.composeAuthHandler(createScopes("server-enroll")), wrapAPICall(r.serverEnroll))
 	}
