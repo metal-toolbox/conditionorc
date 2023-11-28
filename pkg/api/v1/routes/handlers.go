@@ -98,7 +98,7 @@ func (r *Routes) serverConditionCreate(c *gin.Context) (int, *v1types.ServerResp
 	facilityCode, err := r.serverFacilityCode(otelCtx, serverID)
 	if err != nil {
 		return http.StatusInternalServerError, &v1types.ServerResponse{
-			Message: "error looking up facility on non-existence server: " + err.Error(),
+			Message: "facility lookup error: " + err.Error(),
 		}
 	}
 
@@ -155,8 +155,10 @@ func (r *Routes) serverDelete(c *gin.Context) (int, *v1types.ServerResponse) {
 	}
 
 	if err := r.fleetDBClient.DeleteServer(c.Request.Context(), serverID); err != nil {
-		return http.StatusInternalServerError, &v1types.ServerResponse{
-			Message: err.Error(),
+		if !strings.Contains(err.Error(), "404") {
+			return http.StatusInternalServerError, &v1types.ServerResponse{
+				Message: err.Error(),
+			}
 		}
 	}
 

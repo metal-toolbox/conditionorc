@@ -142,7 +142,7 @@ func (r *Routes) Routes(g *gin.RouterGroup) {
 		serverDelete := g.Group("/serverDelete")
 		serverDelete.DELETE("/:uuid", r.composeAuthHandler(createScopes("server")), wrapAPICall(r.serverDelete))
 		// Create a new server ID when uuid is not provided.
-		serverEnroll.POST("/", r.composeAuthHandler(createScopes("server-enroll")), wrapAPICall(r.serverEnroll))
+		serverEnroll.POST("/", r.composeAuthHandler(createScopes("server")), wrapAPICall(r.serverEnroll))
 	}
 
 	servers := g.Group("/servers/:uuid")
