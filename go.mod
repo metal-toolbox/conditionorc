@@ -10,7 +10,7 @@ require (
 	github.com/golang/mock v1.6.0
 	github.com/google/uuid v1.4.0
 	github.com/hashicorp/go-retryablehttp v0.7.5
-	github.com/metal-toolbox/rivets v0.1.1
+	github.com/metal-toolbox/rivets v0.1.0
 	github.com/nats-io/nats-server/v2 v2.10.4
 	github.com/nats-io/nats.go v1.31.0
 	github.com/pkg/errors v0.9.1
