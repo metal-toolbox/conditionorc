@@ -28,6 +28,7 @@ var (
 		kv.WithDescription("tracking active conditions on servers"),
 		kv.WithTTL(10 * 24 * time.Hour), // XXX: we could keep more history here, but might need more storage
 	}
+	errBadData = errors.New("bad condition data")
 )
 
 type natsStore struct {
@@ -50,7 +51,11 @@ func (c conditionRecord) MustJSON() json.RawMessage {
 }
 
 func (c *conditionRecord) FromJSON(rm json.RawMessage) error {
-	return json.Unmarshal(rm, c)
+	err := json.Unmarshal(rm, c)
+	if err != nil {
+		err = errors.Wrap(errBadData, err.Error())
+	}
+	return err
 }
 
 func natsError(op string) {
@@ -82,29 +87,16 @@ func newNatsRepository(log *logrus.Logger, stream events.Stream, replicaCount in
 
 // we must find an active condition with a kind that matches in order to successfully return
 // a condition here.
-func (n *natsStore) findConditionRecord(srvID uuid.UUID, kind rctypes.Kind) (*conditionRecord,
-	*rctypes.Condition, error) {
+func (n *natsStore) findCondition(ctx context.Context, serverID uuid.UUID,
+	kind rctypes.Kind) (*rctypes.Condition, error) {
 	le := n.log.WithFields(logrus.Fields{
-		"serverID":      srvID.String(),
+		"serverID":      serverID.String(),
 		"conditionKind": kind,
 	})
 
-	kve, err := n.bucket.Get(srvID.String())
-	switch {
-	case err == nil:
-	case errors.Is(nats.ErrKeyNotFound, err):
-		le.Debug("no active condition for device")
-		return nil, nil, ErrConditionNotFound
-	default:
-		natsError("get")
-		le.WithError(err).Warn("looking up active condition")
-		return nil, nil, errors.Wrap(ErrRepository, err.Error())
-	}
-
-	var cr conditionRecord
-	if err := cr.FromJSON(kve.Value()); err != nil {
-		le.WithError(err).Warn("bad condition data")
-		return nil, nil, errors.Wrap(ErrRepository, err.Error())
+	cr, err := n.getCurrentConditionRecord(ctx, serverID)
+	if err != nil {
+		return nil, err
 	}
 
 	var found *rctypes.Condition
@@ -119,18 +111,18 @@ func (n *natsStore) findConditionRecord(srvID uuid.UUID, kind rctypes.Kind) (*co
 
 	if found == nil {
 		le.WithField("conditionID", cr.ID.String()).Warn("condition record missing specified type")
-		return nil, nil, ErrConditionNotFound
+		return nil, ErrConditionNotFound
 	}
 
-	return &cr, found, nil
+	return found, nil
 }
 
 // Get returns the active condition of the given Kind on the server.
 func (n *natsStore) Get(ctx context.Context, serverID uuid.UUID, kind rctypes.Kind) (*rctypes.Condition, error) {
-	_, span := otel.Tracer(pkgName).Start(ctx, "NatsStore.Get")
+	otelCtx, span := otel.Tracer(pkgName).Start(ctx, "NatsStore.Get")
 	defer span.End()
 
-	_, condition, err := n.findConditionRecord(serverID, kind)
+	condition, err := n.findCondition(otelCtx, serverID, kind)
 	if err != nil {
 		span.RecordError(err)
 		return nil, err
@@ -143,35 +135,56 @@ func (n *natsStore) Get(ctx context.Context, serverID uuid.UUID, kind rctypes.Ki
 	return condition, nil
 }
 
-// GetActiveCondition returns any condition for the given server-id that is not in a final state.
-// This is a locking mechanism to ensure that conditions (or sets of condtions) are only executed
-// one-at-a-time. That is, even though "Pending" condition isn't "Active" per se, it is still
-// just waiting on a controller and it's equivalent for the purposes of checking if another condition
-// can be started.
-func (n *natsStore) GetActiveCondition(ctx context.Context, srvID uuid.UUID) (*rctypes.Condition, error) {
-	_, span := otel.Tracer(pkgName).Start(ctx, "NatsStore.GetActiveCondition")
+func (n *natsStore) getCurrentConditionRecord(ctx context.Context, serverID uuid.UUID) (*conditionRecord, error) {
+	_, span := otel.Tracer(pkgName).Start(ctx, "NatsStore.getCurrentConditionRecord")
 	defer span.End()
 
 	le := n.log.WithFields(logrus.Fields{
-		"serverID": srvID.String(),
+		"serverID": serverID.String(),
 	})
 
-	kve, err := n.bucket.Get(srvID.String())
+	kve, err := n.bucket.Get(serverID.String())
 	switch {
 	case err == nil:
 	case errors.Is(nats.ErrKeyNotFound, err):
 		le.Debug("no active condition for device")
-		return nil, nil
+		return nil, ErrConditionNotFound
 	default:
 		natsError("get")
 		le.WithError(err).Warn("looking up active condition")
 		return nil, errors.Wrap(ErrRepository, err.Error())
 	}
 
+	// if we're here, we must have non-nil kve because NATS returns an error if a value isn't found for a key.
 	var cr conditionRecord
-	if err := cr.FromJSON(kve.Value()); err != nil {
+	if err = cr.FromJSON(kve.Value()); err != nil {
 		le.WithError(err).Warn("bad condition data")
 		return nil, errors.Wrap(ErrRepository, err.Error())
+	}
+
+	return &cr, nil
+}
+
+// GetActiveCondition returns any condition for the given server-id that is not in a final state.
+// This is a locking mechanism to ensure that conditions (or sets of condtions) are only executed
+// one-at-a-time. That is, even though "Pending" condition isn't "Active" per se, it is still
+// just waiting on a controller and it's equivalent for the purposes of checking if another condition
+// can be started.
+func (n *natsStore) GetActiveCondition(ctx context.Context, serverID uuid.UUID) (*rctypes.Condition, error) {
+	otelCtx, span := otel.Tracer(pkgName).Start(ctx, "NatsStore.GetActiveCondition")
+	defer span.End()
+
+	le := n.log.WithFields(logrus.Fields{
+		"serverID": serverID.String(),
+	})
+
+	cr, err := n.getCurrentConditionRecord(otelCtx, serverID)
+	if errors.Is(err, ErrConditionNotFound) {
+		return nil, nil
+	}
+
+	if err != nil {
+		return nil, err
 	}
 
 	if rctypes.StateIsComplete(cr.State) {
@@ -229,6 +242,52 @@ func (n *natsStore) Create(ctx context.Context, serverID uuid.UUID, condition *r
 	return err
 }
 
+// CreateMultiple crafts a condition-record that is comprised of multiple individual conditions. Unlike Create
+// it checks for an existing, active conditionRecord prior to queuing the new one, and will return an error if
+// it finds one.
+func (n *natsStore) CreateMultiple(ctx context.Context, serverID uuid.UUID, work ...*rctypes.Condition) error {
+	otelCtx, span := otel.Tracer(pkgName).Start(ctx, "NatsStore.CreateMultiple")
+	defer span.End()
+
+	le := n.log.WithFields(logrus.Fields{
+		"serverID": serverID.String(),
+	})
+
+	if len(work) == 0 {
+		le.Info("no work to be done")
+		return nil
+	}
+
+	cr, err := n.getCurrentConditionRecord(otelCtx, serverID)
+	if err != nil && !errors.Is(err, ErrConditionNotFound) {
+		return err
+	}
+
+	if cr != nil && !rctypes.StateIsComplete(cr.State) {
+		activeID := cr.ID.String()
+		le.WithField("active.condition.ID", activeID).Warn("existing active condition")
+		return errors.Wrap(ErrActiveCondition, cr.ID.String())
+	}
+
+	id := uuid.New()
+	cr = &conditionRecord{
+		ID:    id,
+		State: rctypes.Pending,
+	}
+	for _, condition := range work {
+		condition.ID = id
+		cr.Conditions = append(cr.Conditions, condition)
+	}
+
+	_, err = n.bucket.Put(serverID.String(), cr.MustJSON())
+	if err != nil {
+		natsError("create-multiple")
+		span.RecordError(err)
+		le.WithError(err).Warn("writing condition to storage")
+	}
+	return err
+}
+
 // Update a condition on a server.
 // @id: required
 // @condition: required
@@ -236,17 +295,17 @@ func (n *natsStore) Create(ctx context.Context, serverID uuid.UUID, condition *r
 // Note: it's up to the caller to validate the condition update payload. The condition to update must
 // exist, and it must be in a non-final state. The existing condition will be replaced by the incoming
 // parameter. If applicable, the state of the conditionRecord will be updated as well.
-func (n *natsStore) Update(ctx context.Context, serverID uuid.UUID, condition *rctypes.Condition) error {
-	_, span := otel.Tracer(pkgName).Start(ctx, "NatsStore.Update")
+func (n *natsStore) Update(ctx context.Context, serverID uuid.UUID, updated *rctypes.Condition) error {
+	otelCtx, span := otel.Tracer(pkgName).Start(ctx, "NatsStore.Update")
 	defer span.End()
 
 	le := n.log.WithFields(logrus.Fields{
 		"serverID":      serverID.String(),
-		"conditionKind": condition.Kind,
-		"conditionID":   condition.ID.String(),
+		"conditionKind": updated.Kind,
+		"conditionID":   updated.ID.String(),
 	})
 
-	cr, orig, err := n.findConditionRecord(serverID, condition.Kind)
+	cr, err := n.getCurrentConditionRecord(otelCtx, serverID)
 	if err != nil {
 		span.RecordError(err)
 		le.WithError(err).Warn("condition lookup failure on update")
@@ -254,20 +313,38 @@ func (n *natsStore) Update(ctx context.Context, serverID uuid.UUID, condition *r
 	}
 
 	// stupid games, stupid prizes sanity check
-	if cr.ID != condition.ID {
+	if cr.ID != updated.ID {
 		le.WithField("record.ID", cr.ID.String()).Warn("condition id mismatch")
 		return errors.Wrap(ErrRepository, "condition id mismatch")
 	}
 
-	cr.State = condition.State
+	// XXX: Having multiple conditions composed together into a single unit of work makes
+	// managing the state of that unit a little more complicated than merely following the
+	// state of the consitutent conditions. The state of the unit starts as Pending,
+	// transitions to Active when the first update to Active for any condition arrives,
+	// transitions to Failed if any condition fails, and transitions to Success when the
+	// last condition is completed successfully. So to know whether a given success should
+	// be applied to the unit, we need to know if this condition is the last.
 
+	var lastCondition bool
+	lastConditionPosition := len(cr.Conditions) - 1
 	for idx, cond := range cr.Conditions {
 		i := idx
 		c := cond
-		if c == orig {
-			cr.Conditions[i] = condition
+		if c.Kind == updated.Kind {
+			cr.Conditions[i] = updated
+			if i == lastConditionPosition {
+				lastCondition = true
+			}
 			break
 		}
+	}
+
+	// XXX: is there a better way to OR 3 mostly independent conditions
+	switch {
+	case cr.State == rctypes.Pending, updated.State == rctypes.Failed, lastCondition:
+		cr.State = updated.State
+	default:
 	}
 
 	_, err = n.bucket.Put(serverID.String(), cr.MustJSON())
@@ -279,43 +356,4 @@ func (n *natsStore) Update(ctx context.Context, serverID uuid.UUID, condition *r
 	}
 
 	return nil
-}
-
-// Delete removes a condition from being associated with a server. It adheres to the notion that
-// deletes are idempotent; requesting the deletion of a non-existent condition is not an error on
-// the part of this component. This enables repetition of a failed step that composes some
-// operations that succeeded and some that need to be retried.
-func (n *natsStore) Delete(ctx context.Context, serverID uuid.UUID, kind rctypes.Kind) error {
-	_, span := otel.Tracer(pkgName).Start(ctx, "NatsStore.Delete")
-	defer span.End()
-
-	le := n.log.WithFields(logrus.Fields{
-		"serverID":      serverID.String(),
-		"conditionKind": kind,
-	})
-
-	cr, _, err := n.findConditionRecord(serverID, kind)
-
-	if errors.Is(err, ErrConditionNotFound) {
-		le.Info("request to delete non-existent condition")
-		return nil
-	}
-
-	if err != nil {
-		span.RecordError(err)
-		le.WithError(err).Warn("condition lookup failure on delete")
-		return err
-	}
-
-	if !rctypes.StateIsComplete(cr.State) {
-		return ErrConditionNotComplete
-	}
-
-	err = n.bucket.Delete(serverID.String())
-	if err != nil {
-		natsError("delete")
-		span.RecordError(err)
-		le.WithError(err).Warn("deleting condition record")
-	}
-	return err
 }

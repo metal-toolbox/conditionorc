@@ -94,14 +94,6 @@ func (h *Handler) UpdateCondition(ctx context.Context, updEvt *v1types.Condition
 		return errors.Wrap(errRetryThis, err.Error())
 	}
 
-	if existing == nil {
-		h.logger.WithFields(logrus.Fields{
-			"serverID":      updEvt.ConditionUpdate.ServerID,
-			"conditionKind": updEvt.Kind,
-		}).Error("no existing condition found for update")
-		return errors.New("nil existing condition with no error on retrieve")
-	}
-
 	// nothing to update
 	if existing.State == updEvt.ConditionUpdate.State &&
 		bytes.Equal(existing.Status, updEvt.ConditionUpdate.Status) {
@@ -109,13 +101,12 @@ func (h *Handler) UpdateCondition(ctx context.Context, updEvt *v1types.Condition
 	}
 
 	// merge update with existing
-	revisedCondition, err := updEvt.MergeExisting(existing, false)
+	revisedCondition, err := updEvt.MergeExisting(existing)
 	if err != nil {
 		h.logger.WithError(err).WithFields(logrus.Fields{
 			"serverID":         updEvt.ConditionUpdate.ServerID,
 			"conditionKind":    updEvt.Kind,
 			"incoming_state":   updEvt.State,
-			"incoming_version": updEvt.ResourceVersion,
 			"existing_state":   existing.State,
 			"existing_version": existing.ResourceVersion,
 		}).Warn("condition merge failed")

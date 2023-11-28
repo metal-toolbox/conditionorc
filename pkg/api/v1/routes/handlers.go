@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -29,6 +30,7 @@ const (
 var (
 	ErrConditionParameter = errors.New("error in condition parameter")
 	ErrConditionExclusive = errors.New("exclusive condition present")
+	failedPublishStatus   = json.RawMessage(`{ "msg": "failed to publish condition to controller" }`)
 )
 
 func (r *Routes) conditionKindValid(kind rctypes.Kind) bool {
@@ -134,7 +136,7 @@ func (r *Routes) serverEnroll(c *gin.Context) (int, *v1types.ServerResponse) {
 			}).Info("bad serverID")
 
 			return http.StatusBadRequest, &v1types.ServerResponse{
-				Message: err.Error(),
+				Message: "server id: " + err.Error(),
 			}
 		}
 	} else {
@@ -166,11 +168,11 @@ func (r *Routes) serverEnroll(c *gin.Context) (int, *v1types.ServerResponse) {
 		rollbackErr := rollback()
 		if strings.Contains(err.Error(), badRequestErrMsg) {
 			return http.StatusBadRequest, &v1types.ServerResponse{
-				Message: err.Error() + fmt.Sprintf("server rollback err: %v", rollbackErr),
+				Message: "add server: " + err.Error() + fmt.Sprintf("server rollback err: %v", rollbackErr),
 			}
 		}
 		return http.StatusInternalServerError, &v1types.ServerResponse{
-			Message: err.Error() + fmt.Sprintf("server rollback err: %v", rollbackErr),
+			Message: "add server: " + err.Error() + fmt.Sprintf("server rollback err: %v", rollbackErr),
 		}
 	}
 
@@ -197,39 +199,120 @@ func (r *Routes) serverEnroll(c *gin.Context) (int, *v1types.ServerResponse) {
 	return st, resp
 }
 
+// @Summary Firmware Install
+// @Tag Conditions
+// @Description Installs firmware on a device and validates with a subsequent inventory
+// @Description Sample firmwareInstall payload, response: https://github.com/metal-toolbox/conditionorc/blob/main/sample/firmwareInstall.md
+// @Param uuid path string true "Server ID"
+// @Accept json
+// @Produce json
+// @Success 200 {object} v1types.ServerResponse
+// Failure 400 {object} v1types.ServerResponse
+// Failure 500 {object} v1types.ServerResponse
+// Failure 503 {object} v1types.ServerResponse
+// @Router /servers/{uuid}/firmwareInstall [post]
+func (r *Routes) firmwareInstall(c *gin.Context) (int, *v1types.ServerResponse) {
+	id := c.Param("uuid")
+	otelCtx, span := otel.Tracer(pkgName).Start(c.Request.Context(), "Routes.serverEnroll")
+	span.SetAttributes(attribute.KeyValue{Key: "serverId", Value: attribute.StringValue(id)})
+	defer span.End()
+
+	serverID, err := uuid.Parse(id)
+	if err != nil {
+		r.logger.WithError(err).WithField("serverID", id).Warn("bad serverID")
+
+		return http.StatusBadRequest, &v1types.ServerResponse{
+			Message: "server id: " + err.Error(),
+		}
+	}
+
+	facilityCode, err := r.serverFacilityCode(otelCtx, serverID)
+	if err != nil {
+		return http.StatusInternalServerError, &v1types.ServerResponse{
+			Message: "server facility: " + err.Error(),
+		}
+	}
+
+	var fw rctypes.FirmwareInstallTaskParameters
+	if err = c.ShouldBindJSON(&fw); err != nil {
+		r.logger.WithError(err).Warn("unmarshal firmwareInstall payload")
+
+		return http.StatusBadRequest, &v1types.ServerResponse{
+			Message: "invalid firmware install payload: " + err.Error(),
+		}
+	}
+
+	createTime := time.Now()
+
+	fwCondition := &rctypes.Condition{
+		Kind:                  rctypes.FirmwareInstall,
+		Version:               rctypes.ConditionStructVersion,
+		Parameters:            fw.MustJSON(),
+		State:                 rctypes.Pending,
+		FailOnCheckpointError: true,
+		CreatedAt:             createTime,
+	}
+
+	invCondition := &rctypes.Condition{
+		Kind:                  rctypes.Inventory,
+		Version:               rctypes.ConditionStructVersion,
+		Parameters:            rctypes.MustDefaultInventoryJSON(serverID),
+		State:                 rctypes.Pending,
+		FailOnCheckpointError: true,
+		CreatedAt:             createTime,
+	}
+
+	if err = r.repository.CreateMultiple(otelCtx, serverID, fwCondition, invCondition); err != nil {
+		return http.StatusInternalServerError, &v1types.ServerResponse{
+			Message: "scheduling condition: " + err.Error(),
+		}
+	}
+
+	if err = r.publishCondition(otelCtx, serverID, facilityCode, fwCondition); err != nil {
+		r.logger.WithError(err).Warn("publishing firmware-install condition")
+		// mark firmwareInstall as failed
+		fwCondition.State = rctypes.Failed
+		fwCondition.Status = failedPublishStatus
+		if markErr := r.repository.Update(otelCtx, serverID, fwCondition); markErr != nil {
+			// an operator is going to have to sort this out
+			r.logger.WithError(err).Warn("marking unpublished condition failed")
+		}
+		return http.StatusInternalServerError, &v1types.ServerResponse{
+			Message: "publishing condition" + err.Error(),
+		}
+	}
+
+	return http.StatusOK, &v1types.ServerResponse{
+		Message: "firmware install scheduled",
+	}
+}
+
 func (r *Routes) conditionCreate(otelCtx context.Context, newCondition *rctypes.Condition, serverID uuid.UUID, facilityCode string) (int, *v1types.ServerResponse) {
 	// Create the new condition
 	err := r.repository.Create(otelCtx, serverID, newCondition)
 	if err != nil {
-		r.logger.WithFields(logrus.Fields{
-			"error": err,
-		}).Info("condition create failed")
+		r.logger.WithError(err).Info("condition create failed")
 
 		return http.StatusInternalServerError, &v1types.ServerResponse{
-			Message: err.Error(),
+			Message: "condition create: " + err.Error(),
 		}
 	}
 
 	// publish the condition and in case of publish failure - revert.
 	err = r.publishCondition(otelCtx, serverID, facilityCode, newCondition)
 	if err != nil {
-		r.logger.WithFields(logrus.Fields{
-			"error": err,
-		}).Info("condition create failed")
+		r.logger.WithError(err).Warn("condition create failed to publish")
 
 		metrics.PublishErrors.With(
 			prometheus.Labels{"conditionKind": string(newCondition.Kind)},
 		).Inc()
 
-		deleteErr := r.repository.Delete(otelCtx, serverID, newCondition.Kind)
-		if deleteErr != nil {
-			r.logger.WithFields(logrus.Fields{
-				"error": deleteErr,
-			}).Info("condition deletion failed")
+		newCondition.State = rctypes.Failed
+		newCondition.Status = failedPublishStatus
 
-			return http.StatusInternalServerError, &v1types.ServerResponse{
-				Message: deleteErr.Error(),
-			}
+		updateErr := r.repository.Update(otelCtx, serverID, newCondition)
+		if updateErr != nil {
+			r.logger.WithError(updateErr).Warn("condition deletion failed")
 		}
 
 		return http.StatusInternalServerError, &v1types.ServerResponse{

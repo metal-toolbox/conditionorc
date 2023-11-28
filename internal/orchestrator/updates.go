@@ -3,6 +3,7 @@ package orchestrator
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"strings"
 	"sync"
 	"time"
@@ -28,6 +29,7 @@ var (
 	errKeyFormat        = errors.New("malformed update key")
 	errConditionID      = errors.New("bad condition uuid")
 	errInvalidState     = errors.New("invalid condition state")
+	errCompleteEvent    = errors.New("unable to complete event")
 	staleEventThreshold = 30 * time.Minute
 	reconcilerCadence   = 10 * time.Minute
 	failedByReconciler  = []byte(`{ "msg": "worker failed processing this event" }`)
@@ -234,9 +236,9 @@ func eventUpdateFromKV(ctx context.Context, kve nats.KeyValueEntry,
 			ServerID:    serverID,
 			State:       convState,
 			Status:      cs.Status,
+			UpdatedAt:   cs.UpdatedAt,
 		},
 		Kind:         kind,
-		UpdatedAt:    cs.UpdatedAt,
 		ControllerID: controllerID,
 	}
 
@@ -283,9 +285,44 @@ func (o *Orchestrator) eventUpdate(ctx context.Context, evt *v1types.ConditionUp
 	}
 
 	if rctypes.StateIsComplete(evt.ConditionUpdate.State) {
-		err := status.DeleteCondition(evt.Kind, o.facility, evt.ConditionUpdate.ConditionID.String())
+		delErr := status.DeleteCondition(evt.Kind, o.facility, evt.ConditionUpdate.ConditionID.String())
+		if delErr != nil {
+			// if we fail to delete this event from the KV, the reconciler will catch it later
+			// and walk this code, so return early.
+			o.logger.WithError(delErr).WithFields(logrus.Fields{
+				"condition.id":   evt.ConditionUpdate.ConditionID,
+				"server.id":      evt.ConditionUpdate.ServerID,
+				"condition.kind": evt.Kind,
+			}).Warn("removing completed condition data")
+			return errors.Wrap(errCompleteEvent, delErr.Error())
+		}
+		active, err := o.repository.GetActiveCondition(ctx, evt.ConditionUpdate.ServerID)
 		if err != nil {
-			return errors.Wrap(err, "deleting event KV data")
+			o.logger.WithError(err).WithFields(logrus.Fields{
+				"condition.id": evt.ConditionUpdate.ConditionID,
+				"server.id":    evt.ConditionUpdate.ServerID,
+			}).Warn("retrieving next active condition")
+			return errors.Wrap(errCompleteEvent, err.Error())
+		}
+		// seeing as we only *just* completed this event it's hard to believe we'd
+		// lose the race to publish the next one, but it's possible I suppose.
+		if active != nil && active.State == rctypes.Pending {
+			byt := active.MustBytes()
+			subject := fmt.Sprintf("%s.servers.%s", o.facility, active.Kind)
+			err := o.streamBroker.Publish(ctx, subject, byt)
+			if err != nil {
+				o.logger.WithError(err).WithFields(logrus.Fields{
+					"condition.id":   active.ID,
+					"server.id":      evt.ConditionUpdate.ServerID,
+					"condition.kind": active.Kind,
+				}).Warn("publishing next active condition")
+				return errors.Wrap(errCompleteEvent, err.Error())
+			}
+			o.logger.WithFields(logrus.Fields{
+				"condition.id":   active.ID,
+				"server.id":      evt.ConditionUpdate.ServerID,
+				"condition.kind": active.Kind,
+			}).Debug("published next condition in chain")
 		}
 	}
 
@@ -295,7 +332,7 @@ func (o *Orchestrator) eventUpdate(ctx context.Context, evt *v1types.ConditionUp
 func (o *Orchestrator) eventNeedsReconciliation(evt *v1types.ConditionUpdateEvent) bool {
 	// the last update should be later than our internal threshold
 	// this might still be actively worked
-	if time.Since(evt.UpdatedAt) < staleEventThreshold {
+	if time.Since(evt.ConditionUpdate.UpdatedAt) < staleEventThreshold {
 		return false
 	}
 

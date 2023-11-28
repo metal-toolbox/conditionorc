@@ -21,6 +21,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"go.hollow.sh/toolbox/events"
 	mockevents "go.hollow.sh/toolbox/events/mock"
 )
@@ -422,7 +423,7 @@ func TestAddServerRollback(t *testing.T) {
 		mockStoreCreateErr   mockError
 		mockFleetDBClientErr mockError
 		mockStreamErr        mockError
-		mockStoreDeleteErr   mockError
+		mockStoreUpdateErr   mockError
 		request              func(t *testing.T) *http.Request
 		assertResponse       func(t *testing.T, r *httptest.ResponseRecorder)
 		expectRollback       int
@@ -526,13 +527,13 @@ func TestAddServerRollback(t *testing.T) {
 				Times(tc.mockStreamErr.calledTime)
 
 			repository.EXPECT().
-				Delete(
+				Update(
 					gomock.Any(),
 					gomock.Any(),
 					gomock.Any(),
 				).
-				Return(tc.mockStoreDeleteErr.err).
-				Times(tc.mockStoreDeleteErr.calledTime)
+				Return(tc.mockStoreUpdateErr.err).
+				Times(tc.mockStoreUpdateErr.calledTime)
 
 			recorder := httptest.NewRecorder()
 			server.ServeHTTP(recorder, tc.request(t))
@@ -902,9 +903,11 @@ func TestServerConditionCreate(t *testing.T) {
 
 				// condition deletion due to publish failure
 				r.EXPECT().
-					Delete(gomock.Any(), gomock.Eq(serverID), gomock.Eq(rctypes.FirmwareInstall)).
-					Times(1).
-					Return(nil)
+					Update(gomock.Any(), gomock.Eq(serverID), gomock.Any()).
+					Times(1).DoAndReturn(func(_ context.Context, _ uuid.UUID, c *rctypes.Condition) error {
+					require.Equal(t, rctypes.Failed, c.State)
+					return nil
+				})
 			},
 
 			func(m *fleetdb.MockFleetDB) {

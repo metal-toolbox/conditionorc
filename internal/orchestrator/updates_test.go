@@ -131,7 +131,9 @@ func TestEventNeedsReconciliation(t *testing.T) {
 	}
 
 	evt := &v1types.ConditionUpdateEvent{
-		UpdatedAt: time.Now(),
+		ConditionUpdate: v1types.ConditionUpdate{
+			UpdatedAt: time.Now(),
+		},
 	}
 
 	require.False(t, o.eventNeedsReconciliation(evt))

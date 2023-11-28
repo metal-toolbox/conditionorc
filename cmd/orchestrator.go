@@ -13,6 +13,7 @@ import (
 	"github.com/metal-toolbox/conditionorc/internal/orchestrator"
 	"github.com/metal-toolbox/conditionorc/internal/orchestrator/notify"
 	"github.com/metal-toolbox/conditionorc/internal/store"
+	"github.com/metal-toolbox/conditionorc/internal/version"
 	"github.com/spf13/cobra"
 	"go.hollow.sh/toolbox/events"
 )
@@ -79,6 +80,8 @@ var cmdOrchestrator = &cobra.Command{
 				Info("configuring status KV support")
 			options = append(options, orchestrator.WithReplicas(app.Config.NatsOptions.KVReplicationFactor))
 		}
+
+		app.Logger.Info(version.Current().String())
 
 		orc := orchestrator.New(options...)
 		orc.Run(ctx)

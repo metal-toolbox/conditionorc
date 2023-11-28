@@ -23,6 +23,7 @@ var (
 	js     nats.JetStreamContext
 	evJS   *events.NatsJetstream
 	logger *logrus.Logger
+	bucket nats.KeyValue
 )
 
 func init() {
@@ -72,11 +73,19 @@ func TestMain(m *testing.M) {
 	evJS = events.NewJetstreamFromConn(nc)
 	defer evJS.Close()
 
+	// initialize the bucket here
+	var err error
+	bucket, err = kv.CreateOrBindKVBucket(evJS, bucketName)
+	if err != nil {
+		logger.WithError(err).Fatal("kv setup")
+	}
+
 	exitCode := m.Run()
 	os.Exit(exitCode)
 }
 
-func TestCRUDL(t *testing.T) {
+func TestCreateReadUpdate(t *testing.T) {
+	t.Parallel()
 	serverID := uuid.New()
 
 	kind := rctypes.Kind("test-kind")
@@ -89,16 +98,13 @@ func TestCRUDL(t *testing.T) {
 
 	logger := &logrus.Logger{}
 
-	bucket, err := kv.CreateOrBindKVBucket(evJS, bucketName)
-	require.NoError(t, err, "setup NATS kv")
-
 	store := &natsStore{
 		bucket: bucket,
 		log:    logger,
 	}
 
 	// look for a condition in an empty bucket and find nothing
-	_, err = store.Get(context.TODO(), serverID, kind)
+	_, err := store.Get(context.TODO(), serverID, kind)
 	require.ErrorIs(t, err, ErrConditionNotFound)
 
 	active, err := store.GetActiveCondition(context.TODO(), serverID)
@@ -125,11 +131,12 @@ func TestCRUDL(t *testing.T) {
 	// read the new condition
 	c, err = store.Get(context.TODO(), serverID, kind)
 	require.NoError(t, err)
-	require.Equal(t, condition.State, c.State)
+	require.Equal(t, rctypes.Active, c.State)
 
-	// try to delete an incomplete condition and fail
-	err = store.Delete(context.TODO(), serverID, kind)
-	require.ErrorIs(t, err, ErrConditionNotComplete)
+	// make sure that we updated the container too
+	cr, err := store.getCurrentConditionRecord(context.TODO(), serverID)
+	require.NoError(t, err)
+	require.Equal(t, rctypes.Active, cr.State)
 
 	condition.State = rctypes.Succeeded
 	err = store.Update(context.TODO(), serverID, condition)
@@ -139,15 +146,124 @@ func TestCRUDL(t *testing.T) {
 	require.NoError(t, err)
 	require.Nil(t, active)
 
-	// OK, get rid of it
-	err = store.Delete(context.TODO(), serverID, kind)
+	cr, err = store.getCurrentConditionRecord(context.TODO(), serverID)
 	require.NoError(t, err)
+	require.Equal(t, rctypes.Succeeded, cr.State)
+}
 
-	// And now it's not here anymore
-	_, err = store.Get(context.TODO(), serverID, kind)
-	require.ErrorIs(t, err, ErrConditionNotFound)
+// Given a conditionRecord with multiple conditions, walk through some common
+// scenarios around CreateMultiple/Update/Get/GetActive
+func TestMultipleConditionUpdate(t *testing.T) {
+	t.Parallel()
 
-	// And if you delete it again, it's fine.
-	err = store.Delete(context.TODO(), serverID, kind)
-	require.NoError(t, err)
+	logger := &logrus.Logger{}
+
+	store := &natsStore{
+		bucket: bucket,
+		log:    logger,
+	}
+	t.Run("create multiple sanity checks", func(t *testing.T) {
+		serverID := uuid.New()
+
+		err := store.CreateMultiple(context.TODO(), serverID)
+		require.NoError(t, err, "created multiple with nil work")
+
+		work := []*rctypes.Condition{
+			&rctypes.Condition{
+				Kind:  rctypes.Kind("first"),
+				State: rctypes.Pending,
+			},
+		}
+
+		err = store.CreateMultiple(context.TODO(), serverID, work...)
+		require.NoError(t, err, "created multiple on idle server with work")
+
+		err = store.CreateMultiple(context.TODO(), serverID, work...)
+		require.ErrorIs(t, err, ErrActiveCondition, "created multiple on busy server with work")
+
+	})
+	t.Run("success path", func(t *testing.T) {
+		serverID := uuid.New()
+		first := &rctypes.Condition{
+			Kind:  rctypes.Kind("first"),
+			State: rctypes.Pending,
+		}
+		second := &rctypes.Condition{
+			Kind:  rctypes.Kind("second"),
+			State: rctypes.Pending,
+		}
+		work := []*rctypes.Condition{
+			first,
+			second,
+		}
+
+		err := store.CreateMultiple(context.TODO(), serverID, work...)
+		require.NoError(t, err, "CreateMultiple")
+
+		active, err := store.GetActiveCondition(context.TODO(), serverID)
+		require.NoError(t, err, "GetActiveCondition I")
+		require.Equal(t, active, first)
+
+		first.State = rctypes.Active
+		err = store.Update(context.TODO(), serverID, first)
+		require.NoError(t, err, "first update - active")
+
+		active, err = store.GetActiveCondition(context.TODO(), serverID)
+		require.NoError(t, err, "GetActiveCondition II")
+		require.Equal(t, active, first)
+
+		first.State = rctypes.Succeeded
+		err = store.Update(context.TODO(), serverID, first)
+		require.NoError(t, err, "first update - succeeded")
+
+		active, err = store.GetActiveCondition(context.TODO(), serverID)
+		require.NoError(t, err, "GetActiveCondition III")
+		require.Equal(t, active, second)
+
+		second.State = rctypes.Succeeded
+		err = store.Update(context.TODO(), serverID, second)
+		require.NoError(t, err, "second update - succeeded")
+
+		active, err = store.GetActiveCondition(context.TODO(), serverID)
+		require.NoError(t, err, "GetActiveCondition IV")
+		require.Nil(t, active)
+	})
+	t.Run("failure short circuit", func(t *testing.T) {
+		serverID := uuid.New()
+		first := &rctypes.Condition{
+			Kind:  rctypes.Kind("first"),
+			State: rctypes.Pending,
+		}
+		second := &rctypes.Condition{
+			Kind:  rctypes.Kind("second"),
+			State: rctypes.Pending,
+		}
+		work := []*rctypes.Condition{
+			first,
+			second,
+		}
+
+		err := store.CreateMultiple(context.TODO(), serverID, work...)
+		require.NoError(t, err, "CreateMultiple")
+
+		active, err := store.GetActiveCondition(context.TODO(), serverID)
+		require.NoError(t, err, "GetActiveCondition I")
+		require.Equal(t, active, first)
+
+		first.State = rctypes.Active
+		err = store.Update(context.TODO(), serverID, first)
+		require.NoError(t, err, "first update - active")
+
+		active, err = store.GetActiveCondition(context.TODO(), serverID)
+		require.NoError(t, err, "GetActiveCondition II")
+		require.Equal(t, active, first)
+
+		first.State = rctypes.Failed
+		err = store.Update(context.TODO(), serverID, first)
+		require.NoError(t, err, "first update - failed")
+
+		active, err = store.GetActiveCondition(context.TODO(), serverID)
+		require.NoError(t, err, "GetActiveCondition III")
+		require.Nil(t, active)
+	})
 }

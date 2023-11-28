@@ -145,6 +145,10 @@ func (r *Routes) Routes(g *gin.RouterGroup) {
 
 	servers := g.Group("/servers/:uuid")
 	{
+		// Combined API for firmwareInstall
+		servers.POST("/firmwareInstall", r.composeAuthHandler(createScopes("condition")),
+			wrapAPICall(r.firmwareInstall))
+
 		// /servers/:uuid/condition/:conditionKind
 		serverConditionBySlug := servers.Group("/condition")
 

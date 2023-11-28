@@ -19,8 +19,6 @@ func TestValidate(t *testing.T) {
 	update.State = rctypes.Failed
 	require.Error(t, update.Validate(), "ConditionID, ServerID, State")
 	update.Status = []byte(`{"you":"lose"}`)
-	require.Error(t, update.Validate(), "ConditionID, ServerID, State, Status")
-	update.ResourceVersion = int64(5)
 	require.NoError(t, update.Validate(), "should be good")
 }
 
@@ -40,34 +38,25 @@ func TestConditionUpdate_mergeExisting(t *testing.T) {
 			errBadUpdateTarget,
 		},
 		{
-			"resource version mismatch returns error",
-			&ConditionUpdate{ResourceVersion: 0},
-			&rctypes.Condition{ResourceVersion: 1},
-			nil,
-			errResourceVersionMismatch,
-		},
-		{
 			"transition state invalid error",
-			&ConditionUpdate{ResourceVersion: 1, State: rctypes.Active},
-			&rctypes.Condition{ResourceVersion: 1, State: rctypes.Failed},
+			&ConditionUpdate{State: rctypes.Active},
+			&rctypes.Condition{State: rctypes.Failed},
 			nil,
 			errInvalidStateTransition,
 		},
 		{
 			"condition ID mismatch error",
 			&ConditionUpdate{
-				ConditionID:     uuid.New(),
-				ResourceVersion: 1,
-				State:           rctypes.Active,
-				Status:          []byte("{'foo': 'bar'}"),
+				ConditionID: uuid.New(),
+				State:       rctypes.Active,
+				Status:      []byte("{'foo': 'bar'}"),
 			},
 			&rctypes.Condition{
-				ID:              uuid.New(),
-				Kind:            rctypes.FirmwareInstall,
-				Parameters:      nil,
-				ResourceVersion: 1,
-				State:           rctypes.Pending,
-				Status:          []byte("{'woo': 'alala'}"),
+				ID:         uuid.New(),
+				Kind:       rctypes.FirmwareInstall,
+				Parameters: nil,
+				State:      rctypes.Pending,
+				Status:     []byte("{'woo': 'alala'}"),
 			},
 			nil,
 			errBadUpdateTarget,
@@ -75,34 +64,31 @@ func TestConditionUpdate_mergeExisting(t *testing.T) {
 		{
 			"existing merged with update",
 			&ConditionUpdate{
-				ConditionID:     uuid.MustParse("48e632e0-d0af-013b-9540-2cde48001122"),
-				ServerID:        uuid.MustParse("f2cd1ef8-c759-4049-905e-f6fdf61719a9"),
-				ResourceVersion: 1,
-				State:           rctypes.Active,
-				Status:          []byte("{'foo': 'bar'}"),
+				ConditionID: uuid.MustParse("48e632e0-d0af-013b-9540-2cde48001122"),
+				ServerID:    uuid.MustParse("f2cd1ef8-c759-4049-905e-f6fdf61719a9"),
+				State:       rctypes.Active,
+				Status:      []byte("{'foo': 'bar'}"),
 			},
 			&rctypes.Condition{
-				Kind:            rctypes.FirmwareInstall,
-				ID:              uuid.MustParse("48e632e0-d0af-013b-9540-2cde48001122"),
-				Parameters:      nil,
-				ResourceVersion: 1,
-				State:           rctypes.Pending,
-				Status:          []byte("{'woo': 'alala'}"),
+				Kind:       rctypes.FirmwareInstall,
+				ID:         uuid.MustParse("48e632e0-d0af-013b-9540-2cde48001122"),
+				Parameters: nil,
+				State:      rctypes.Pending,
+				Status:     []byte("{'woo': 'alala'}"),
 			},
 			&rctypes.Condition{
-				ID:              uuid.MustParse("48e632e0-d0af-013b-9540-2cde48001122"),
-				Kind:            rctypes.FirmwareInstall,
-				Parameters:      nil,
-				ResourceVersion: 1,
-				State:           rctypes.Active,
-				Status:          []byte("{'foo': 'bar'}"),
+				ID:         uuid.MustParse("48e632e0-d0af-013b-9540-2cde48001122"),
+				Kind:       rctypes.FirmwareInstall,
+				Parameters: nil,
+				State:      rctypes.Active,
+				Status:     []byte("{'foo': 'bar'}"),
 			},
 			nil,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := tt.update.MergeExisting(tt.existing, true)
+			got, err := tt.update.MergeExisting(tt.existing)
 			if tt.wantErr != nil {
 				require.Error(t, err, "no error when one is expected")
 				require.Equal(t, tt.wantErr, err, "error does not match expectation")
