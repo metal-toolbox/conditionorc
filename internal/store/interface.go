@@ -2,6 +2,7 @@ package store
 
 import (
 	"context"
+	"encoding/json"
 	"strings"
 
 	"github.com/google/uuid"
@@ -14,12 +15,35 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+// ConditionRecord is a container of multiple conditions all handled as a single
+// unit-of-work.
+type ConditionRecord struct {
+	ID         uuid.UUID            `json:"id"`
+	State      rctypes.State        `json:"state"`
+	Conditions []*rctypes.Condition `json:"conditions"`
+}
+
+func (c ConditionRecord) MustJSON() json.RawMessage {
+	byt, err := json.Marshal(&c)
+	if err != nil {
+		panic("bad condition record serialize")
+	}
+	return byt
+}
+
+func (c *ConditionRecord) FromJSON(rm json.RawMessage) error {
+	err := json.Unmarshal(rm, c)
+	if err != nil {
+		err = errors.Wrap(errBadData, err.Error())
+	}
+	return err
+}
+
 // NOTE: when updating this interface, run make gen-store-mock to make sure the mocks are updated.
 type Repository interface {
-	// Get a condition set on a server.
+	// Get the last condition set on a server in any state, including finished ones.
 	// @serverID: required
-	// @conditionKind: required
-	Get(ctx context.Context, serverID uuid.UUID, conditionKind rctypes.Kind) (*rctypes.Condition, error)
+	Get(ctx context.Context, serverID uuid.UUID) (*ConditionRecord, error)
 
 	// Get the currently active condition. If there is nothing active, return nil. Errors only
 	// when the underlying storage is unavailable

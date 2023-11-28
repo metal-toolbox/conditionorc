@@ -411,64 +411,52 @@ func (r *Routes) publishCondition(ctx context.Context, serverID uuid.UUID, facil
 	return nil
 }
 
-// @Summary Condition Get
+// @Summary Condition Status
 // @Tag Conditions
 // @Description Returns condition of a server
-// @ID serverConditionGet
+// @ID conditionStatus
 // @Param uuid path string true "Server ID"
-// @Param conditionKind path string true "Condition Kind"
 // @Accept json
 // @Produce json
 // @Success 200 {object} v1types.ServerResponse
 // Failure 400 {object} v1types.ServerResponse
 // Failure 404 {object} v1types.ServerResponse
 // Failure 503 {object} v1types.ServerResponse
-// @Router /servers/{uuid}/condition/{conditionKind} [get]
-func (r *Routes) serverConditionGet(c *gin.Context) (int, *v1types.ServerResponse) {
-	otelCtx, span := otel.Tracer(pkgName).Start(c.Request.Context(), "Routes.serverConditionGet")
+// @Router /servers/{uuid}/conditionStatus [get]
+func (r *Routes) conditionStatus(c *gin.Context) (int, *v1types.ServerResponse) {
+	otelCtx, span := otel.Tracer(pkgName).Start(c.Request.Context(), "Routes.conditionStatus")
 	span.SetAttributes(
-		attribute.KeyValue{Key: "conditionKind", Value: attribute.StringValue(c.Param("conditionKind"))},
-		attribute.KeyValue{Key: "serverId", Value: attribute.StringValue(c.Param("uuid"))})
+		attribute.KeyValue{
+			Key:   "serverId",
+			Value: attribute.StringValue(c.Param("uuid")),
+		})
 	defer span.End()
 	serverID, err := uuid.Parse(c.Param("uuid"))
 	if err != nil {
 		return http.StatusBadRequest, &v1types.ServerResponse{
-			Message: err.Error(),
+			Message: "invalid server id: " + err.Error(),
 		}
 	}
 
-	kind := rctypes.Kind(c.Param("conditionKind"))
-	if !r.conditionKindValid(kind) {
-		return http.StatusBadRequest, &v1types.ServerResponse{
-			Message: "unsupported condition kind: " + string(kind),
-		}
-	}
-
-	found, err := r.repository.Get(otelCtx, serverID, kind)
+	cr, err := r.repository.Get(otelCtx, serverID)
 	if err != nil {
 		if errors.Is(err, store.ErrConditionNotFound) {
 			return http.StatusNotFound, &v1types.ServerResponse{
-				Message: "conditionKind not found on server",
+				Message: "condition not found for server",
 			}
 		}
 
 		return http.StatusServiceUnavailable, &v1types.ServerResponse{
-			Message: err.Error(),
+			Message: "condition lookup: " + err.Error(),
 		}
 	}
 
-	if found == nil {
-		return http.StatusNotFound, &v1types.ServerResponse{
-			Message: "conditionKind not found on server",
-		}
-	}
-
+	// if we're here cr must be not-nil
 	return http.StatusOK, &v1types.ServerResponse{
 		Records: &v1types.ConditionsResponse{
-			ServerID: serverID,
-			Conditions: []*rctypes.Condition{
-				found,
-			},
+			ServerID:   serverID,
+			State:      cr.State,
+			Conditions: cr.Conditions,
 		},
 	}
 }

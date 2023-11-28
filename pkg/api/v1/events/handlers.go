@@ -82,7 +82,7 @@ func (h *Handler) UpdateCondition(ctx context.Context, updEvt *v1types.Condition
 	}
 
 	// query existing condition
-	existing, err := h.repository.Get(ctx, updEvt.ConditionUpdate.ServerID, updEvt.Kind)
+	existing, err := h.repository.GetActiveCondition(ctx, updEvt.ConditionUpdate.ServerID)
 	if err != nil {
 		if errors.Is(err, store.ErrConditionNotFound) {
 			h.logger.WithFields(logrus.Fields{
@@ -159,7 +159,7 @@ func (h *Handler) ServerserviceEvent(ctx context.Context, ev events.Message) {
 
 		conditionFromEvent := &rctypes.Condition{
 			ID:         uuid.New(),
-			Kind:       rctypes.Inventory, // TODO: change, once the condition types package is moved into a shared package
+			Kind:       rctypes.Inventory,
 			State:      rctypes.Pending,
 			Exclusive:  false,
 			Parameters: byt, // pass the incoming message data to Alloy

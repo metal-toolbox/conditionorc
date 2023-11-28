@@ -14,6 +14,7 @@ import (
 	"github.com/volatiletech/null/v8"
 
 	"github.com/metal-toolbox/conditionorc/internal/store"
+	storeTest "github.com/metal-toolbox/conditionorc/internal/store/test"
 	v1types "github.com/metal-toolbox/conditionorc/pkg/api/v1/types"
 
 	rctypes "github.com/metal-toolbox/rivets/condition"
@@ -29,7 +30,7 @@ func TestUpdateEvent(t *testing.T) {
 		defer ctrl.Finish()
 
 		stream := mock_events.NewMockStream(ctrl)
-		repo := store.NewMockRepository(ctrl)
+		repo := storeTest.NewMockRepository(ctrl)
 
 		handler := NewHandler(repo, stream, logrus.New())
 
@@ -43,7 +44,7 @@ func TestUpdateEvent(t *testing.T) {
 		defer ctrl.Finish()
 
 		stream := mock_events.NewMockStream(ctrl)
-		repo := store.NewMockRepository(ctrl)
+		repo := storeTest.NewMockRepository(ctrl)
 
 		handler := NewHandler(repo, stream, logrus.New())
 		serverID := uuid.New()
@@ -51,10 +52,9 @@ func TestUpdateEvent(t *testing.T) {
 		conditionID := uuid.New()
 		status := []byte(`{ "msg":"it's happening!" }`)
 		gomock.InOrder(
-			repo.EXPECT().Get(
+			repo.EXPECT().GetActiveCondition(
 				gomock.Any(),
 				serverID,
-				testKind,
 			).Times(1).Return(nil, errors.New("not today")),
 		)
 
@@ -76,7 +76,7 @@ func TestUpdateEvent(t *testing.T) {
 		defer ctrl.Finish()
 
 		stream := mock_events.NewMockStream(ctrl)
-		repo := store.NewMockRepository(ctrl)
+		repo := storeTest.NewMockRepository(ctrl)
 
 		handler := NewHandler(repo, stream, logrus.New())
 		serverID := uuid.New()
@@ -84,10 +84,9 @@ func TestUpdateEvent(t *testing.T) {
 		conditionID := uuid.New()
 		status := []byte(`{ "msg":"it's happening!" }`)
 		gomock.InOrder(
-			repo.EXPECT().Get(
+			repo.EXPECT().GetActiveCondition(
 				gomock.Any(),
 				serverID,
-				testKind,
 			).Times(1).Return(nil, store.ErrConditionNotFound),
 		)
 
@@ -109,7 +108,7 @@ func TestUpdateEvent(t *testing.T) {
 		defer ctrl.Finish()
 
 		stream := mock_events.NewMockStream(ctrl)
-		repo := store.NewMockRepository(ctrl)
+		repo := storeTest.NewMockRepository(ctrl)
 
 		handler := NewHandler(repo, stream, logrus.New())
 		serverID := uuid.New()
@@ -117,10 +116,9 @@ func TestUpdateEvent(t *testing.T) {
 		conditionID := uuid.New()
 		status := []byte(`{ "msg":"it's happening!" }`)
 		gomock.InOrder(
-			repo.EXPECT().Get(
+			repo.EXPECT().GetActiveCondition(
 				gomock.Any(),
 				serverID,
-				testKind,
 			).Times(1).Return(&rctypes.Condition{
 				ID:     conditionID,
 				Kind:   testKind,
@@ -147,7 +145,7 @@ func TestUpdateEvent(t *testing.T) {
 		defer ctrl.Finish()
 
 		stream := mock_events.NewMockStream(ctrl)
-		repo := store.NewMockRepository(ctrl)
+		repo := storeTest.NewMockRepository(ctrl)
 
 		handler := NewHandler(repo, stream, logrus.New())
 		serverID := uuid.New()
@@ -155,10 +153,9 @@ func TestUpdateEvent(t *testing.T) {
 		conditionID := uuid.New()
 
 		gomock.InOrder(
-			repo.EXPECT().Get(
+			repo.EXPECT().GetActiveCondition(
 				gomock.Any(),
 				serverID,
-				testKind,
 			).Times(1).Return(&rctypes.Condition{
 				ID:     conditionID,
 				Kind:   testKind,
@@ -190,7 +187,7 @@ func TestUpdateEvent(t *testing.T) {
 		defer ctrl.Finish()
 
 		stream := mock_events.NewMockStream(ctrl)
-		repo := store.NewMockRepository(ctrl)
+		repo := storeTest.NewMockRepository(ctrl)
 
 		handler := NewHandler(repo, stream, logrus.New())
 		serverID := uuid.New()
@@ -198,10 +195,9 @@ func TestUpdateEvent(t *testing.T) {
 		conditionID := uuid.New()
 
 		gomock.InOrder(
-			repo.EXPECT().Get(
+			repo.EXPECT().GetActiveCondition(
 				gomock.Any(),
 				serverID,
-				testKind,
 			).Times(1).Return(&rctypes.Condition{
 				ID:     conditionID,
 				Kind:   testKind,
@@ -238,7 +234,7 @@ func TestServerserviceEvent(t *testing.T) {
 
 		stream := mock_events.NewMockStream(ctrl)
 		msg := mock_events.NewMockMessage(ctrl)
-		repo := store.NewMockRepository(ctrl)
+		repo := storeTest.NewMockRepository(ctrl)
 
 		handler := NewHandler(repo, stream, logrus.New())
 		gomock.InOrder(
@@ -254,7 +250,7 @@ func TestServerserviceEvent(t *testing.T) {
 
 		stream := mock_events.NewMockStream(ctrl)
 		msg := mock_events.NewMockMessage(ctrl)
-		repo := store.NewMockRepository(ctrl)
+		repo := storeTest.NewMockRepository(ctrl)
 
 		handler := NewHandler(repo, stream, logrus.New())
 		gomock.InOrder(
@@ -271,7 +267,7 @@ func TestServerserviceEvent(t *testing.T) {
 
 		stream := mock_events.NewMockStream(ctrl)
 		msg := mock_events.NewMockMessage(ctrl)
-		repo := store.NewMockRepository(ctrl)
+		repo := storeTest.NewMockRepository(ctrl)
 
 		serverID := uuid.New()
 		createServer := serversvc.CreateServer{
@@ -299,7 +295,7 @@ func TestServerserviceEvent(t *testing.T) {
 
 		stream := mock_events.NewMockStream(ctrl)
 		msg := mock_events.NewMockMessage(ctrl)
-		repo := store.NewMockRepository(ctrl)
+		repo := storeTest.NewMockRepository(ctrl)
 
 		serverID := uuid.New()
 		createServer := serversvc.CreateServer{
@@ -329,7 +325,7 @@ func TestServerserviceEvent(t *testing.T) {
 
 		stream := mock_events.NewMockStream(ctrl)
 		msg := mock_events.NewMockMessage(ctrl)
-		repo := store.NewMockRepository(ctrl)
+		repo := storeTest.NewMockRepository(ctrl)
 
 		serverID := uuid.New()
 		createServer := serversvc.CreateServer{
@@ -361,7 +357,7 @@ func TestServerserviceEvent(t *testing.T) {
 
 		stream := mock_events.NewMockStream(ctrl)
 		msg := mock_events.NewMockMessage(ctrl)
-		repo := store.NewMockRepository(ctrl)
+		repo := storeTest.NewMockRepository(ctrl)
 
 		serverID := uuid.New()
 		createServer := serversvc.CreateServer{
