@@ -26,6 +26,8 @@ type FleetDB interface {
 	// Get Server attributes.
 	// @serverID: required
 	GetServer(ctx context.Context, serverID uuid.UUID) (*model.Server, error)
+	// DeleteServer
+	DeleteServer(ctx context.Context, serverID uuid.UUID) error
 }
 
 func NewFleetDBClient(ctx context.Context, config *app.Configuration, conditionDefs rctypes.Definitions,

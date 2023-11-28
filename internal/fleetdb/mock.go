@@ -51,6 +51,20 @@ func (mr *MockFleetDBMockRecorder) AddServer(ctx, serverID, facilityCode, bmcAdd
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AddServer", reflect.TypeOf((*MockFleetDB)(nil).AddServer), ctx, serverID, facilityCode, bmcAddr, bmcUser, bmcPass)
 }
 
+// DeleteServer mocks base method.
+func (m *MockFleetDB) DeleteServer(ctx context.Context, serverID uuid.UUID) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DeleteServer", ctx, serverID)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// DeleteServer indicates an expected call of DeleteServer.
+func (mr *MockFleetDBMockRecorder) DeleteServer(ctx, serverID interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteServer", reflect.TypeOf((*MockFleetDB)(nil).DeleteServer), ctx, serverID)
+}
+
 // GetServer mocks base method.
 func (m *MockFleetDB) GetServer(ctx context.Context, serverID uuid.UUID) (*model.Server, error) {
 	m.ctrl.T.Helper()

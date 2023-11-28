@@ -385,6 +385,221 @@ func TestAddServer(t *testing.T) {
 }
 
 // nolint:gocyclo // cyclomatic tests are cyclomatic
+func TestDeleteServer(t *testing.T) {
+	repository, fleetDBClient, _, server, err := setupTestServer(t)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	mockServerID := uuid.New()
+	testcases := []struct {
+		name              string
+		mockStore         func(r *store.MockRepository)
+		mockFleetDBClient func(f *fleetdb.MockFleetDB)
+		request           func(t *testing.T) *http.Request
+		assertResponse    func(t *testing.T, r *httptest.ResponseRecorder)
+	}{
+		{
+			"delete server success",
+			// mock repository
+			func(r *store.MockRepository) {
+				// create condition query
+				r.EXPECT().
+					GetActiveCondition(
+						gomock.Any(),
+						gomock.Eq(mockServerID),
+					).
+					Return(nil, nil).
+					Times(1)
+			},
+			func(r *fleetdb.MockFleetDB) {
+				// lookup for an existing condition
+				r.EXPECT().
+					DeleteServer(
+						gomock.Any(),
+						gomock.Eq(mockServerID),
+					).
+					Return(nil). // no condition exists
+					Times(1)
+			},
+			func(t *testing.T) *http.Request {
+				url := fmt.Sprintf("/api/v1/serverDelete/%v", mockServerID)
+				request, err := http.NewRequestWithContext(context.TODO(), http.MethodDelete, url, nil)
+				if err != nil {
+					t.Fatal(err)
+				}
+
+				return request
+			},
+			func(t *testing.T, r *httptest.ResponseRecorder) {
+				assert.Equal(t, http.StatusOK, r.Code)
+			},
+		},
+		{
+			"invalid ID",
+			// mock repository
+			func(r *store.MockRepository) {
+				// create condition query
+				r.EXPECT().
+					GetActiveCondition(
+						gomock.Any(),
+						gomock.Eq(mockServerID),
+					).
+					Return(&rctypes.Condition{}, nil).
+					Times(0)
+			},
+			func(r *fleetdb.MockFleetDB) {
+				// lookup for an existing condition
+				r.EXPECT().
+					DeleteServer(
+						gomock.Any(),
+						gomock.Eq(mockServerID),
+					).
+					Return(nil). // no condition exists
+					Times(0)
+			},
+			func(t *testing.T) *http.Request {
+				url := fmt.Sprintf("/api/v1/serverDelete/%v", "invalidID")
+				request, err := http.NewRequestWithContext(context.TODO(), http.MethodDelete, url, nil)
+				if err != nil {
+					t.Fatal(err)
+				}
+
+				return request
+			},
+			func(t *testing.T, r *httptest.ResponseRecorder) {
+				assert.Equal(t, http.StatusBadRequest, r.Code)
+			},
+		},
+		{
+			"active condition",
+			// mock repository
+			func(r *store.MockRepository) {
+				// create condition query
+				r.EXPECT().
+					GetActiveCondition(
+						gomock.Any(),
+						gomock.Eq(mockServerID),
+					).
+					Return(&rctypes.Condition{}, nil).
+					Times(1)
+			},
+			func(r *fleetdb.MockFleetDB) {
+				// lookup for an existing condition
+				r.EXPECT().
+					DeleteServer(
+						gomock.Any(),
+						gomock.Eq(mockServerID),
+					).
+					Return(nil). // no condition exists
+					Times(0)
+			},
+			func(t *testing.T) *http.Request {
+				url := fmt.Sprintf("/api/v1/serverDelete/%v", mockServerID)
+				request, err := http.NewRequestWithContext(context.TODO(), http.MethodDelete, url, nil)
+				if err != nil {
+					t.Fatal(err)
+				}
+
+				return request
+			},
+			func(t *testing.T, r *httptest.ResponseRecorder) {
+				assert.Equal(t, http.StatusBadRequest, r.Code)
+			},
+		},
+		{
+			"check active condition error",
+			// mock repository
+			func(r *store.MockRepository) {
+				// create condition query
+				r.EXPECT().
+					GetActiveCondition(
+						gomock.Any(),
+						gomock.Eq(mockServerID),
+					).
+					Return(nil, fmt.Errorf("fake check condition error")).
+					Times(1)
+			},
+			func(r *fleetdb.MockFleetDB) {
+				// lookup for an existing condition
+				r.EXPECT().
+					DeleteServer(
+						gomock.Any(),
+						gomock.Eq(mockServerID),
+					).
+					Return(fmt.Errorf("fake delete error")). // no condition exists
+					Times(0)
+			},
+			func(t *testing.T) *http.Request {
+				url := fmt.Sprintf("/api/v1/serverDelete/%v", mockServerID)
+				request, err := http.NewRequestWithContext(context.TODO(), http.MethodDelete, url, nil)
+				if err != nil {
+					t.Fatal(err)
+				}
+
+				return request
+			},
+			func(t *testing.T, r *httptest.ResponseRecorder) {
+				assert.Equal(t, http.StatusServiceUnavailable, r.Code)
+			},
+		},
+		{
+			"delete error",
+			// mock repository
+			func(r *store.MockRepository) {
+				// create condition query
+				r.EXPECT().
+					GetActiveCondition(
+						gomock.Any(),
+						gomock.Eq(mockServerID),
+					).
+					Return(nil, nil).
+					Times(1)
+			},
+			func(r *fleetdb.MockFleetDB) {
+				// lookup for an existing condition
+				r.EXPECT().
+					DeleteServer(
+						gomock.Any(),
+						gomock.Eq(mockServerID),
+					).
+					Return(fmt.Errorf("fake delete error")). // no condition exists
+					Times(1)
+			},
+			func(t *testing.T) *http.Request {
+				url := fmt.Sprintf("/api/v1/serverDelete/%v", mockServerID)
+				request, err := http.NewRequestWithContext(context.TODO(), http.MethodDelete, url, nil)
+				if err != nil {
+					t.Fatal(err)
+				}
+
+				return request
+			},
+			func(t *testing.T, r *httptest.ResponseRecorder) {
+				assert.Equal(t, http.StatusInternalServerError, r.Code)
+			},
+		},
+	}
+
+	for _, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+			if tc.mockStore != nil {
+				tc.mockStore(repository)
+			}
+
+			if tc.mockFleetDBClient != nil {
+				tc.mockFleetDBClient(fleetDBClient)
+			}
+
+			recorder := httptest.NewRecorder()
+			server.ServeHTTP(recorder, tc.request(t))
+
+			tc.assertResponse(t, recorder)
+		})
+	}
+}
+
+// nolint:gocyclo // cyclomatic tests are cyclomatic
 func TestAddServerRollback(t *testing.T) {
 	repository, fleetDBClient, stream, server, err := setupTestServer(t)
 	if err != nil {
