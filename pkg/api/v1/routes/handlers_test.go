@@ -423,7 +423,7 @@ func TestDeleteServer(t *testing.T) {
 					Times(1)
 			},
 			func(t *testing.T) *http.Request {
-				url := fmt.Sprintf("/api/v1/server/%v", mockServerID)
+				url := fmt.Sprintf("/api/v1/servers/%v", mockServerID)
 				request, err := http.NewRequestWithContext(context.TODO(), http.MethodDelete, url, nil)
 				if err != nil {
 					t.Fatal(err)
@@ -459,7 +459,7 @@ func TestDeleteServer(t *testing.T) {
 					Times(0)
 			},
 			func(t *testing.T) *http.Request {
-				url := fmt.Sprintf("/api/v1/server/%v", "invalidID")
+				url := fmt.Sprintf("/api/v1/servers/%v", "invalidID")
 				request, err := http.NewRequestWithContext(context.TODO(), http.MethodDelete, url, nil)
 				if err != nil {
 					t.Fatal(err)
@@ -495,7 +495,7 @@ func TestDeleteServer(t *testing.T) {
 					Times(0)
 			},
 			func(t *testing.T) *http.Request {
-				url := fmt.Sprintf("/api/v1/server/%v", mockServerID)
+				url := fmt.Sprintf("/api/v1/servers/%v", mockServerID)
 				request, err := http.NewRequestWithContext(context.TODO(), http.MethodDelete, url, nil)
 				if err != nil {
 					t.Fatal(err)
@@ -531,7 +531,7 @@ func TestDeleteServer(t *testing.T) {
 					Times(0)
 			},
 			func(t *testing.T) *http.Request {
-				url := fmt.Sprintf("/api/v1/server/%v", mockServerID)
+				url := fmt.Sprintf("/api/v1/servers/%v", mockServerID)
 				request, err := http.NewRequestWithContext(context.TODO(), http.MethodDelete, url, nil)
 				if err != nil {
 					t.Fatal(err)
@@ -567,7 +567,7 @@ func TestDeleteServer(t *testing.T) {
 					Times(1)
 			},
 			func(t *testing.T) *http.Request {
-				url := fmt.Sprintf("/api/v1/server/%v", mockServerID)
+				url := fmt.Sprintf("/api/v1/servers/%v", mockServerID)
 				request, err := http.NewRequestWithContext(context.TODO(), http.MethodDelete, url, nil)
 				if err != nil {
 					t.Fatal(err)
