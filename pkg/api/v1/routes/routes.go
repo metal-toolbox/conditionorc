@@ -136,16 +136,15 @@ func (r *Routes) composeAuthHandler(scopes []string) gin.HandlerFunc {
 }
 
 func (r *Routes) Routes(g *gin.RouterGroup) {
+	servers := g.Group("/servers/:uuid")
 	if r.enableServerEnroll {
 		serverEnroll := g.Group("/serverEnroll")
 		serverEnroll.POST("/:uuid", r.composeAuthHandler(createScopes("server")), wrapAPICall(r.serverEnroll))
-		serverDelete := g.Group("/serverDelete")
-		serverDelete.DELETE("/:uuid", r.composeAuthHandler(createScopes("server")), wrapAPICall(r.serverDelete))
 		// Create a new server ID when uuid is not provided.
 		serverEnroll.POST("/", r.composeAuthHandler(createScopes("server")), wrapAPICall(r.serverEnroll))
+		servers.DELETE("", r.composeAuthHandler(createScopes("server")), wrapAPICall(r.serverDelete))
 	}
 
-	servers := g.Group("/servers/:uuid")
 	{
 		// Combined API for firmwareInstall
 		servers.POST("/firmwareInstall", r.composeAuthHandler(createScopes("condition")),
