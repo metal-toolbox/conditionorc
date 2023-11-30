@@ -263,6 +263,12 @@ func (r *Routes) firmwareInstall(c *gin.Context) (int, *v1types.ServerResponse) 
 	}
 
 	if err = r.repository.CreateMultiple(otelCtx, serverID, fwCondition, invCondition); err != nil {
+		if errors.Is(err, store.ErrActiveCondition) {
+			return http.StatusBadRequest, &v1types.ServerResponse{
+				Message: err.Error(),
+			}
+		}
+
 		return http.StatusInternalServerError, &v1types.ServerResponse{
 			Message: "scheduling condition: " + err.Error(),
 		}

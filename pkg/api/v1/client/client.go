@@ -72,10 +72,17 @@ func WithAuthToken(authToken string) Option {
 	}
 }
 
-func (c *Client) ServerConditionGet(ctx context.Context, serverID uuid.UUID, conditionKind rctypes.Kind) (*v1types.ServerResponse, error) {
-	path := fmt.Sprintf("servers/%s/condition/%s", serverID.String(), conditionKind)
+func (c *Client) ServerConditionStatus(ctx context.Context, serverID uuid.UUID) (*v1types.ServerResponse, error) {
+	path := fmt.Sprintf("servers/%s/conditionStatus", serverID.String())
 
 	return c.get(ctx, path)
+}
+
+func (c *Client) ServerFirmwareInstall(ctx context.Context,
+	params *rctypes.FirmwareInstallTaskParameters) (*v1types.ServerResponse, error) {
+	path := fmt.Sprintf("servers/%s/firmwareInstall", params.AssetID.String())
+
+	return c.post(ctx, path, params)
 }
 
 func (c *Client) ServerConditionCreate(ctx context.Context, serverID uuid.UUID, conditionKind rctypes.Kind, conditionCreate v1types.ConditionCreate) (*v1types.ServerResponse, error) {

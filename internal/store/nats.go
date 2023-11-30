@@ -7,6 +7,7 @@ package store
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/google/uuid"
@@ -198,7 +199,7 @@ func (n *natsStore) CreateMultiple(ctx context.Context, serverID uuid.UUID, work
 	if cr != nil && !rctypes.StateIsComplete(cr.State) {
 		activeID := cr.ID.String()
 		le.WithField("active.condition.ID", activeID).Warn("existing active condition")
-		return errors.Wrap(ErrActiveCondition, cr.ID.String())
+		return fmt.Errorf("%w:%s", ErrActiveCondition, cr.ID.String())
 	}
 
 	id := uuid.New()
