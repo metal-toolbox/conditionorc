@@ -121,6 +121,15 @@ func (r *Routes) serverConditionCreate(c *gin.Context) (int, *v1types.ServerResp
 	return r.conditionCreate(otelCtx, newCondition, serverID, facilityCode)
 }
 
+// @Summary Server Delete
+// @Tag Servers
+// @Description Delete a server from FleetDB
+// @Description Sample server delete request and response: https://github.com/metal-toolbox/conditionorc/blob/main/sample/serverenroll.md
+// @Param uuid path string true "Server ID"
+// @Success 200 {object} v1types.ServerResponse
+// Failure 400 {object} v1types.ServerResponse
+// Failure 500 {object} v1types.ServerResponse
+// @Router /servers/{uuid} [delete]
 func (r *Routes) serverDelete(c *gin.Context) (int, *v1types.ServerResponse) {
 	otelCtx, span := otel.Tracer(pkgName).Start(c.Request.Context(), "Routes.serverDelete")
 	id := c.Param("uuid")
@@ -170,6 +179,18 @@ func (r *Routes) serverDelete(c *gin.Context) (int, *v1types.ServerResponse) {
 	}
 }
 
+// @Summary Server Enroll
+// @Tag Servers
+// @Description Creates a server record in FleetDB and schedules an inventory condition on the device.
+// @Description It will create a new server ID if UUID is not provided.
+// @Description Sample server enroll request and response: https://github.com/metal-toolbox/conditionorc/blob/main/sample/serverenroll.md
+// @Param uuid path string true "Server ID"
+// @Accept json
+// @Produce json
+// @Success 200 {object} v1types.ServerResponse
+// Failure 400 {object} v1types.ServerResponse
+// Failure 500 {object} v1types.ServerResponse
+// @Router /serverEnroll/{uuid} [post]
 func (r *Routes) serverEnroll(c *gin.Context) (int, *v1types.ServerResponse) {
 	id := c.Param("uuid")
 	otelCtx, span := otel.Tracer(pkgName).Start(c.Request.Context(), "Routes.serverEnroll")

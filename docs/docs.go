@@ -15,17 +15,68 @@ const docTemplate = `{
     "host": "{{.Host}}",
     "basePath": "{{.BasePath}}",
     "paths": {
-        "/servers/{uuid}/condition/{conditionKind}": {
-            "get": {
-                "description": "Returns condition of a server",
+        "/serverEnroll/{uuid}": {
+            "post": {
+                "description": "Creates a server record in FleetDB and schedules an inventory condition on the device.\nIt will create a new server ID if UUID is not provided.\nSample server enroll request and response: https://github.com/metal-toolbox/conditionorc/blob/main/sample/serverenroll.md",
                 "consumes": [
                     "application/json"
                 ],
                 "produces": [
                     "application/json"
                 ],
-                "summary": "Condition Get",
-                "operationId": "serverConditionGet",
+                "summary": "Server Enroll",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Server ID",
+                        "name": "uuid",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/types.ServerResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/servers/{uuid}": {
+            "delete": {
+                "description": "Delete a server from FleetDB\nSample server delete request and response: https://github.com/metal-toolbox/conditionorc/blob/main/sample/serverenroll.md",
+                "summary": "Server Delete",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Server ID",
+                        "name": "uuid",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/types.ServerResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/servers/{uuid}/condition/{conditionKind}": {
+            "post": {
+                "description": "Creates a condition on a server\nSample firmwareInstall payload, response: https://github.com/metal-toolbox/conditionorc/blob/main/sample/firmwareInstall.md",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "summary": "Condition Create",
                 "parameters": [
                     {
                         "type": "string",
@@ -50,16 +101,19 @@ const docTemplate = `{
                         }
                     }
                 }
-            },
-            "post": {
-                "description": "Creates a condition on a server\nSample firmwareInstall payload, response: https://github.com/metal-toolbox/conditionorc/blob/main/sample/firmwareInstall.md",
+            }
+        },
+        "/servers/{uuid}/conditionStatus": {
+            "get": {
+                "description": "Returns condition of a server",
                 "consumes": [
                     "application/json"
                 ],
                 "produces": [
                     "application/json"
                 ],
-                "summary": "Condition Create",
+                "summary": "Condition Status",
+                "operationId": "conditionStatus",
                 "parameters": [
                     {
                         "type": "string",
@@ -67,11 +121,33 @@ const docTemplate = `{
                         "name": "uuid",
                         "in": "path",
                         "required": true
-                    },
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/types.ServerResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/servers/{uuid}/firmwareInstall": {
+            "post": {
+                "description": "Installs firmware on a device and validates with a subsequent inventory\nSample firmwareInstall payload, response: https://github.com/metal-toolbox/conditionorc/blob/main/sample/firmwareInstall.md",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "summary": "Firmware Install",
+                "parameters": [
                     {
                         "type": "string",
-                        "description": "Condition Kind",
-                        "name": "conditionKind",
+                        "description": "Server ID",
+                        "name": "uuid",
                         "in": "path",
                         "required": true
                     }
@@ -183,13 +259,13 @@ const docTemplate = `{
         "condition.Kind": {
             "type": "string",
             "enum": [
-                "inventory",
                 "virtualMediaMount",
+                "inventory",
                 "firmwareInstall"
             ],
             "x-enum-varnames": [
-                "Inventory",
                 "VirtualMediaMount",
+                "Inventory",
                 "FirmwareInstall"
             ]
         },
@@ -219,6 +295,9 @@ const docTemplate = `{
                 },
                 "serverID": {
                     "type": "string"
+                },
+                "state": {
+                    "$ref": "#/definitions/condition.State"
                 }
             }
         },
