@@ -395,7 +395,7 @@ func TestDeleteServer(t *testing.T) {
 	mockServerID := uuid.New()
 	testcases := []struct {
 		name              string
-		mockStore         func(r *store.MockRepository)
+		mockStore         func(r *storeTest.MockRepository)
 		mockFleetDBClient func(f *fleetdb.MockFleetDB)
 		request           func(t *testing.T) *http.Request
 		assertResponse    func(t *testing.T, r *httptest.ResponseRecorder)
@@ -403,7 +403,7 @@ func TestDeleteServer(t *testing.T) {
 		{
 			"delete server success",
 			// mock repository
-			func(r *store.MockRepository) {
+			func(r *storeTest.MockRepository) {
 				// create condition query
 				r.EXPECT().
 					GetActiveCondition(
@@ -439,7 +439,7 @@ func TestDeleteServer(t *testing.T) {
 		{
 			"invalid ID",
 			// mock repository
-			func(r *store.MockRepository) {
+			func(r *storeTest.MockRepository) {
 				// create condition query
 				r.EXPECT().
 					GetActiveCondition(
@@ -475,7 +475,7 @@ func TestDeleteServer(t *testing.T) {
 		{
 			"active condition",
 			// mock repository
-			func(r *store.MockRepository) {
+			func(r *storeTest.MockRepository) {
 				// create condition query
 				r.EXPECT().
 					GetActiveCondition(
@@ -511,7 +511,7 @@ func TestDeleteServer(t *testing.T) {
 		{
 			"check active condition error",
 			// mock repository
-			func(r *store.MockRepository) {
+			func(r *storeTest.MockRepository) {
 				// create condition query
 				r.EXPECT().
 					GetActiveCondition(
@@ -547,7 +547,7 @@ func TestDeleteServer(t *testing.T) {
 		{
 			"delete error",
 			// mock repository
-			func(r *store.MockRepository) {
+			func(r *storeTest.MockRepository) {
 				// create condition query
 				r.EXPECT().
 					GetActiveCondition(
