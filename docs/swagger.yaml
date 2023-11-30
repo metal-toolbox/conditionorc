@@ -82,13 +82,13 @@ definitions:
     type: object
   condition.Kind:
     enum:
-    - inventory
     - virtualMediaMount
+    - inventory
     - firmwareInstall
     type: string
     x-enum-varnames:
-    - Inventory
     - VirtualMediaMount
+    - Inventory
     - FirmwareInstall
   condition.State:
     enum:
@@ -110,6 +110,8 @@ definitions:
         type: array
       serverID:
         type: string
+      state:
+        $ref: '#/definitions/condition.State'
     type: object
   types.ServerResponse:
     properties:
@@ -125,21 +127,18 @@ info:
   description: Conditions API expose CRUD actions to condition objects on servers
   title: Condition orchestrator API
 paths:
-  /servers/{uuid}/condition/{conditionKind}:
-    get:
+  /serverEnroll/{uuid}:
+    post:
       consumes:
       - application/json
-      description: Returns condition of a server
-      operationId: serverConditionGet
+      description: |-
+        Creates a server record in FleetDB and schedules an inventory condition on the device.
+        It will create a new server ID if UUID is not provided.
+        Sample server enroll request and response: https://github.com/metal-toolbox/conditionorc/blob/main/sample/serverenroll.md
       parameters:
       - description: Server ID
         in: path
         name: uuid
-        required: true
-        type: string
-      - description: Condition Kind
-        in: path
-        name: conditionKind
         required: true
         type: string
       produces:
@@ -149,7 +148,25 @@ paths:
           description: OK
           schema:
             $ref: '#/definitions/types.ServerResponse'
-      summary: Condition Get
+      summary: Server Enroll
+  /servers/{uuid}:
+    delete:
+      description: |-
+        Delete a server from FleetDB
+        Sample server delete request and response: https://github.com/metal-toolbox/conditionorc/blob/main/sample/serverenroll.md
+      parameters:
+      - description: Server ID
+        in: path
+        name: uuid
+        required: true
+        type: string
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/types.ServerResponse'
+      summary: Server Delete
+  /servers/{uuid}/condition/{conditionKind}:
     post:
       consumes:
       - application/json
@@ -175,4 +192,45 @@ paths:
           schema:
             $ref: '#/definitions/types.ServerResponse'
       summary: Condition Create
+  /servers/{uuid}/conditionStatus:
+    get:
+      consumes:
+      - application/json
+      description: Returns condition of a server
+      operationId: conditionStatus
+      parameters:
+      - description: Server ID
+        in: path
+        name: uuid
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/types.ServerResponse'
+      summary: Condition Status
+  /servers/{uuid}/firmwareInstall:
+    post:
+      consumes:
+      - application/json
+      description: |-
+        Installs firmware on a device and validates with a subsequent inventory
+        Sample firmwareInstall payload, response: https://github.com/metal-toolbox/conditionorc/blob/main/sample/firmwareInstall.md
+      parameters:
+      - description: Server ID
+        in: path
+        name: uuid
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/types.ServerResponse'
+      summary: Firmware Install
 swagger: "2.0"
