@@ -1017,7 +1017,7 @@ func TestConditionStatus(t *testing.T) {
 			"invalid server ID error",
 			nil,
 			func(t *testing.T) *http.Request {
-				url := fmt.Sprintf("/api/v1/servers/%s/conditionStatus", "123")
+				url := fmt.Sprintf("/api/v1/servers/%s/status", "123")
 				request, err := http.NewRequestWithContext(context.TODO(), http.MethodGet, url, http.NoBody)
 				if err != nil {
 					t.Fatal(err)
@@ -1040,7 +1040,7 @@ func TestConditionStatus(t *testing.T) {
 					Return(conditionRecord, nil)
 			},
 			func(t *testing.T) *http.Request {
-				url := fmt.Sprintf("/api/v1/servers/%s/conditionStatus", serverID.String())
+				url := fmt.Sprintf("/api/v1/servers/%s/status", serverID.String())
 
 				request, err := http.NewRequestWithContext(context.TODO(), http.MethodGet, url, http.NoBody)
 				if err != nil {
@@ -1078,7 +1078,7 @@ func TestConditionStatus(t *testing.T) {
 					Return(nil, store.ErrConditionNotFound)
 			},
 			func(t *testing.T) *http.Request {
-				url := fmt.Sprintf("/api/v1/servers/%s/conditionStatus", serverID.String())
+				url := fmt.Sprintf("/api/v1/servers/%s/status", serverID.String())
 
 				request, err := http.NewRequestWithContext(context.TODO(), http.MethodGet, url, http.NoBody)
 				if err != nil {
@@ -1110,7 +1110,7 @@ func TestConditionStatus(t *testing.T) {
 					Return(nil, errors.New("bogus error"))
 			},
 			func(t *testing.T) *http.Request {
-				url := fmt.Sprintf("/api/v1/servers/%s/conditionStatus", serverID.String())
+				url := fmt.Sprintf("/api/v1/servers/%s/status", serverID.String())
 
 				request, err := http.NewRequestWithContext(context.TODO(), http.MethodGet, url, http.NoBody)
 				if err != nil {

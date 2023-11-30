@@ -151,7 +151,7 @@ func (r *Routes) Routes(g *gin.RouterGroup) {
 
 		// Generalized API for any condition status (for cases where some server work
 		// has multiple conditions involved and the caller doesn't know what they might be)
-		servers.GET("/conditionStatus", r.composeAuthHandler(readScopes("condition")),
+		servers.GET("/status", r.composeAuthHandler(readScopes("condition")),
 			wrapAPICall(r.conditionStatus))
 
 		// /servers/:uuid/condition/:conditionKind

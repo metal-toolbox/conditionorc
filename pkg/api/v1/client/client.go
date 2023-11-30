@@ -73,7 +73,7 @@ func WithAuthToken(authToken string) Option {
 }
 
 func (c *Client) ServerConditionStatus(ctx context.Context, serverID uuid.UUID) (*v1types.ServerResponse, error) {
-	path := fmt.Sprintf("servers/%s/conditionStatus", serverID.String())
+	path := fmt.Sprintf("servers/%s/status", serverID.String())
 
 	return c.get(ctx, path)
 }
