@@ -7,7 +7,7 @@ package store
 
 import (
 	"context"
-	"encoding/json"
+	"fmt"
 	"time"
 
 	"github.com/google/uuid"
@@ -19,7 +19,6 @@ import (
 	"go.hollow.sh/toolbox/events"
 	"go.hollow.sh/toolbox/events/pkg/kv"
 	"go.opentelemetry.io/otel"
-	"go.opentelemetry.io/otel/attribute"
 )
 
 var (
@@ -34,28 +33,6 @@ var (
 type natsStore struct {
 	log    *logrus.Logger
 	bucket nats.KeyValue
-}
-
-type conditionRecord struct {
-	ID         uuid.UUID            `json:"id"`
-	State      rctypes.State        `json:"state"`
-	Conditions []*rctypes.Condition `json:"conditions"`
-}
-
-func (c conditionRecord) MustJSON() json.RawMessage {
-	byt, err := json.Marshal(&c)
-	if err != nil {
-		panic("bad condition record serialize")
-	}
-	return byt
-}
-
-func (c *conditionRecord) FromJSON(rm json.RawMessage) error {
-	err := json.Unmarshal(rm, c)
-	if err != nil {
-		err = errors.Wrap(errBadData, err.Error())
-	}
-	return err
 }
 
 func natsError(op string) {
@@ -85,57 +62,16 @@ func newNatsRepository(log *logrus.Logger, stream events.Stream, replicaCount in
 	}, nil
 }
 
-// we must find an active condition with a kind that matches in order to successfully return
-// a condition here.
-func (n *natsStore) findCondition(ctx context.Context, serverID uuid.UUID,
-	kind rctypes.Kind) (*rctypes.Condition, error) {
-	le := n.log.WithFields(logrus.Fields{
-		"serverID":      serverID.String(),
-		"conditionKind": kind,
-	})
-
-	cr, err := n.getCurrentConditionRecord(ctx, serverID)
-	if err != nil {
-		return nil, err
-	}
-
-	var found *rctypes.Condition
-	for _, c := range cr.Conditions {
-		if c.Kind == kind {
-			// XXX: this assumes that there is only a single example of a given condition
-			// kind in a record. That is reasonable for current use-cases.
-			found = c
-			break
-		}
-	}
-
-	if found == nil {
-		le.WithField("conditionID", cr.ID.String()).Warn("condition record missing specified type")
-		return nil, ErrConditionNotFound
-	}
-
-	return found, nil
-}
-
-// Get returns the active condition of the given Kind on the server.
-func (n *natsStore) Get(ctx context.Context, serverID uuid.UUID, kind rctypes.Kind) (*rctypes.Condition, error) {
+// Get returns the last ConditionRecord for activity on the server. This might be an active,
+// or it might be history.
+func (n *natsStore) Get(ctx context.Context, serverID uuid.UUID) (*ConditionRecord, error) {
 	otelCtx, span := otel.Tracer(pkgName).Start(ctx, "NatsStore.Get")
 	defer span.End()
 
-	condition, err := n.findCondition(otelCtx, serverID, kind)
-	if err != nil {
-		span.RecordError(err)
-		return nil, err
-	}
-
-	if span.IsRecording() {
-		span.SetAttributes(attribute.Stringer("conditionID", condition.ID))
-	}
-
-	return condition, nil
+	return n.getCurrentConditionRecord(otelCtx, serverID)
 }
 
-func (n *natsStore) getCurrentConditionRecord(ctx context.Context, serverID uuid.UUID) (*conditionRecord, error) {
+func (n *natsStore) getCurrentConditionRecord(ctx context.Context, serverID uuid.UUID) (*ConditionRecord, error) {
 	_, span := otel.Tracer(pkgName).Start(ctx, "NatsStore.getCurrentConditionRecord")
 	defer span.End()
 
@@ -156,7 +92,7 @@ func (n *natsStore) getCurrentConditionRecord(ctx context.Context, serverID uuid
 	}
 
 	// if we're here, we must have non-nil kve because NATS returns an error if a value isn't found for a key.
-	var cr conditionRecord
+	var cr ConditionRecord
 	if err = cr.FromJSON(kve.Value()); err != nil {
 		le.WithError(err).Warn("bad condition data")
 		return nil, errors.Wrap(ErrRepository, err.Error())
@@ -210,7 +146,8 @@ func (n *natsStore) GetActiveCondition(ctx context.Context, serverID uuid.UUID) 
 // @id: required
 // @condition: required
 //
-// Note: its upto the caller to validate the condition payload and to check any existing condition before creating.
+// Note: it is up to the caller to validate the condition payload and to check
+// any existing condition before creating.
 func (n *natsStore) Create(ctx context.Context, serverID uuid.UUID, condition *rctypes.Condition) error {
 	_, span := otel.Tracer(pkgName).Start(ctx, "NatsStore.Create")
 	defer span.End()
@@ -221,7 +158,7 @@ func (n *natsStore) Create(ctx context.Context, serverID uuid.UUID, condition *r
 		"conditionID":   condition.ID.String(),
 	})
 
-	cr := conditionRecord{
+	cr := ConditionRecord{
 		ID:    condition.ID,
 		State: rctypes.Pending,
 		Conditions: []*rctypes.Condition{
@@ -229,10 +166,6 @@ func (n *natsStore) Create(ctx context.Context, serverID uuid.UUID, condition *r
 		},
 	}
 
-	// XXX: We *should* be using Create() below, but we can't while we're in transition between Serverservice
-	// and NATS as repository implementations. Once we have a better story for how we handle any existing
-	// conditionRecord, we can revisit the decision to use the NATS Put API
-	// _, err := n.bucket.Create(serverID.String(), cr.MustJSON())
 	_, err := n.bucket.Put(serverID.String(), cr.MustJSON())
 	if err != nil {
 		natsError("create")
@@ -243,7 +176,7 @@ func (n *natsStore) Create(ctx context.Context, serverID uuid.UUID, condition *r
 }
 
 // CreateMultiple crafts a condition-record that is comprised of multiple individual conditions. Unlike Create
-// it checks for an existing, active conditionRecord prior to queuing the new one, and will return an error if
+// it checks for an existing, active ConditionRecord prior to queuing the new one, and will return an error if
 // it finds one.
 func (n *natsStore) CreateMultiple(ctx context.Context, serverID uuid.UUID, work ...*rctypes.Condition) error {
 	otelCtx, span := otel.Tracer(pkgName).Start(ctx, "NatsStore.CreateMultiple")
@@ -266,11 +199,11 @@ func (n *natsStore) CreateMultiple(ctx context.Context, serverID uuid.UUID, work
 	if cr != nil && !rctypes.StateIsComplete(cr.State) {
 		activeID := cr.ID.String()
 		le.WithField("active.condition.ID", activeID).Warn("existing active condition")
-		return errors.Wrap(ErrActiveCondition, cr.ID.String())
+		return fmt.Errorf("%w:%s", ErrActiveCondition, cr.ID.String())
 	}
 
 	id := uuid.New()
-	cr = &conditionRecord{
+	cr = &ConditionRecord{
 		ID:    id,
 		State: rctypes.Pending,
 	}
@@ -294,7 +227,7 @@ func (n *natsStore) CreateMultiple(ctx context.Context, serverID uuid.UUID, work
 //
 // Note: it's up to the caller to validate the condition update payload. The condition to update must
 // exist, and it must be in a non-final state. The existing condition will be replaced by the incoming
-// parameter. If applicable, the state of the conditionRecord will be updated as well.
+// parameter. If applicable, the state of the ConditionRecord will be updated as well.
 func (n *natsStore) Update(ctx context.Context, serverID uuid.UUID, updated *rctypes.Condition) error {
 	otelCtx, span := otel.Tracer(pkgName).Start(ctx, "NatsStore.Update")
 	defer span.End()

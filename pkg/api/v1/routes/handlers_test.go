@@ -16,6 +16,7 @@ import (
 	"github.com/metal-toolbox/conditionorc/internal/fleetdb"
 	"github.com/metal-toolbox/conditionorc/internal/model"
 	"github.com/metal-toolbox/conditionorc/internal/store"
+	storeTest "github.com/metal-toolbox/conditionorc/internal/store/test"
 	v1types "github.com/metal-toolbox/conditionorc/pkg/api/v1/types"
 	rctypes "github.com/metal-toolbox/rivets/condition"
 	"github.com/pkg/errors"
@@ -85,11 +86,11 @@ func asJSONBytes(t *testing.T, s *v1types.ServerResponse) []byte {
 	return b
 }
 
-func setupTestServer(t *testing.T) (*store.MockRepository, *fleetdb.MockFleetDB, *mockevents.MockStream, *gin.Engine, error) {
+func setupTestServer(t *testing.T) (*storeTest.MockRepository, *fleetdb.MockFleetDB, *mockevents.MockStream, *gin.Engine, error) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	repository := store.NewMockRepository(ctrl)
+	repository := storeTest.NewMockRepository(ctrl)
 
 	fleetDBCtrl := gomock.NewController(t)
 	defer fleetDBCtrl.Finish()
@@ -130,7 +131,7 @@ func TestAddServer(t *testing.T) {
 	var generatedServerID uuid.UUID
 	testcases := []struct {
 		name              string
-		mockStore         func(r *store.MockRepository)
+		mockStore         func(r *storeTest.MockRepository)
 		mockFleetDBClient func(f *fleetdb.MockFleetDB)
 		mockStream        func(r *mockevents.MockStream)
 		request           func(t *testing.T) *http.Request
@@ -139,7 +140,7 @@ func TestAddServer(t *testing.T) {
 		{
 			"add server success",
 			// mock repository
-			func(r *store.MockRepository) {
+			func(r *storeTest.MockRepository) {
 				// create condition query
 				r.EXPECT().
 					Create(
@@ -297,7 +298,7 @@ func TestAddServer(t *testing.T) {
 		{
 			"add server success no uuid param",
 			// mock repository
-			func(r *store.MockRepository) {
+			func(r *storeTest.MockRepository) {
 				// create condition query
 				r.EXPECT().
 					Create(
@@ -770,7 +771,7 @@ func TestServerConditionCreate(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	repository := store.NewMockRepository(ctrl)
+	repository := storeTest.NewMockRepository(ctrl)
 
 	fleetDBCtrl := gomock.NewController(t)
 	defer fleetDBCtrl.Finish()
@@ -789,7 +790,7 @@ func TestServerConditionCreate(t *testing.T) {
 
 	testcases := []struct {
 		name              string
-		mockStore         func(r *store.MockRepository)
+		mockStore         func(r *storeTest.MockRepository)
 		mockFleetDBClient func(f *fleetdb.MockFleetDB)
 		mockStream        func(r *mockevents.MockStream)
 		request           func(t *testing.T) *http.Request
@@ -891,7 +892,7 @@ func TestServerConditionCreate(t *testing.T) {
 		{
 			"valid server condition created",
 			// mock repository
-			func(r *store.MockRepository) {
+			func(r *storeTest.MockRepository) {
 				parametersJSON, _ := json.Marshal(json.RawMessage(`{"some param": "1"}`))
 
 				// lookup for an existing condition
@@ -969,7 +970,7 @@ func TestServerConditionCreate(t *testing.T) {
 		{
 			"condition with Fault created",
 			// mock repository
-			func(r *store.MockRepository) {
+			func(r *storeTest.MockRepository) {
 				// lookup for an existing condition
 				r.EXPECT().
 					GetActiveCondition(
@@ -1044,7 +1045,7 @@ func TestServerConditionCreate(t *testing.T) {
 		{
 			"server condition exists in non-finalized state",
 			// mock repository
-			func(r *store.MockRepository) {
+			func(r *storeTest.MockRepository) {
 				// lookup existing condition
 				r.EXPECT().
 					GetActiveCondition(
@@ -1089,7 +1090,7 @@ func TestServerConditionCreate(t *testing.T) {
 		{
 			"server condition publish failure results in created condition deletion",
 			// mock repository
-			func(r *store.MockRepository) {
+			func(r *storeTest.MockRepository) {
 				parametersJSON, _ := json.Marshal(json.RawMessage(`{"some param": "1"}`))
 
 				// lookup for an existing condition
@@ -1195,18 +1196,26 @@ func TestServerConditionCreate(t *testing.T) {
 	}
 }
 
-func TestServerConditionGet(t *testing.T) {
+func TestConditionStatus(t *testing.T) {
 	serverID := uuid.New()
+	condID := uuid.New()
 	testCondition := &rctypes.Condition{
-		Kind:       rctypes.FirmwareInstall,
-		Parameters: json.RawMessage{},
+		ID:   condID,
+		Kind: rctypes.FirmwareInstall,
+	}
+	conditionRecord := &store.ConditionRecord{
+		ID:    condID,
+		State: rctypes.Pending,
+		Conditions: []*rctypes.Condition{
+			testCondition,
+		},
 	}
 
 	// mock repository
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	repository := store.NewMockRepository(ctrl)
+	repository := storeTest.NewMockRepository(ctrl)
 
 	server, err := mockserver(t, logrus.New(), nil, repository, nil)
 	if err != nil {
@@ -1215,7 +1224,7 @@ func TestServerConditionGet(t *testing.T) {
 
 	testcases := []struct {
 		name           string
-		mockStore      func(r *store.MockRepository)
+		mockStore      func(r *storeTest.MockRepository)
 		request        func(t *testing.T) *http.Request
 		assertResponse func(t *testing.T, r *httptest.ResponseRecorder)
 	}{
@@ -1223,7 +1232,7 @@ func TestServerConditionGet(t *testing.T) {
 			"invalid server ID error",
 			nil,
 			func(t *testing.T) *http.Request {
-				url := fmt.Sprintf("/api/v1/servers/%s/condition/%s", "123", "asdasd")
+				url := fmt.Sprintf("/api/v1/servers/%s/status", "123")
 				request, err := http.NewRequestWithContext(context.TODO(), http.MethodGet, url, http.NoBody)
 				if err != nil {
 					t.Fatal(err)
@@ -1237,33 +1246,16 @@ func TestServerConditionGet(t *testing.T) {
 			},
 		},
 		{
-			"invalid condition requested",
-			nil,
-			func(t *testing.T) *http.Request {
-				url := fmt.Sprintf("/api/v1/servers/%s/condition/%s", uuid.New().String(), "asdasd")
-				request, err := http.NewRequestWithContext(context.TODO(), http.MethodGet, url, http.NoBody)
-				if err != nil {
-					t.Fatal(err)
-				}
-
-				return request
-			},
-			func(t *testing.T, r *httptest.ResponseRecorder) {
-				assert.Equal(t, http.StatusBadRequest, r.Code)
-				assert.Contains(t, string(asBytes(t, r.Body)), "unsupported condition")
-			},
-		},
-		{
 			"server condition record returned",
 			// mock repository
-			func(r *store.MockRepository) {
+			func(r *storeTest.MockRepository) {
 				r.EXPECT().
-					Get(gomock.Any(), gomock.Eq(serverID), gomock.Eq(rctypes.FirmwareInstall)).
+					Get(gomock.Any(), gomock.Eq(serverID)).
 					Times(1).
-					Return(testCondition, nil)
+					Return(conditionRecord, nil)
 			},
 			func(t *testing.T) *http.Request {
-				url := fmt.Sprintf("/api/v1/servers/%s/condition/%s", serverID.String(), rctypes.FirmwareInstall)
+				url := fmt.Sprintf("/api/v1/servers/%s/status", serverID.String())
 
 				request, err := http.NewRequestWithContext(context.TODO(), http.MethodGet, url, http.NoBody)
 				if err != nil {
@@ -1280,10 +1272,75 @@ func TestServerConditionGet(t *testing.T) {
 					&v1types.ServerResponse{
 						Records: &v1types.ConditionsResponse{
 							ServerID: serverID,
+							State:    rctypes.Pending,
 							Conditions: []*rctypes.Condition{
 								testCondition,
 							},
 						},
+					},
+				)
+
+				assert.Equal(t, asBytes(t, r.Body), want)
+			},
+		},
+		{
+			"no server condition",
+			// mock repository
+			func(r *storeTest.MockRepository) {
+				r.EXPECT().
+					Get(gomock.Any(), gomock.Eq(serverID)).
+					Times(1).
+					Return(nil, store.ErrConditionNotFound)
+			},
+			func(t *testing.T) *http.Request {
+				url := fmt.Sprintf("/api/v1/servers/%s/status", serverID.String())
+
+				request, err := http.NewRequestWithContext(context.TODO(), http.MethodGet, url, http.NoBody)
+				if err != nil {
+					t.Fatal(err)
+				}
+
+				return request
+			},
+			func(t *testing.T, r *httptest.ResponseRecorder) {
+				assert.Equal(t, http.StatusNotFound, r.Code)
+
+				want := asJSONBytes(
+					t,
+					&v1types.ServerResponse{
+						Message: "condition not found for server",
+					},
+				)
+
+				assert.Equal(t, asBytes(t, r.Body), want)
+			},
+		},
+		{
+			"lookup error",
+			// mock repository
+			func(r *storeTest.MockRepository) {
+				r.EXPECT().
+					Get(gomock.Any(), gomock.Eq(serverID)).
+					Times(1).
+					Return(nil, errors.New("bogus error"))
+			},
+			func(t *testing.T) *http.Request {
+				url := fmt.Sprintf("/api/v1/servers/%s/status", serverID.String())
+
+				request, err := http.NewRequestWithContext(context.TODO(), http.MethodGet, url, http.NoBody)
+				if err != nil {
+					t.Fatal(err)
+				}
+
+				return request
+			},
+			func(t *testing.T, r *httptest.ResponseRecorder) {
+				assert.Equal(t, http.StatusServiceUnavailable, r.Code)
+
+				want := asJSONBytes(
+					t,
+					&v1types.ServerResponse{
+						Message: "condition lookup: bogus error",
 					},
 				)
 

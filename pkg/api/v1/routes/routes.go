@@ -150,13 +150,13 @@ func (r *Routes) Routes(g *gin.RouterGroup) {
 		servers.POST("/firmwareInstall", r.composeAuthHandler(createScopes("condition")),
 			wrapAPICall(r.firmwareInstall))
 
+		// Generalized API for any condition status (for cases where some server work
+		// has multiple conditions involved and the caller doesn't know what they might be)
+		servers.GET("/status", r.composeAuthHandler(readScopes("condition")),
+			wrapAPICall(r.conditionStatus))
+
 		// /servers/:uuid/condition/:conditionKind
 		serverConditionBySlug := servers.Group("/condition")
-
-		// List condition on a server.
-		serverConditionBySlug.GET("/:conditionKind",
-			r.composeAuthHandler(readScopes("condition")),
-			wrapAPICall(r.serverConditionGet))
 
 		// Create a condition on a server.
 		// XXX: refactor me! see comments

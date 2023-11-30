@@ -24,7 +24,7 @@ test: lint
 ## generate mock store - invoke when changes are made to the store interface
 gen-store-mock:
 	go install github.com/golang/mock/mockgen@v1.6.0
-	mockgen -package=store -source=internal/store/interface.go > internal/store/mock.go
+	mockgen -package=test -source=internal/store/interface.go > internal/store/test/mock.go
 	mockgen -package=fleetdb -source=internal/fleetdb/interface.go > internal/fleetdb/mock.go
 
 ## build osx bin

@@ -104,7 +104,7 @@ func TestCreateReadUpdate(t *testing.T) {
 	}
 
 	// look for a condition in an empty bucket and find nothing
-	_, err := store.Get(context.TODO(), serverID, kind)
+	_, err := store.Get(context.TODO(), serverID)
 	require.ErrorIs(t, err, ErrConditionNotFound)
 
 	active, err := store.GetActiveCondition(context.TODO(), serverID)
@@ -119,9 +119,9 @@ func TestCreateReadUpdate(t *testing.T) {
 	require.NotNil(t, active)
 
 	// get the new condition
-	c, err := store.Get(context.TODO(), serverID, kind)
+	cr, err := store.Get(context.TODO(), serverID)
 	require.NoError(t, err)
-	require.Equal(t, condition.ID.String(), c.ID.String())
+	require.Equal(t, condition.ID.String(), cr.ID.String())
 
 	// update the condition
 	condition.State = rctypes.Active
@@ -129,12 +129,7 @@ func TestCreateReadUpdate(t *testing.T) {
 	require.NoError(t, err)
 
 	// read the new condition
-	c, err = store.Get(context.TODO(), serverID, kind)
-	require.NoError(t, err)
-	require.Equal(t, rctypes.Active, c.State)
-
-	// make sure that we updated the container too
-	cr, err := store.getCurrentConditionRecord(context.TODO(), serverID)
+	cr, err = store.Get(context.TODO(), serverID)
 	require.NoError(t, err)
 	require.Equal(t, rctypes.Active, cr.State)
 
@@ -146,7 +141,7 @@ func TestCreateReadUpdate(t *testing.T) {
 	require.NoError(t, err)
 	require.Nil(t, active)
 
-	cr, err = store.getCurrentConditionRecord(context.TODO(), serverID)
+	cr, err = store.Get(context.TODO(), serverID)
 	require.NoError(t, err)
 	require.Equal(t, rctypes.Succeeded, cr.State)
 }
@@ -227,6 +222,10 @@ func TestMultipleConditionUpdate(t *testing.T) {
 		active, err = store.GetActiveCondition(context.TODO(), serverID)
 		require.NoError(t, err, "GetActiveCondition IV")
 		require.Nil(t, active)
+
+		cr, err := store.Get(context.TODO(), serverID)
+		require.NoError(t, err)
+		require.Equal(t, rctypes.Succeeded, cr.State)
 	})
 	t.Run("failure short circuit", func(t *testing.T) {
 		serverID := uuid.New()
@@ -265,5 +264,9 @@ func TestMultipleConditionUpdate(t *testing.T) {
 		active, err = store.GetActiveCondition(context.TODO(), serverID)
 		require.NoError(t, err, "GetActiveCondition III")
 		require.Nil(t, active)
+
+		cr, err := store.Get(context.TODO(), serverID)
+		require.NoError(t, err)
+		require.Equal(t, rctypes.Failed, cr.State)
 	})
 }

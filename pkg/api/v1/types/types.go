@@ -27,6 +27,7 @@ type ServerResponse struct {
 // ConditionsResponse is the response returned for listing multiple conditions on a server.
 type ConditionsResponse struct {
 	ServerID   uuid.UUID            `json:"serverID,omitempty"`
+	State      rctypes.State        `json:"state,omitempty"`
 	Conditions []*rctypes.Condition `json:"conditions,omitempty"`
 }
 
