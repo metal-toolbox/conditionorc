@@ -47,6 +47,20 @@ func (c *Client) post(ctx context.Context, path string, body interface{}) (*v1ty
 	return c.do(req)
 }
 
+func (c *Client) delete(ctx context.Context, path string) (*v1types.ServerResponse, error) {
+	requestURL, err := url.Parse(fmt.Sprintf("%s%s/%s", c.serverAddress, routes.PathPrefix, path))
+	if err != nil {
+		return nil, Error{Cause: err.Error()}
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodDelete, requestURL.String(), http.NoBody)
+	if err != nil {
+		return nil, Error{Cause: "error in DELETE request" + err.Error()}
+	}
+
+	return c.do(req)
+}
+
 func (c *Client) do(req *http.Request) (*v1types.ServerResponse, error) {
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("User-Agent", fmt.Sprintf("conditionorc-client (%s)", version.Current().String()))
