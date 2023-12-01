@@ -360,6 +360,14 @@ func (r *Routes) firmwareInstall(c *gin.Context) (int, *v1types.ServerResponse) 
 
 	return http.StatusOK, &v1types.ServerResponse{
 		Message: "firmware install scheduled",
+		Records: &v1types.ConditionsResponse{
+			ServerID: serverID,
+			State:    rctypes.Pending,
+			Conditions: []*rctypes.Condition{
+				fwCondition,
+				invCondition,
+			},
+		},
 	}
 }
 
