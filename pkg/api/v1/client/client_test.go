@@ -73,7 +73,6 @@ func newTester(t *testing.T) (*integrationTester, finalizer) {
 		server.WithStore(repository),
 		server.WithFleetDBClient(fleetDBClient),
 		server.WithStreamBroker(stream),
-		server.EnableServerEnroll(true),
 		server.WithConditionDefinitions(
 			[]*rctypes.Definition{
 				{Kind: rctypes.FirmwareInstall},
