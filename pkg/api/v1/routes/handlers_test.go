@@ -38,7 +38,6 @@ func mockserver(t *testing.T, logger *logrus.Logger, fleetDBClient fleetdb.Fleet
 		WithLogger(logger),
 		WithStore(repository),
 		WithFleetDBClient(fleetDBClient),
-		EnableServerEnroll(true),
 		WithConditionDefinitions(
 			[]*rctypes.Definition{
 				{Kind: rctypes.FirmwareInstall},

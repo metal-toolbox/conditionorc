@@ -61,9 +61,6 @@ type Configuration struct {
 
 	// Notifications defines the properties for alerting external parties
 	Notifications notify.Configuration `mapstructure:"notifications"`
-
-	// EnableServerEnroll enables the server enrollment API.
-	EnableServerEnroll bool `mapstructure:"enable_server_enroll"`
 }
 
 // https://github.com/metal-toolbox/hollow-serverservice
@@ -138,10 +135,6 @@ func (a *App) envVarOverrides() error {
 	if a.Config.Notifications.Enabled {
 		// load the token from the environment b/c it's a secret
 		a.Config.Notifications.Token = a.v.GetString("notifications.token")
-	}
-
-	if a.v.GetString("fleetdb.enable.server.enroll") != "" {
-		a.Config.EnableServerEnroll = a.v.GetBool("fleetdb.enable.server.enroll")
 	}
 
 	if err := a.envVarServerserviceOverrides(); err != nil {

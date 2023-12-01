@@ -35,7 +35,6 @@ type Routes struct {
 	streamBroker         events.Stream
 	conditionDefinitions rctypes.Definitions
 	logger               *logrus.Logger
-	enableServerEnroll   bool
 }
 
 // Option type sets a parameter on the Routes type.
@@ -52,13 +51,6 @@ func WithStore(repository store.Repository) Option {
 func WithFleetDBClient(client fleetdb.FleetDB) Option {
 	return func(r *Routes) {
 		r.fleetDBClient = client
-	}
-}
-
-// EnableServerEnroll enables server enroll API.
-func EnableServerEnroll(enable bool) Option {
-	return func(r *Routes) {
-		r.enableServerEnroll = enable
 	}
 }
 
@@ -137,13 +129,12 @@ func (r *Routes) composeAuthHandler(scopes []string) gin.HandlerFunc {
 
 func (r *Routes) Routes(g *gin.RouterGroup) {
 	servers := g.Group("/servers/:uuid")
-	if r.enableServerEnroll {
-		serverEnroll := g.Group("/serverEnroll")
-		serverEnroll.POST("/:uuid", r.composeAuthHandler(createScopes("server")), wrapAPICall(r.serverEnroll))
-		// Create a new server ID when uuid is not provided.
-		serverEnroll.POST("/", r.composeAuthHandler(createScopes("server")), wrapAPICall(r.serverEnroll))
-		servers.DELETE("", r.composeAuthHandler(createScopes("server")), wrapAPICall(r.serverDelete))
-	}
+
+	serverEnroll := g.Group("/serverEnroll")
+	serverEnroll.POST("/:uuid", r.composeAuthHandler(createScopes("server")), wrapAPICall(r.serverEnroll))
+	// Create a new server ID when uuid is not provided.
+	serverEnroll.POST("/", r.composeAuthHandler(createScopes("server")), wrapAPICall(r.serverEnroll))
+	servers.DELETE("", r.composeAuthHandler(createScopes("server")), wrapAPICall(r.serverDelete))
 
 	{
 		// Combined API for firmwareInstall
