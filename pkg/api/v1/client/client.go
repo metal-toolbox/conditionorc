@@ -97,3 +97,9 @@ func (c *Client) ServerEnroll(ctx context.Context, serverID string, conditionCre
 
 	return c.post(ctx, path, conditionCreate)
 }
+
+func (c *Client) ServerDelete(ctx context.Context, serverID string) (*v1types.ServerResponse, error) {
+	path := fmt.Sprintf("servers/%s", serverID)
+
+	return c.delete(ctx, path)
+}

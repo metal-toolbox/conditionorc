@@ -174,7 +174,7 @@ func (r *Routes) serverDelete(c *gin.Context) (int, *v1types.ServerResponse) {
 	}
 
 	return http.StatusOK, &v1types.ServerResponse{
-		Message: "server detele",
+		Message: "server deleted",
 		Records: &v1types.ConditionsResponse{ServerID: serverID},
 	}
 }
