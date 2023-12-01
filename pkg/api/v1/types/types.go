@@ -46,6 +46,14 @@ type AddServerParams struct {
 	Password string `json:"pwd"`
 }
 
+func (asp *AddServerParams) MustJSON() []byte {
+	byt, err := json.Marshal(asp)
+	if err != nil {
+		panic(err)
+	}
+	return byt
+}
+
 // NewCondition returns a new Condition type.
 func (c *ConditionCreate) NewCondition(kind rctypes.Kind) *rctypes.Condition {
 	return &rctypes.Condition{

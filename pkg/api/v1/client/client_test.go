@@ -19,6 +19,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
 
+	"github.com/metal-toolbox/conditionorc/pkg/api/v1/types"
 	v1types "github.com/metal-toolbox/conditionorc/pkg/api/v1/types"
 	rctypes "github.com/metal-toolbox/rivets/condition"
 
@@ -425,8 +426,18 @@ func TestFirmwareInstall(t *testing.T) {
 
 func TestServerEnroll(t *testing.T) {
 	serverID := uuid.New()
-	validParams := fmt.Sprintf(`{"facility":"mock-facility-code","ip":"mock-ip","user":"mock-user","pwd":"mock-pwd","some param":"1","asset_id":"%v","collect_firmware_status":true,"inventory_method":"outofband"}`, serverID)
-	invalidParams := fmt.Sprintf(`{"facility":"mock-facility-code","ip":"mock-ip","pwd":"mock-pwd","some param":"1","asset_id":"%v","collect_firmware_status":true,"inventory_method":"outofband"}`, serverID)
+	validParams := types.AddServerParams{
+		Facility: "mock-facility-code",
+		IP:       "mock-ip",
+		Username: "mock-user",
+		Password: "mock-pwd",
+	}
+	invalidParamsNoBMCUser := types.AddServerParams{
+		Facility: "mock-facility-code",
+		IP:       "mock-ip",
+		Password: "mock-pwd",
+	}
+
 	expectedInventoryParams := func(id string) string {
 		return fmt.Sprintf(`{"collect_bios_cfg":true,"collect_firmware_status":true,"inventory_method":"outofband","asset_id":"%v"}`, id)
 	}
@@ -448,7 +459,7 @@ func TestServerEnroll(t *testing.T) {
 	}{
 		{
 			"valid payload sent",
-			v1types.ConditionCreate{Parameters: []byte(validParams)},
+			v1types.ConditionCreate{Parameters: validParams.MustJSON()},
 			func(r *fleetdb.MockFleetDB) {
 				// lookup for an existing condition
 				r.EXPECT().
@@ -490,7 +501,7 @@ func TestServerEnroll(t *testing.T) {
 		},
 		{
 			"invalid payload - failed to send out",
-			v1types.ConditionCreate{Parameters: []byte("noy json")},
+			v1types.ConditionCreate{Parameters: []byte("not json")},
 			func(r *fleetdb.MockFleetDB) {
 				// lookup for an existing condition
 				r.EXPECT().
@@ -522,7 +533,7 @@ func TestServerEnroll(t *testing.T) {
 		},
 		{
 			"no bmc user",
-			v1types.ConditionCreate{Parameters: []byte(invalidParams)},
+			v1types.ConditionCreate{Parameters: invalidParamsNoBMCUser.MustJSON()},
 			func(r *fleetdb.MockFleetDB) {
 				// lookup for an existing condition
 				r.EXPECT().
