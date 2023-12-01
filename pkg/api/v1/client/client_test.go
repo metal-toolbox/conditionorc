@@ -72,6 +72,7 @@ func newTester(t *testing.T) (*integrationTester, finalizer) {
 		server.WithStore(repository),
 		server.WithFleetDBClient(fleetDBClient),
 		server.WithStreamBroker(stream),
+		server.EnableServerEnroll(true),
 		server.WithConditionDefinitions(
 			[]*rctypes.Definition{
 				{Kind: rctypes.FirmwareInstall},
@@ -418,6 +419,439 @@ func TestFirmwareInstall(t *testing.T) {
 
 			require.Equal(t, tc.expectResponse().StatusCode, got.StatusCode, "bad status code")
 			require.Contains(t, got.Message, tc.expectResponse().Message, "bad message")
+		})
+	}
+}
+
+func TestServerEnroll(t *testing.T) {
+	serverID := uuid.New()
+	validParams := fmt.Sprintf(`{"facility":"mock-facility-code","ip":"mock-ip","user":"mock-user","pwd":"mock-pwd","some param":"1","asset_id":"%v","collect_firmware_status":true,"inventory_method":"outofband"}`, serverID)
+	invalidParams := fmt.Sprintf(`{"facility":"mock-facility-code","ip":"mock-ip","pwd":"mock-pwd","some param":"1","asset_id":"%v","collect_firmware_status":true,"inventory_method":"outofband"}`, serverID)
+	expectedInventoryParams := func(id string) string {
+		return fmt.Sprintf(`{"collect_bios_cfg":true,"collect_firmware_status":true,"inventory_method":"outofband","asset_id":"%v"}`, id)
+	}
+
+	rollbackCounter := 0
+	rollback := func() error {
+		rollbackCounter += 1
+		return nil
+	}
+
+	testcases := []struct {
+		name                  string
+		payload               v1types.ConditionCreate
+		mockFleetDBClient     func(f *fleetdb.MockFleetDB)
+		mockStore             func(r *storeTest.MockRepository)
+		expectedRollbackCount int
+		expectResponse        func() *v1types.ServerResponse
+		expectError           string
+	}{
+		{
+			"valid payload sent",
+			v1types.ConditionCreate{Parameters: []byte(validParams)},
+			func(r *fleetdb.MockFleetDB) {
+				// lookup for an existing condition
+				r.EXPECT().
+					AddServer(
+						gomock.Any(),
+						gomock.Eq(serverID),
+						gomock.Eq("mock-facility-code"),
+						gomock.Eq("mock-ip"), gomock.Eq("mock-user"),
+						gomock.Eq("mock-pwd"),
+					).
+					Return(nil, nil).
+					Times(1)
+			},
+			func(r *storeTest.MockRepository) {
+				// expect valid payload
+				r.EXPECT().
+					Create(
+						gomock.Any(),
+						gomock.Eq(serverID),
+						gomock.Any(),
+					).
+					DoAndReturn(func(_ context.Context, _ uuid.UUID, c *rctypes.Condition) error {
+						require.Equal(t, rctypes.ConditionStructVersion, c.Version, "condition version mismatch")
+						require.Equal(t, rctypes.Inventory, c.Kind, "condition kind mismatch")
+						require.Equal(t, json.RawMessage(expectedInventoryParams(serverID.String())), c.Parameters, "condition parameters mismatch")
+						require.Equal(t, rctypes.Pending, c.State, "condition state mismatch")
+						return nil
+					}).
+					Times(1)
+			},
+			0,
+			func() *v1types.ServerResponse {
+				return &v1types.ServerResponse{
+					StatusCode: 200,
+					Message:    "condition set",
+				}
+			},
+			"",
+		},
+		{
+			"invalid payload - failed to send out",
+			v1types.ConditionCreate{Parameters: []byte("noy json")},
+			func(r *fleetdb.MockFleetDB) {
+				// lookup for an existing condition
+				r.EXPECT().
+					AddServer(
+						gomock.Any(),
+						gomock.Any(),
+						gomock.Any(),
+						gomock.Any(),
+						gomock.Any(),
+						gomock.Any(),
+					).
+					Times(0)
+			},
+			func(r *storeTest.MockRepository) {
+				// expect valid payload
+				r.EXPECT().
+					Create(
+						gomock.Any(),
+						gomock.Any(),
+						gomock.Any(),
+					).
+					Times(0)
+			},
+			0,
+			func() *v1types.ServerResponse {
+				return nil
+			},
+			"conditionorc client error - error in POST JSON payload",
+		},
+		{
+			"no bmc user",
+			v1types.ConditionCreate{Parameters: []byte(invalidParams)},
+			func(r *fleetdb.MockFleetDB) {
+				// lookup for an existing condition
+				r.EXPECT().
+					AddServer(
+						gomock.Any(),
+						gomock.Eq(serverID),
+						gomock.Eq("mock-facility-code"),
+						gomock.Eq("mock-ip"), gomock.Eq(""),
+						gomock.Eq("mock-pwd"),
+					).
+					Return(rollback, fleetdb.ErrBMCCredentials).
+					Times(1)
+			},
+			func(r *storeTest.MockRepository) {
+				// expect valid payload
+				r.EXPECT().
+					Create(
+						gomock.Any(),
+						gomock.Any(),
+						gomock.Any(),
+					).Times(0)
+			},
+			1,
+			func() *v1types.ServerResponse {
+				return &v1types.ServerResponse{
+					StatusCode: 500,
+					Message:    "add server: invalid bmc credentials. missing user or passwordserver rollback err: <nil>",
+				}
+			},
+			"",
+		},
+	}
+
+	for _, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+			tester, finish := newTester(t)
+			defer finish()
+
+			if tc.mockStore != nil {
+				tc.mockStore(tester.repository)
+			}
+
+			if tc.mockFleetDBClient != nil {
+				tc.mockFleetDBClient(tester.fleetDB)
+			}
+
+			tester.stream.EXPECT().Publish(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes().
+				Return(nil)
+			defer func() {
+				require.Equal(t, tc.expectedRollbackCount, rollbackCounter, "rollback called incorrectly")
+				rollbackCounter = 0
+			}()
+
+			got, err := tester.client.ServerEnroll(context.TODO(), serverID.String(), tc.payload)
+			if tc.expectError != "" {
+				require.Contains(t, err.Error(), tc.expectError, "request should not send out")
+				if got != nil {
+					t.Errorf("expect nil response, got %v", got)
+				}
+				return
+			}
+
+			if err != nil {
+				t.Error(err)
+			}
+
+			if tc.expectResponse() != nil {
+				require.Equal(t, tc.expectResponse().StatusCode, got.StatusCode, "bad status code")
+				require.Equal(t, tc.expectResponse().Message, got.Message, "bad message")
+			}
+		})
+	}
+}
+
+func TestServerEnrollEmptyUUID(t *testing.T) {
+	tester, finish := newTester(t)
+	defer finish()
+
+	var generatedServerID uuid.UUID
+	validParams := `{"facility":"mock-facility-code","ip":"mock-ip","user":"mock-user","pwd":"mock-pwd","some param":"1","collect_firmware_status":true,"inventory_method":"outofband"}`
+	expectedInventoryParams := func(id string) string {
+		return fmt.Sprintf(`{"collect_bios_cfg":true,"collect_firmware_status":true,"inventory_method":"outofband","asset_id":"%v"}`, id)
+	}
+
+	rollbackCounter := 0
+	rollback := func() error {
+		rollbackCounter += 1
+		return nil
+	}
+
+	tester.fleetDB.EXPECT().
+		AddServer(gomock.Any(),
+			gomock.Any(),
+			gomock.Eq("mock-facility-code"),
+			gomock.Eq("mock-ip"),
+			gomock.Eq("mock-user"),
+			gomock.Eq("mock-pwd"),
+		).
+		DoAndReturn(func(ctx context.Context, serverID uuid.UUID, _, _, _, _ string) (func() error, error) {
+			generatedServerID = serverID
+			return rollback, nil
+		}).
+		Times(1)
+
+	tester.repository.EXPECT().
+		Create(
+			gomock.Any(),
+			gomock.Any(),
+			gomock.Any(),
+		).
+		DoAndReturn(func(_ context.Context, _ uuid.UUID, c *rctypes.Condition) error {
+			require.Equal(t, rctypes.ConditionStructVersion, c.Version, "condition version mismatch")
+			require.Equal(t, rctypes.Inventory, c.Kind, "condition kind mismatch")
+			require.Equal(t, json.RawMessage(expectedInventoryParams(generatedServerID.String())), c.Parameters, "condition parameters mismatch")
+			require.Equal(t, rctypes.Pending, c.State, "condition state mismatch")
+			return nil
+		}).
+		Times(1)
+
+	tester.stream.EXPECT().Publish(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes().
+		Return(nil)
+
+	got, err := tester.client.ServerEnroll(context.TODO(), "", v1types.ConditionCreate{Parameters: []byte(validParams)})
+	if err != nil {
+		t.Error(err)
+	}
+	require.Equal(t, http.StatusOK, got.StatusCode, "bad status code")
+	require.Equal(t, 0, rollbackCounter, "rollback called incorrectly")
+}
+
+func TestServerDelete(t *testing.T) {
+	serverID := uuid.New()
+	testcases := []struct {
+		name              string
+		mockFleetDBClient func(f *fleetdb.MockFleetDB)
+		mockStore         func(r *storeTest.MockRepository)
+		expectResponse    func() *v1types.ServerResponse
+	}{
+		{
+			"delete server success",
+			func(r *fleetdb.MockFleetDB) {
+				r.EXPECT().
+					DeleteServer(
+						gomock.Any(),
+						gomock.Eq(serverID),
+					).
+					Return(nil).
+					Times(1)
+			},
+			func(r *storeTest.MockRepository) {
+				// expect valid payload
+				r.EXPECT().
+					GetActiveCondition(
+						gomock.Any(),
+						gomock.Eq(serverID),
+					).
+					Return(nil, nil).
+					Times(1)
+			},
+			func() *v1types.ServerResponse {
+				return &v1types.ServerResponse{
+					StatusCode: 200,
+					Message:    "server deleted",
+				}
+			},
+		},
+		{
+			"active condition",
+			func(r *fleetdb.MockFleetDB) {
+				r.EXPECT().
+					DeleteServer(
+						gomock.Any(),
+						gomock.Any(),
+					).
+					Times(0)
+			},
+			func(r *storeTest.MockRepository) {
+				// expect valid payload
+				r.EXPECT().
+					GetActiveCondition(
+						gomock.Any(),
+						gomock.Eq(serverID),
+					).
+					Return(&rctypes.Condition{}, nil).
+					Times(1)
+			},
+			func() *v1types.ServerResponse {
+				return &v1types.ServerResponse{
+					StatusCode: 400,
+					Message:    "failed to delete server because it has an active condition",
+				}
+			},
+		},
+		{
+			"check active condition error",
+			func(r *fleetdb.MockFleetDB) {
+				r.EXPECT().
+					DeleteServer(
+						gomock.Any(),
+						gomock.Any(),
+					).
+					Times(0)
+			},
+			func(r *storeTest.MockRepository) {
+				// expect valid payload
+				r.EXPECT().
+					GetActiveCondition(
+						gomock.Any(),
+						gomock.Eq(serverID),
+					).
+					Return(nil, fmt.Errorf("fake check condition error")).
+					Times(1)
+			},
+			func() *v1types.ServerResponse {
+				return &v1types.ServerResponse{
+					StatusCode: 503,
+					Message:    "error checking server state: fake check condition error",
+				}
+			},
+		},
+		{
+			"fleetdb delete error",
+			func(r *fleetdb.MockFleetDB) {
+				r.EXPECT().
+					DeleteServer(
+						gomock.Any(),
+						gomock.Any(),
+					).
+					Return(fmt.Errorf("fake delete error")).
+					Times(1)
+			},
+			func(r *storeTest.MockRepository) {
+				// expect valid payload
+				r.EXPECT().
+					GetActiveCondition(
+						gomock.Any(),
+						gomock.Eq(serverID),
+					).
+					Return(nil, nil).
+					Times(1)
+			},
+			func() *v1types.ServerResponse {
+				return &v1types.ServerResponse{
+					StatusCode: 500,
+					Message:    "fake delete error",
+				}
+			},
+		},
+	}
+
+	for _, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+			tester, finish := newTester(t)
+			defer finish()
+
+			if tc.mockStore != nil {
+				tc.mockStore(tester.repository)
+			}
+
+			if tc.mockFleetDBClient != nil {
+				tc.mockFleetDBClient(tester.fleetDB)
+			}
+
+			got, err := tester.client.ServerDelete(context.TODO(), serverID.String())
+			if err != nil {
+				t.Error(err)
+			}
+			require.Equal(t, tc.expectResponse().StatusCode, got.StatusCode, "bad status code")
+			require.Equal(t, tc.expectResponse().Message, got.Message, "bad message")
+		})
+	}
+}
+
+func TestServerDeleteInvalidUUID(t *testing.T) {
+	tester, finish := newTester(t)
+	defer finish()
+	fakeInvalidServerID := "fakeInvalidID"
+
+	testcases := []struct {
+		name           string
+		serverID       string
+		expectResponse func() *v1types.ServerResponse
+	}{
+		{
+			"empty ID",
+			"",
+			func() *v1types.ServerResponse {
+				return &v1types.ServerResponse{
+					StatusCode: 404,
+					Message:    "invalid request - route not found",
+				}
+			},
+		},
+		{
+			"invalid ID",
+			fakeInvalidServerID,
+			func() *v1types.ServerResponse {
+				return &v1types.ServerResponse{
+					StatusCode: 400,
+					Message:    fmt.Sprintf("invalid UUID length: %d", len(fakeInvalidServerID)),
+				}
+			},
+		},
+	}
+
+	for _, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+			tester.fleetDB.EXPECT().
+				DeleteServer(
+					gomock.Any(),
+					gomock.Any(),
+				).
+				Return(nil).
+				Times(0)
+
+			tester.repository.EXPECT().
+				GetActiveCondition(
+					gomock.Any(),
+					gomock.Any(),
+				).
+				Return(nil, nil).
+				Times(0)
+
+			got, err := tester.client.ServerDelete(context.TODO(), tc.serverID)
+			if err != nil {
+				t.Error(err)
+			}
+			require.Equal(t, tc.expectResponse().StatusCode, got.StatusCode, "bad status code")
+			require.Equal(t, tc.expectResponse().Message, got.Message, "bad message")
 		})
 	}
 }
