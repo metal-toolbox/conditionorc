@@ -4,7 +4,7 @@ request
 ```bash
    curl -i -X POST --header 'Content-Type: application/json' \
 'localhost:9001/api/v1/serverEnroll/<server UUID>'  \
-    -d '{"parameters":{"facility":"sandbox","ip":"fakeip","user":"root","pwd":"fakepwd","collect_firmware_status":true,"inventory_method":"outofband"}}'
+    -d '{"parameters":{"facility":"sandbox","bmc-ip":"fakeip","bmc-user":"root","bmc-pwd":"fakepwd"}}'
 ```
 
 response
