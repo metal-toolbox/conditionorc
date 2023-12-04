@@ -17,6 +17,7 @@ import (
 	"github.com/metal-toolbox/conditionorc/internal/model"
 	"github.com/metal-toolbox/conditionorc/internal/store"
 	storeTest "github.com/metal-toolbox/conditionorc/internal/store/test"
+	"github.com/metal-toolbox/conditionorc/pkg/api/v1/types"
 	v1types "github.com/metal-toolbox/conditionorc/pkg/api/v1/types"
 	rctypes "github.com/metal-toolbox/rivets/condition"
 	"github.com/pkg/errors"
@@ -118,7 +119,12 @@ func TestAddServer(t *testing.T) {
 	mockIP := "mock-ip"
 	mockUser := "mock-user"
 	mockPwd := "mock-pwd"
-	validParams := fmt.Sprintf(`{"facility":"%v","ip":"%v","user":"%v","pwd":"%v","some param":"1","asset_id":"%v","collect_firmware_status":true,"inventory_method":"outofband"}`, mockFacilityCode, mockIP, mockUser, mockPwd, mockServerID)
+	validParams := types.AddServerParams{
+		Facility: "mock-facility-code",
+		IP:       "mock-ip",
+		Username: "mock-user",
+		Password: "mock-pwd",
+	}
 	// collect_bios_cfg is default to false since we don't set it in validParams.
 	expectedInventoryParams := func(id string) string {
 		return fmt.Sprintf(`{"collect_bios_cfg":true,"collect_firmware_status":true,"inventory_method":"outofband","asset_id":"%v"}`, id)
@@ -126,7 +132,6 @@ func TestAddServer(t *testing.T) {
 	nopRollback := func() error {
 		return nil
 	}
-	validParamsNoAssetID := fmt.Sprintf(`{"facility":"%v","ip":"%v","user":"%v","pwd":"%v","some param":"1","collect_firmware_status":true,"inventory_method":"outofband"}`, mockFacilityCode, mockIP, mockUser, mockPwd)
 	var generatedServerID uuid.UUID
 	testcases := []struct {
 		name              string
@@ -181,7 +186,7 @@ func TestAddServer(t *testing.T) {
 					Times(1)
 			},
 			func(t *testing.T) *http.Request {
-				payload, err := json.Marshal(&v1types.ConditionCreate{Parameters: []byte(validParams)})
+				payload, err := json.Marshal(&v1types.ConditionCreate{Parameters: validParams.MustJSON()})
 				if err != nil {
 					t.Error()
 				}
@@ -237,8 +242,12 @@ func TestAddServer(t *testing.T) {
 			},
 			nil,
 			func(t *testing.T) *http.Request {
-				noUserParams := fmt.Sprintf(`{"facility":"%v","ip":"%v","pwd":"%v","some param":"1"}`, mockFacilityCode, mockIP, mockPwd)
-				payload, err := json.Marshal(&v1types.ConditionCreate{Parameters: []byte(noUserParams)})
+				noUserParams := types.AddServerParams{
+					Facility: "mock-facility-code",
+					IP:       "mock-ip",
+					Password: "mock-pwd",
+				}
+				payload, err := json.Marshal(&v1types.ConditionCreate{Parameters: noUserParams.MustJSON()})
 				if err != nil {
 					t.Error()
 				}
@@ -275,8 +284,12 @@ func TestAddServer(t *testing.T) {
 			},
 			nil,
 			func(t *testing.T) *http.Request {
-				noPwdParams := fmt.Sprintf(`{"facility":"%v","ip":"%v","user":"%v","some param":"1"}`, mockFacilityCode, mockIP, mockUser)
-				payload, err := json.Marshal(&v1types.ConditionCreate{Parameters: []byte(noPwdParams)})
+				noPwdParams := types.AddServerParams{
+					Facility: "mock-facility-code",
+					IP:       "mock-ip",
+					Username: "mock-user",
+				}
+				payload, err := json.Marshal(&v1types.ConditionCreate{Parameters: noPwdParams.MustJSON()})
 				if err != nil {
 					t.Error()
 				}
@@ -343,7 +356,7 @@ func TestAddServer(t *testing.T) {
 					Times(1)
 			},
 			func(t *testing.T) *http.Request {
-				payload, err := json.Marshal(&v1types.ConditionCreate{Parameters: []byte(validParamsNoAssetID)})
+				payload, err := json.Marshal(&v1types.ConditionCreate{Parameters: validParams.MustJSON()})
 				if err != nil {
 					t.Error()
 				}

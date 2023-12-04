@@ -612,7 +612,12 @@ func TestServerEnrollEmptyUUID(t *testing.T) {
 	defer finish()
 
 	var generatedServerID uuid.UUID
-	validParams := `{"facility":"mock-facility-code","ip":"mock-ip","user":"mock-user","pwd":"mock-pwd","some param":"1","collect_firmware_status":true,"inventory_method":"outofband"}`
+	validParams := types.AddServerParams{
+		Facility: "mock-facility-code",
+		IP:       "mock-ip",
+		Username: "mock-user",
+		Password: "mock-pwd",
+	}
 	expectedInventoryParams := func(id string) string {
 		return fmt.Sprintf(`{"collect_bios_cfg":true,"collect_firmware_status":true,"inventory_method":"outofband","asset_id":"%v"}`, id)
 	}
@@ -655,7 +660,7 @@ func TestServerEnrollEmptyUUID(t *testing.T) {
 	tester.stream.EXPECT().Publish(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes().
 		Return(nil)
 
-	got, err := tester.client.ServerEnroll(context.TODO(), "", v1types.ConditionCreate{Parameters: []byte(validParams)})
+	got, err := tester.client.ServerEnroll(context.TODO(), "", v1types.ConditionCreate{Parameters: validParams.MustJSON()})
 	if err != nil {
 		t.Error(err)
 	}
