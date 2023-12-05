@@ -37,12 +37,6 @@ definitions:
         items:
           type: integer
         type: array
-      resourceVersion:
-        description: |-
-          ResourceVersion has to be set to the value received by the
-          client updating it, this it to make sure condition updates
-          occur in the expected order.
-        type: integer
       state:
         allOf:
         - $ref: '#/definitions/condition.State'
@@ -80,15 +74,68 @@ definitions:
         description: will cause the condition execution to panic on the controller.
         type: boolean
     type: object
+  condition.Firmware:
+    properties:
+      URL:
+        type: string
+      checksum:
+        type: string
+      component:
+        type: string
+      filename:
+        type: string
+      id:
+        type: string
+      models:
+        items:
+          type: string
+        type: array
+      vendor:
+        type: string
+      version:
+        type: string
+    type: object
+  condition.FirmwareInstallTaskParameters:
+    properties:
+      asset_id:
+        description: Inventory identifier for the asset to install firmware on.
+        type: string
+      dry_run:
+        description: |-
+          When defined, flasher will not perform any disruptive actions on the asset,
+          it will download the firmware to be installed and determine if the firmware is applicable for the device.
+
+          No firmware installs will be attempted and if the device is powered off, it will not be powered on.
+        type: boolean
+      firmware_set_id:
+        description: FirmwareSetID specifies the firmware set to be applied.
+        type: string
+      firmwares:
+        description: Firmwares is the list of firmwares to be installed.
+        items:
+          $ref: '#/definitions/condition.Firmware'
+        type: array
+      force_install:
+        description: Force install given firmware regardless of current firmware version.
+        type: boolean
+      require_host_powered_off:
+        description: |-
+          When true, flasher will expect the host to be powered off before proceeding,
+          if the host is not already powered off - the install task will be failed.
+        type: boolean
+      reset_bmc_before_install:
+        description: Reset device BMC before firmware install
+        type: boolean
+    type: object
   condition.Kind:
     enum:
-    - virtualMediaMount
     - inventory
+    - virtualMediaMount
     - firmwareInstall
     type: string
     x-enum-varnames:
-    - VirtualMediaMount
     - Inventory
+    - VirtualMediaMount
     - FirmwareInstall
   condition.State:
     enum:
@@ -192,7 +239,34 @@ paths:
           schema:
             $ref: '#/definitions/types.ServerResponse'
       summary: Condition Create
-  /servers/{uuid}/conditionStatus:
+  /servers/{uuid}/firmwareInstall:
+    post:
+      consumes:
+      - application/json
+      description: |-
+        Installs firmware on a device and validates with a subsequent inventory
+        Sample firmwareInstall payload, response: https://github.com/metal-toolbox/conditionorc/blob/main/sample/firmwareInstall.md
+      parameters:
+      - description: Server ID
+        in: path
+        name: uuid
+        required: true
+        type: string
+      - description: firmware install options
+        in: body
+        name: data
+        required: true
+        schema:
+          $ref: '#/definitions/condition.FirmwareInstallTaskParameters'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/types.ServerResponse'
+      summary: Firmware Install
+  /servers/{uuid}/status:
     get:
       consumes:
       - application/json
@@ -212,25 +286,4 @@ paths:
           schema:
             $ref: '#/definitions/types.ServerResponse'
       summary: Condition Status
-  /servers/{uuid}/firmwareInstall:
-    post:
-      consumes:
-      - application/json
-      description: |-
-        Installs firmware on a device and validates with a subsequent inventory
-        Sample firmwareInstall payload, response: https://github.com/metal-toolbox/conditionorc/blob/main/sample/firmwareInstall.md
-      parameters:
-      - description: Server ID
-        in: path
-        name: uuid
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/types.ServerResponse'
-      summary: Firmware Install
 swagger: "2.0"

@@ -103,17 +103,16 @@ const docTemplate = `{
                 }
             }
         },
-        "/servers/{uuid}/conditionStatus": {
-            "get": {
-                "description": "Returns condition of a server",
+        "/servers/{uuid}/firmwareInstall": {
+            "post": {
+                "description": "Installs firmware on a device and validates with a subsequent inventory\nSample firmwareInstall payload, response: https://github.com/metal-toolbox/conditionorc/blob/main/sample/firmwareInstall.md",
                 "consumes": [
                     "application/json"
                 ],
                 "produces": [
                     "application/json"
                 ],
-                "summary": "Condition Status",
-                "operationId": "conditionStatus",
+                "summary": "Firmware Install",
                 "parameters": [
                     {
                         "type": "string",
@@ -121,6 +120,15 @@ const docTemplate = `{
                         "name": "uuid",
                         "in": "path",
                         "required": true
+                    },
+                    {
+                        "description": "firmware install options",
+                        "name": "data",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/condition.FirmwareInstallTaskParameters"
+                        }
                     }
                 ],
                 "responses": {
@@ -133,16 +141,17 @@ const docTemplate = `{
                 }
             }
         },
-        "/servers/{uuid}/firmwareInstall": {
-            "post": {
-                "description": "Installs firmware on a device and validates with a subsequent inventory\nSample firmwareInstall payload, response: https://github.com/metal-toolbox/conditionorc/blob/main/sample/firmwareInstall.md",
+        "/servers/{uuid}/status": {
+            "get": {
+                "description": "Returns condition of a server",
                 "consumes": [
                     "application/json"
                 ],
                 "produces": [
                     "application/json"
                 ],
-                "summary": "Firmware Install",
+                "summary": "Condition Status",
+                "operationId": "conditionStatus",
                 "parameters": [
                     {
                         "type": "string",
@@ -210,10 +219,6 @@ const docTemplate = `{
                         "type": "integer"
                     }
                 },
-                "resourceVersion": {
-                    "description": "ResourceVersion has to be set to the value received by the\nclient updating it, this it to make sure condition updates\noccur in the expected order.",
-                    "type": "integer"
-                },
                 "state": {
                     "description": "State is one of State",
                     "allOf": [
@@ -256,16 +261,84 @@ const docTemplate = `{
                 }
             }
         },
+        "condition.Firmware": {
+            "type": "object",
+            "properties": {
+                "URL": {
+                    "type": "string"
+                },
+                "checksum": {
+                    "type": "string"
+                },
+                "component": {
+                    "type": "string"
+                },
+                "filename": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "models": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "vendor": {
+                    "type": "string"
+                },
+                "version": {
+                    "type": "string"
+                }
+            }
+        },
+        "condition.FirmwareInstallTaskParameters": {
+            "type": "object",
+            "properties": {
+                "asset_id": {
+                    "description": "Inventory identifier for the asset to install firmware on.",
+                    "type": "string"
+                },
+                "dry_run": {
+                    "description": "When defined, flasher will not perform any disruptive actions on the asset,\nit will download the firmware to be installed and determine if the firmware is applicable for the device.\n\nNo firmware installs will be attempted and if the device is powered off, it will not be powered on.",
+                    "type": "boolean"
+                },
+                "firmware_set_id": {
+                    "description": "FirmwareSetID specifies the firmware set to be applied.",
+                    "type": "string"
+                },
+                "firmwares": {
+                    "description": "Firmwares is the list of firmwares to be installed.",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/condition.Firmware"
+                    }
+                },
+                "force_install": {
+                    "description": "Force install given firmware regardless of current firmware version.",
+                    "type": "boolean"
+                },
+                "require_host_powered_off": {
+                    "description": "When true, flasher will expect the host to be powered off before proceeding,\nif the host is not already powered off - the install task will be failed.",
+                    "type": "boolean"
+                },
+                "reset_bmc_before_install": {
+                    "description": "Reset device BMC before firmware install",
+                    "type": "boolean"
+                }
+            }
+        },
         "condition.Kind": {
             "type": "string",
             "enum": [
-                "virtualMediaMount",
                 "inventory",
+                "virtualMediaMount",
                 "firmwareInstall"
             ],
             "x-enum-varnames": [
-                "VirtualMediaMount",
                 "Inventory",
+                "VirtualMediaMount",
                 "FirmwareInstall"
             ]
         },
