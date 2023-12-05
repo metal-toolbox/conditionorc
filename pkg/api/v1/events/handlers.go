@@ -104,11 +104,10 @@ func (h *Handler) UpdateCondition(ctx context.Context, updEvt *v1types.Condition
 	revisedCondition, err := updEvt.MergeExisting(existing)
 	if err != nil {
 		h.logger.WithError(err).WithFields(logrus.Fields{
-			"serverID":         updEvt.ConditionUpdate.ServerID,
-			"conditionKind":    updEvt.Kind,
-			"incoming_state":   updEvt.State,
-			"existing_state":   existing.State,
-			"existing_version": existing.ResourceVersion,
+			"serverID":       updEvt.ConditionUpdate.ServerID,
+			"conditionKind":  updEvt.Kind,
+			"incoming_state": updEvt.State,
+			"existing_state": existing.State,
 		}).Warn("condition merge failed")
 		return err
 	}
@@ -116,9 +115,8 @@ func (h *Handler) UpdateCondition(ctx context.Context, updEvt *v1types.Condition
 	// update
 	if err := h.repository.Update(ctx, updEvt.ServerID, revisedCondition); err != nil {
 		h.logger.WithError(err).WithFields(logrus.Fields{
-			"serverID":          updEvt.ConditionUpdate.ServerID,
-			"conditionID":       revisedCondition.ID,
-			"condition_version": revisedCondition.ResourceVersion,
+			"serverID":    updEvt.ConditionUpdate.ServerID,
+			"conditionID": revisedCondition.ID,
 		}).Info("condition update failed")
 		return errors.Wrap(errRetryThis, err.Error())
 	}

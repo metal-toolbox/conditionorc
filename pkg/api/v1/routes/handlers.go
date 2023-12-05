@@ -274,6 +274,7 @@ func (r *Routes) serverEnroll(c *gin.Context) (int, *v1types.ServerResponse) {
 // @Description Installs firmware on a device and validates with a subsequent inventory
 // @Description Sample firmwareInstall payload, response: https://github.com/metal-toolbox/conditionorc/blob/main/sample/firmwareInstall.md
 // @Param uuid path string true "Server ID"
+// @Param data body rctypes.FirmwareInstallTaskParameters true "firmware install options"
 // @Accept json
 // @Produce json
 // @Success 200 {object} v1types.ServerResponse
@@ -506,7 +507,7 @@ func (r *Routes) publishCondition(ctx context.Context, serverID uuid.UUID, facil
 // Failure 400 {object} v1types.ServerResponse
 // Failure 404 {object} v1types.ServerResponse
 // Failure 503 {object} v1types.ServerResponse
-// @Router /servers/{uuid}/conditionStatus [get]
+// @Router /servers/{uuid}/status [get]
 func (r *Routes) conditionStatus(c *gin.Context) (int, *v1types.ServerResponse) {
 	otelCtx, span := otel.Tracer(pkgName).Start(c.Request.Context(), "Routes.conditionStatus")
 	span.SetAttributes(
