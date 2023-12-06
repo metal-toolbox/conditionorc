@@ -76,8 +76,7 @@ func TestStatusKV(t *testing.T) {
 
 	defs := rctypes.Definitions{
 		&rctypes.Definition{
-			Kind:      rctypes.Kind("test-event"),
-			Exclusive: true,
+			Kind: rctypes.Kind("test-event"),
 		},
 	}
 
