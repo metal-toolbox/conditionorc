@@ -159,7 +159,6 @@ func (h *Handler) ServerserviceEvent(ctx context.Context, ev events.Message) {
 			ID:         uuid.New(),
 			Kind:       rctypes.Inventory,
 			State:      rctypes.Pending,
-			Exclusive:  false,
 			Parameters: byt, // pass the incoming message data to Alloy
 		}
 

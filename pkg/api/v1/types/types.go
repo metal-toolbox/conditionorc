@@ -33,7 +33,6 @@ type ConditionsResponse struct {
 
 // ConditionCreate is the request payload to create a condition with its parameters on server.
 type ConditionCreate struct {
-	Exclusive  bool            `json:"exclusive"`
 	Parameters json.RawMessage `json:"parameters"`
 	Fault      *rctypes.Fault  `json:"fault,omitempty"`
 }
@@ -61,7 +60,6 @@ func (c *ConditionCreate) NewCondition(kind rctypes.Kind) *rctypes.Condition {
 		Version:    rctypes.ConditionStructVersion,
 		Kind:       kind,
 		State:      rctypes.Pending,
-		Exclusive:  c.Exclusive,
 		Parameters: c.Parameters,
 		Fault:      c.Fault,
 		CreatedAt:  time.Now(),
@@ -155,7 +153,6 @@ func (c *ConditionUpdate) MergeExisting(existing *rctypes.Condition) (*rctypes.C
 		State:                 c.State,
 		Status:                c.Status,
 		FailOnCheckpointError: existing.FailOnCheckpointError,
-		Exclusive:             existing.Exclusive,
 		UpdatedAt:             c.UpdatedAt,
 		CreatedAt:             existing.CreatedAt,
 	}, nil
