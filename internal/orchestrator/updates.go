@@ -19,7 +19,6 @@ import (
 	"go.opentelemetry.io/otel/trace"
 
 	v1types "github.com/metal-toolbox/conditionorc/pkg/api/v1/types"
-	rcond "github.com/metal-toolbox/rivets/condition"
 	rctypes "github.com/metal-toolbox/rivets/condition"
 )
 
@@ -189,7 +188,7 @@ func eventUpdateFromKV(ctx context.Context, kve nats.KeyValueEntry,
 	}
 
 	byt := kve.Value()
-	cs := rcond.StatusValue{}
+	cs := rctypes.StatusValue{}
 	//nolint:govet // you and gocritic can argue about it outside.
 	if err := json.Unmarshal(byt, &cs); err != nil {
 		return nil, err
