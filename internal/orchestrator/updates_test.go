@@ -22,8 +22,8 @@ import (
 	"go.uber.org/goleak"
 
 	v1types "github.com/metal-toolbox/conditionorc/pkg/api/v1/types"
+	rcond "github.com/metal-toolbox/rivets/condition"
 	rctypes "github.com/metal-toolbox/rivets/condition"
-	rkv "github.com/metal-toolbox/rivets/kv"
 )
 
 var (
@@ -159,18 +159,18 @@ func TestEventUpdateFromKV(t *testing.T) {
 	cID := registry.GetID("test-app")
 
 	// add some KVs
-	sv1 := rkv.StatusValue{
+	sv1 := rcond.StatusValue{
 		Target:   uuid.New().String(),
 		State:    "pending",
 		Status:   json.RawMessage(`{"msg":"some-status"}`),
 		WorkerID: cID.String(),
 	}
-	bogus := rkv.StatusValue{
+	bogus := rcond.StatusValue{
 		Target: uuid.New().String(),
 		State:  "bogus",
 		Status: json.RawMessage(`{"msg":"some-status"}`),
 	}
-	noCID := rkv.StatusValue{
+	noCID := rcond.StatusValue{
 		Target:    uuid.New().String(),
 		State:     "failed",
 		Status:    json.RawMessage(`{"msg":"some-status"}`),
