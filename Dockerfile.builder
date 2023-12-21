@@ -21,7 +21,7 @@ RUN GOOS=linux GOARCH=amd64 go build -o /usr/sbin/conditionorc \
 -X ${LDFLAG_LOCATION}.AppVersion=${VERSION} \
 -X ${LDFLAG_LOCATION}.BuildDate=${BUILD_DATE}"
 
-FROM alpine:3.18.4
+FROM alpine:3.19.0
 RUN apk -U add curl
 
 COPY --from=build /usr/sbin/conditionorc /usr/sbin/
