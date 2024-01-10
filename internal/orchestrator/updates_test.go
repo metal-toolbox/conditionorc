@@ -71,7 +71,7 @@ func shutdownJetStream(s *server.Server) {
 	s.WaitForShutdown()
 }
 
-// let's pretend we're a conditioon-orchestrator app and do some one-time setup
+// let's pretend we're a condition-orchestrator app and do some one-time setup
 func TestMain(m *testing.M) {
 	logger = logrus.New()
 
