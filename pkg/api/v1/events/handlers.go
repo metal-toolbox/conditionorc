@@ -120,6 +120,7 @@ func (h *Handler) UpdateCondition(ctx context.Context, updEvt *v1types.Condition
 		}).Info("condition update failed")
 		return errors.Wrap(errRetryThis, err.Error())
 	}
+
 	return nil
 }
 
