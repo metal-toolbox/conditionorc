@@ -359,6 +359,10 @@ func (r *Routes) firmwareInstall(c *gin.Context) (int, *v1types.ServerResponse) 
 		}
 	}
 
+	metrics.ConditionQueued.With(
+		prometheus.Labels{"conditionKind": string(rctypes.FirmwareInstall)},
+	).Inc()
+
 	return http.StatusOK, &v1types.ServerResponse{
 		Message: "firmware install scheduled",
 		Records: &v1types.ConditionsResponse{
@@ -407,7 +411,7 @@ func (r *Routes) conditionCreate(otelCtx context.Context, newCondition *rctypes.
 
 	metrics.ConditionQueued.With(
 		prometheus.Labels{"conditionKind": string(newCondition.Kind)},
-	)
+	).Inc()
 
 	return http.StatusOK, &v1types.ServerResponse{
 		Message: "condition set",

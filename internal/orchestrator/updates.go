@@ -9,9 +9,11 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/metal-toolbox/conditionorc/internal/metrics"
 	"github.com/metal-toolbox/conditionorc/internal/status"
 	"github.com/nats-io/nats.go"
 	"github.com/pkg/errors"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/sirupsen/logrus"
 	"go.hollow.sh/toolbox/events/pkg/kv"
 	"go.hollow.sh/toolbox/events/registry"
@@ -284,6 +286,7 @@ func (o *Orchestrator) eventUpdate(ctx context.Context, evt *v1types.ConditionUp
 	}
 
 	if rctypes.StateIsComplete(evt.ConditionUpdate.State) {
+		// deal with the completed event
 		delErr := status.DeleteCondition(evt.Kind, o.facility, evt.ConditionUpdate.ConditionID.String())
 		if delErr != nil {
 			// if we fail to delete this event from the KV, the reconciler will catch it later
@@ -295,12 +298,21 @@ func (o *Orchestrator) eventUpdate(ctx context.Context, evt *v1types.ConditionUp
 			}).Warn("removing completed condition data")
 			return errors.Wrap(errCompleteEvent, delErr.Error())
 		}
+		metrics.ConditionCompleted.With(
+			prometheus.Labels{
+				"conditionKind": string(evt.Kind),
+				"state":         string(evt.ConditionUpdate.State),
+			},
+		).Inc()
+
+		// queue any follow-on work as required
 		active, err := o.repository.GetActiveCondition(ctx, evt.ConditionUpdate.ServerID)
 		if err != nil {
 			o.logger.WithError(err).WithFields(logrus.Fields{
 				"condition.id": evt.ConditionUpdate.ConditionID,
 				"server.id":    evt.ConditionUpdate.ServerID,
 			}).Warn("retrieving next active condition")
+			metrics.DependencyError("nats", "retrieve active condition")
 			return errors.Wrap(errCompleteEvent, err.Error())
 		}
 		// seeing as we only *just* completed this event it's hard to believe we'd
@@ -315,8 +327,12 @@ func (o *Orchestrator) eventUpdate(ctx context.Context, evt *v1types.ConditionUp
 					"server.id":      evt.ConditionUpdate.ServerID,
 					"condition.kind": active.Kind,
 				}).Warn("publishing next active condition")
+				metrics.DependencyError("nats", "publish-condition")
 				return errors.Wrap(errCompleteEvent, err.Error())
 			}
+			metrics.ConditionQueued.With(
+				prometheus.Labels{"conditionKind": string(active.Kind)},
+			).Inc()
 			o.logger.WithFields(logrus.Fields{
 				"condition.id":   active.ID,
 				"server.id":      evt.ConditionUpdate.ServerID,
