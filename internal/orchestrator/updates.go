@@ -123,6 +123,9 @@ func (o *Orchestrator) startConditionWatchers(ctx context.Context,
 
 		go func() {
 			defer wg.Done()
+			// NATS will send an nil if the connection is live but there are no updates. We expect one per use
+			// of the update channel, sent before it transitions to a blocking behavior.
+			sawNil := false
 			for keepRunning := true; keepRunning; {
 				select {
 				case <-ctx.Done():
@@ -132,7 +135,21 @@ func (o *Orchestrator) startConditionWatchers(ctx context.Context,
 					watcher.Stop()
 				case entry := <-watcher.Updates():
 					if entry == nil {
+						if sawNil {
+							o.logger.WithField("rctypes.kind", string(kind)).Info("refreshing KV watcher")
+							//nolint:errcheck,gocritic
+							watcher.Stop()
+							watcher, err = status.WatchConditionStatus(ctx, kind, o.facility)
+							if err != nil {
+								// if NATS is unavailable, stopping is best
+								o.logger.WithError(err).
+									WithField("rctypes.kind", string(kind)).Fatal("unable to refresh KV watcher")
+							}
+							sawNil = false
+							continue
+						}
 						o.logger.WithField("rctypes.kind", string(kind)).Debug("nil KV update")
+						sawNil = true
 						continue
 					}
 
