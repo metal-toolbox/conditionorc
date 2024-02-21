@@ -28,7 +28,7 @@ var shutdownTimeout = 10 * time.Second
 var cmdServer = &cobra.Command{
 	Use:   "server",
 	Short: "Run condition orchestrator API service",
-	Run: func(cmd *cobra.Command, args []string) {
+	Run: func(cmd *cobra.Command, _ []string) {
 		app, termCh, err := app.New(cmd.Context(), model.AppKindServer, cfgFile, model.LogLevel(logLevel))
 		if err != nil {
 			log.Fatal(err)

@@ -382,7 +382,7 @@ func TestFirmwareInstall(t *testing.T) {
 			func() *v1types.ServerResponse {
 				return &v1types.ServerResponse{
 					Message:    "server has an active condition",
-					StatusCode: 400,
+					StatusCode: 409,
 				}
 			},
 			"",
