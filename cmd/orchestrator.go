@@ -26,7 +26,7 @@ var (
 var cmdOrchestrator = &cobra.Command{
 	Use:   "orchestrator",
 	Short: "Run condition orchestrator service",
-	Run: func(cmd *cobra.Command, args []string) {
+	Run: func(cmd *cobra.Command, _ []string) {
 		app, termCh, err := app.New(cmd.Context(), model.AppKindOrchestrator, cfgFile, model.LogLevel(logLevel))
 		if err != nil {
 			log.Fatal(err)
