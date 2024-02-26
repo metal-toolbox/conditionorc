@@ -11,6 +11,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/metal-toolbox/conditionorc/internal/metrics"
 	"github.com/metal-toolbox/conditionorc/internal/status"
+	"github.com/metal-toolbox/conditionorc/internal/store"
 	"github.com/nats-io/nats.go"
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
@@ -324,6 +325,11 @@ func (o *Orchestrator) eventUpdate(ctx context.Context, evt *v1types.ConditionUp
 
 		// queue any follow-on work as required
 		active, err := o.repository.GetActiveCondition(ctx, evt.ConditionUpdate.ServerID)
+		if err != nil && errors.Is(err, store.ErrConditionNotFound) {
+			// nothing more to do
+			return nil
+		}
+
 		if err != nil {
 			o.logger.WithError(err).WithFields(logrus.Fields{
 				"condition.id": evt.ConditionUpdate.ConditionID,
@@ -332,7 +338,9 @@ func (o *Orchestrator) eventUpdate(ctx context.Context, evt *v1types.ConditionUp
 			metrics.DependencyError("nats", "retrieve active condition")
 			return errors.Wrap(errCompleteEvent, err.Error())
 		}
-		// seeing as we only *just* completed this event it's hard to believe we'd
+
+		// Publish the next event iff that event is in the pending state.
+		// Seeing as we only *just* completed this event it's hard to believe we'd
 		// lose the race to publish the next one, but it's possible I suppose.
 		if active != nil && active.State == rctypes.Pending {
 			byt := active.MustBytes()

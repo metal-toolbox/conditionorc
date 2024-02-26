@@ -105,7 +105,7 @@ func (r *Routes) serverConditionCreate(c *gin.Context) (int, *v1types.ServerResp
 	}
 
 	active, err := r.repository.GetActiveCondition(otelCtx, serverID)
-	if err != nil {
+	if err != nil && !errors.Is(err, store.ErrConditionNotFound) {
 		return http.StatusServiceUnavailable, &v1types.ServerResponse{
 			Message: "error checking server state: " + err.Error(),
 		}
@@ -154,7 +154,7 @@ func (r *Routes) serverDelete(c *gin.Context) (int, *v1types.ServerResponse) {
 	}
 
 	active, err := r.repository.GetActiveCondition(otelCtx, serverID)
-	if err != nil {
+	if err != nil && !errors.Is(err, store.ErrConditionNotFound) {
 		return http.StatusServiceUnavailable, &v1types.ServerResponse{
 			Message: "error checking server state: " + err.Error(),
 		}

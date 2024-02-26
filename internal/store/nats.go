@@ -115,16 +115,12 @@ func (n *natsStore) GetActiveCondition(ctx context.Context, serverID uuid.UUID) 
 	})
 
 	cr, err := n.getCurrentConditionRecord(otelCtx, serverID)
-	if errors.Is(err, ErrConditionNotFound) {
-		return nil, nil
-	}
-
 	if err != nil {
 		return nil, err
 	}
 
 	if rctypes.StateIsComplete(cr.State) {
-		return nil, nil
+		return nil, ErrConditionNotFound
 	}
 
 	var active *rctypes.Condition

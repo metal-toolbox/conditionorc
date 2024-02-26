@@ -108,7 +108,7 @@ func TestCreateReadUpdate(t *testing.T) {
 	require.ErrorIs(t, err, ErrConditionNotFound)
 
 	active, err := store.GetActiveCondition(context.TODO(), serverID)
-	require.NoError(t, err)
+	require.ErrorIs(t, err, ErrConditionNotFound)
 	require.Nil(t, active)
 
 	// add a condition
@@ -116,6 +116,7 @@ func TestCreateReadUpdate(t *testing.T) {
 	require.NoError(t, err)
 
 	active, err = store.GetActiveCondition(context.TODO(), serverID)
+	require.NoError(t, err)
 	require.NotNil(t, active)
 
 	// get the new condition
@@ -138,7 +139,7 @@ func TestCreateReadUpdate(t *testing.T) {
 	require.NoError(t, err)
 
 	active, err = store.GetActiveCondition(context.TODO(), serverID)
-	require.NoError(t, err)
+	require.ErrorIs(t, err, ErrConditionNotFound)
 	require.Nil(t, active)
 
 	cr, err = store.Get(context.TODO(), serverID)
@@ -220,7 +221,7 @@ func TestMultipleConditionUpdate(t *testing.T) {
 		require.NoError(t, err, "second update - succeeded")
 
 		active, err = store.GetActiveCondition(context.TODO(), serverID)
-		require.NoError(t, err, "GetActiveCondition IV")
+		require.ErrorIs(t, err, ErrConditionNotFound, "GetActiveCondition IV")
 		require.Nil(t, active)
 
 		cr, err := store.Get(context.TODO(), serverID)
@@ -262,7 +263,7 @@ func TestMultipleConditionUpdate(t *testing.T) {
 		require.NoError(t, err, "first update - failed")
 
 		active, err = store.GetActiveCondition(context.TODO(), serverID)
-		require.NoError(t, err, "GetActiveCondition III")
+		require.ErrorIs(t, err, ErrConditionNotFound, "GetActiveCondition III")
 		require.Nil(t, active)
 
 		cr, err := store.Get(context.TODO(), serverID)
