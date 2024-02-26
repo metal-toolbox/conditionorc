@@ -86,8 +86,9 @@ func (h *Handler) UpdateCondition(ctx context.Context, updEvt *v1types.Condition
 	if err != nil {
 		if errors.Is(err, store.ErrConditionNotFound) {
 			h.logger.WithFields(logrus.Fields{
-				"serverID":      updEvt.ConditionUpdate.ServerID,
-				"conditionKind": updEvt.Kind,
+				"server_id":      updEvt.ConditionUpdate.ServerID,
+				"condition_id":   updEvt.ConditionUpdate.ConditionID,
+				"condition_kind": updEvt.Kind,
 			}).Error("no existing condition found for update")
 			return err
 		}
