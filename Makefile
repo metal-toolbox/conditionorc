@@ -18,8 +18,7 @@ lint:
 
 ## Go test
 test: lint
-	CGO_ENABLED=0 go test -timeout 1m -v -covermode=atomic ./...
-
+	go test -timeout 1m -v -covermode=atomic ./...
 
 ## generate mock store - invoke when changes are made to the store interface
 gen-store-mock:
@@ -29,40 +28,36 @@ gen-store-mock:
 
 ## build osx bin
 build-osx:
-ifeq ($(GO_VERSION), 0)
+ifeq (${GO_VERSION}, 0)
 	$(error build requies go version 1.17.n or higher)
 endif
-	  GOOS=darwin GOARCH=amd64 go build -o conditionorc \
-	   -ldflags \
-		"-X $(LDFLAG_LOCATION).GitCommit=$(GIT_COMMIT) \
-         -X $(LDFLAG_LOCATION).GitBranch=$(GIT_BRANCH) \
-         -X $(LDFLAG_LOCATION).GitSummary=$(GIT_SUMMARY) \
-         -X $(LDFLAG_LOCATION).AppVersion=$(VERSION) \
-         -X $(LDFLAG_LOCATION).BuildDate=$(BUILD_DATE)"
-
-
+	CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 go build -o conditionorc \
+		-ldflags \
+		"-X ${LDFLAG_LOCATION}.GitCommit=${GIT_COMMIT} \
+		 -X ${LDFLAG_LOCATION}.GitBranch=${GIT_BRANCH} \
+		 -X ${LDFLAG_LOCATION}.GitSummary=${GIT_SUMMARY} \
+		 -X ${LDFLAG_LOCATION}.AppVersion=${VERSION} \
+		 -X ${LDFLAG_LOCATION}.BuildDate=${BUILD_DATE}"
 
 ## Build linux bin
 build-linux:
-ifeq ($(GO_VERSION), 0)
+ifeq (${GO_VERSION}, 0)
 	$(error build requies go version 1.16.n or higher)
 endif
-	GOOS=linux GOARCH=amd64 go build -o conditionorc \
-	   -ldflags \
-		"-X $(LDFLAG_LOCATION).GitCommit=$(GIT_COMMIT) \
-         -X $(LDFLAG_LOCATION).GitBranch=$(GIT_BRANCH) \
-         -X $(LDFLAG_LOCATION).GitSummary=$(GIT_SUMMARY) \
-         -X $(LDFLAG_LOCATION).AppVersion=$(VERSION) \
-         -X $(LDFLAG_LOCATION).BuildDate=$(BUILD_DATE)"
-
+	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o conditionorc \
+		-ldflags \
+		"-X ${LDFLAG_LOCATION}.GitCommit=${GIT_COMMIT} \
+		 -X ${LDFLAG_LOCATION}.GitBranch=${GIT_BRANCH} \
+		 -X ${LDFLAG_LOCATION}.GitSummary=${GIT_SUMMARY} \
+		 -X ${LDFLAG_LOCATION}.AppVersion=${VERSION} \
+		 -X ${LDFLAG_LOCATION}.BuildDate=${BUILD_DATE}"
 
 ## build docker image and tag as ghcr.io/metal-toolbox/conditionorc:latest
 build-image: build-linux
-	@echo ">>>> NOTE: You may want to execute 'make build-image-nocache' depending on the Docker stages changed"
-	docker build --rm=true -f Dockerfile -t ${DOCKER_IMAGE}:latest  . \
-							 --label org.label-schema.schema-version=1.0 \
-							 --label org.label-schema.vcs-ref=$(GIT_COMMIT_FULL) \
-							 --label org.label-schema.vcs-url=$(REPO)
+	docker build --rm=true -f Dockerfile -t ${DOCKER_IMAGE}:latest . \
+		--label org.label-schema.schema-version=1.0 \
+		--label org.label-schema.vcs-ref=${GIT_COMMIT_FULL} \
+		--label org.label-schema.vcs-url=${REPO}
 
 ## build and push devel docker image to KIND image repo
 push-image-devel: build-image
@@ -73,7 +68,6 @@ push-image-devel: build-image
 ## push docker image
 push-image:
 	docker push ${DOCKER_IMAGE}:latest
-
 
 SWAG_INSTALLED := $(shell command -v swag 2> /dev/null)
 
@@ -88,10 +82,14 @@ endif
 # experimental
 multistage-image:
 	docker build -f Dockerfile.builder -t ${DOCKER_IMAGE}:latest . \
-		--build-arg GIT_COMMIT=$(GIT_COMMIT) --build-arg GIT_BRANCH=$(GIT_BRANCH) \
-		--build-arg GIT_SUMMARY=$(GIT_SUMMARY) --build-arg VERSION=$(VERSION) \
-		--build-arg BUILD_DATE=$(BUILD_DATE) --label org.label-schema.schema-version=1.0 \
-		--label org.label-schema.vcs-ref=$(GIT_COMMIT_FULL) --label=org.label-schema.vcs-url=$(REPO)
+		--build-arg GIT_COMMIT=${GIT_COMMIT} \
+		--build-arg GIT_BRANCH=${GIT_BRANCH} \
+		--build-arg GIT_SUMMARY=${GIT_SUMMARY} \
+		--build-arg VERSION=${VERSION} \
+		--build-arg BUILD_DATE=${BUILD_DATE} \
+		--label org.label-schema.schema-version=1.0 \
+		--label org.label-schema.vcs-ref=${GIT_COMMIT_FULL} \
+		--label org.label-schema.vcs-url=${REPO}
 
 push-ms-devel: multistage-image
 	docker tag ${DOCKER_IMAGE}:latest localhost:5001/conditionorc:latest
@@ -105,8 +103,8 @@ YELLOW := $(shell tput -Txterm setaf 3)
 WHITE  := $(shell tput -Txterm setaf 7)
 RESET  := $(shell tput -Txterm sgr0)
 
-
 TARGET_MAX_CHAR_NUM=20
+
 ## Show help
 help:
 	@echo ''
@@ -119,7 +117,7 @@ help:
 		if (helpMessage) { \
 			helpCommand = substr($$1, 0, index($$1, ":")-1); \
 			helpMessage = substr(lastLine, RSTART + 3, RLENGTH); \
-			printf "  ${YELLOW}%-$(TARGET_MAX_CHAR_NUM)s${RESET} ${GREEN}%s${RESET}\n", helpCommand, helpMessage; \
+			printf "  ${YELLOW}%-${TARGET_MAX_CHAR_NUM}s${RESET} ${GREEN}%s${RESET}\n", helpCommand, helpMessage; \
 		} \
 	} \
-	{ lastLine = $$0 }' $(MAKEFILE_LIST)
+	{ lastLine = $$0 }' ${MAKEFILE_LIST}

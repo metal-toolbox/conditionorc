@@ -13,7 +13,7 @@ ARG BUILD_DATE
 
 COPY . ./
 
-RUN GOOS=linux GOARCH=amd64 go build -o /usr/sbin/conditionorc \
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o /usr/sbin/conditionorc \
 -ldflags \
 "-X ${LDFLAG_LOCATION}.GitCommit=${GIT_COMMIT} \
 -X ${LDFLAG_LOCATION}.GitBranch=${GIT_BRANCH} \
