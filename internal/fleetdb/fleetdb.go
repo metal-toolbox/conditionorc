@@ -15,9 +15,9 @@ import (
 	"github.com/sirupsen/logrus"
 	"go.opentelemetry.io/otel"
 
+	fleetdbapi "github.com/metal-toolbox/fleetdb/pkg/api/v1"
 	rctypes "github.com/metal-toolbox/rivets/condition"
-	rservice "github.com/metal-toolbox/rivets/serverservice"
-	sservice "go.hollow.sh/serverservice/pkg/api/v1"
+	rfleetdbapi "github.com/metal-toolbox/rivets/fleetdb"
 )
 
 const (
@@ -25,9 +25,9 @@ const (
 )
 
 type fleetDBImpl struct {
-	config               *app.ServerserviceOptions
+	config               *app.FleetDBAPIOptions
 	conditionDefinitions rctypes.Definitions
-	client               *sservice.Client
+	client               *fleetdbapi.Client
 	logger               *logrus.Logger
 }
 
@@ -54,7 +54,7 @@ func (s *fleetDBImpl) AddServer(ctx context.Context, serverID uuid.UUID, facilit
 	var createStatus serverCreateStatus
 	cleanup := func() error {
 		if createStatus.serverCreated {
-			server := sservice.Server{UUID: serverID, Name: serverID.String(), FacilityCode: facilityCode}
+			server := fleetdbapi.Server{UUID: serverID, Name: serverID.String(), FacilityCode: facilityCode}
 			_, err := s.client.Delete(ctx, server)
 			if err != nil {
 				s.logger.WithError(err).Warning("server enroll failed to rollback server")
@@ -71,7 +71,7 @@ func (s *fleetDBImpl) AddServer(ctx context.Context, serverID uuid.UUID, facilit
 		}
 
 		if createStatus.attributesCreated {
-			_, err := s.client.DeleteAttributes(ctx, serverID, rservice.ServerAttributeNSBmcAddress)
+			_, err := s.client.DeleteAttributes(ctx, serverID, rfleetdbapi.ServerAttributeNSBmcAddress)
 			if err != nil {
 				s.logger.WithError(err).Warning("server enroll failed to rollback attributes")
 				return err
@@ -92,7 +92,7 @@ func (s *fleetDBImpl) AddServer(ctx context.Context, serverID uuid.UUID, facilit
 	}
 
 	// Add server
-	server := sservice.Server{UUID: serverID, Name: serverID.String(), FacilityCode: facilityCode}
+	server := fleetdbapi.Server{UUID: serverID, Name: serverID.String(), FacilityCode: facilityCode}
 	_, _, err = s.client.Create(otelCtx, server)
 	if err != nil {
 		return cleanup, err
@@ -108,7 +108,7 @@ func (s *fleetDBImpl) AddServer(ctx context.Context, serverID uuid.UUID, facilit
 
 	// Add server BMC IP attribute
 	addrAttr := fmt.Sprintf(`{"address": %q}`, addr.String())
-	bmcIPAttr := sservice.Attributes{Namespace: rservice.ServerAttributeNSBmcAddress, Data: []byte(addrAttr)}
+	bmcIPAttr := fleetdbapi.Attributes{Namespace: rfleetdbapi.ServerAttributeNSBmcAddress, Data: []byte(addrAttr)}
 	_, err = s.client.CreateAttributes(otelCtx, serverID, bmcIPAttr)
 	if err != nil {
 		return cleanup, err
@@ -148,6 +148,6 @@ func (s *fleetDBImpl) DeleteServer(ctx context.Context, serverID uuid.UUID) erro
 	otelCtx, span := otel.Tracer(pkgName).Start(ctx, "FleetDB.GetServer")
 	defer span.End()
 
-	_, err := s.client.Delete(otelCtx, sservice.Server{UUID: serverID})
+	_, err := s.client.Delete(otelCtx, fleetdbapi.Server{UUID: serverID})
 	return err
 }

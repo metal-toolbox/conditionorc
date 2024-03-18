@@ -9,13 +9,13 @@ import (
 	"github.com/hashicorp/go-retryablehttp"
 	"github.com/metal-toolbox/conditionorc/internal/app"
 	"github.com/metal-toolbox/conditionorc/internal/model"
-	rctypes "github.com/metal-toolbox/rivets/condition"
-	sservice "go.hollow.sh/serverservice/pkg/api/v1"
+	"github.com/sirupsen/logrus"
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/clientcredentials"
 
-	"github.com/sirupsen/logrus"
+	fleetdbapi "github.com/metal-toolbox/fleetdb/pkg/api/v1"
+	rctypes "github.com/metal-toolbox/rivets/condition"
 )
 
 // FleetDB handles traffics between conditionorc and fleet db.
@@ -33,8 +33,8 @@ type FleetDB interface {
 func NewFleetDBClient(ctx context.Context, config *app.Configuration, conditionDefs rctypes.Definitions,
 	logger *logrus.Logger) (FleetDB, error) {
 
-	ssOpts := &config.ServerserviceOptions
-	client, err := getServerServiceClient(ctx, ssOpts, logger)
+	ssOpts := &config.FleetDBAPIOptions
+	client, err := getFleetDBAPIClient(ctx, ssOpts, logger)
 	if err != nil {
 		return nil, err
 	}
@@ -46,12 +46,12 @@ func NewFleetDBClient(ctx context.Context, config *app.Configuration, conditionD
 	}, nil
 }
 
-func getServerServiceClient(ctx context.Context, cfg *app.ServerserviceOptions, log *logrus.Logger) (*sservice.Client, error) {
-	var client *sservice.Client
+func getFleetDBAPIClient(ctx context.Context, cfg *app.FleetDBAPIOptions, log *logrus.Logger) (*fleetdbapi.Client, error) {
+	var client *fleetdbapi.Client
 	var err error
 
 	if cfg.DisableOAuth {
-		client, err = sservice.NewClientWithToken("fake", cfg.Endpoint, nil)
+		client, err = fleetdbapi.NewClientWithToken("fake", cfg.Endpoint, nil)
 		if err != nil {
 			return nil, err
 		}
@@ -66,7 +66,7 @@ func getServerServiceClient(ctx context.Context, cfg *app.ServerserviceOptions, 
 }
 
 // returns a serverservice retryable http client with Otel and Oauth wrapped in
-func newClientWithOAuth(ctx context.Context, cfg *app.ServerserviceOptions, logger *logrus.Logger) (*sservice.Client, error) {
+func newClientWithOAuth(ctx context.Context, cfg *app.FleetDBAPIOptions, logger *logrus.Logger) (*fleetdbapi.Client, error) {
 	// init retryable http client
 	retryableClient := retryablehttp.NewClient()
 
@@ -112,7 +112,7 @@ func newClientWithOAuth(ctx context.Context, cfg *app.ServerserviceOptions, logg
 	httpClient := retryableClient.StandardClient()
 	httpClient.Timeout = connectionTimeout
 
-	return sservice.NewClientWithToken(
+	return fleetdbapi.NewClientWithToken(
 		cfg.OidcClientSecret,
 		cfg.Endpoint,
 		httpClient,
