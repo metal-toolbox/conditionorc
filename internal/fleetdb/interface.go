@@ -32,7 +32,6 @@ type FleetDB interface {
 
 func NewFleetDBClient(ctx context.Context, config *app.Configuration, conditionDefs rctypes.Definitions,
 	logger *logrus.Logger) (FleetDB, error) {
-
 	ssOpts := &config.FleetDBAPIOptions
 	client, err := getFleetDBAPIClient(ctx, ssOpts, logger)
 	if err != nil {

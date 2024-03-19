@@ -72,7 +72,6 @@ var (
 )
 
 func NewStore(config *app.Configuration, logger *logrus.Logger, stream events.Stream) (Repository, error) {
-
 	storeKind := strings.ToLower(string(config.StoreKind))
 
 	switch model.StoreKind(storeKind) {
