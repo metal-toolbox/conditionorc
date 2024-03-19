@@ -16,6 +16,11 @@ REPO := "https://github.com/metal-toolbox/conditionorc.git"
 lint:
 	golangci-lint run --config .golangci.yml
 
+## lint-fix - auto fix lint errors - for the linters that support auto fix
+lint-fix:
+	golangci-lint run --config .golangci.yml --fix
+
+
 ## Go test
 test: lint
 	go test -timeout 1m -v -covermode=atomic ./...

@@ -1,7 +1,7 @@
 # golangci.com configuration
 # https://github.com/golangci/golangci/wiki/Configuration
 service:
-  golangci-lint-version: 1.50.0 # use the fixed version to not introduce new linters unexpectedly
+  golangci-lint-version: v1.56.2 # use the fixed version to not introduce new linters unexpectedly
 
 linters-settings:
   govet:
@@ -45,7 +45,7 @@ linters-settings:
       - wrapperFunc
   gofumpt:
     extra-rules: true
-  wsl:
+  whitespace:
     auto-fix: true
 
 linters:
@@ -72,6 +72,15 @@ linters:
     - noctx
     - stylecheck
     - gosec
+    - contextcheck
+    - durationcheck
+    - errchkjson
+    - errorlint
+    - gochecksumtype
+    - nilerr
+    - reassign
+    - whitespace
+    - exportloopref
   enable-all: false
   disable-all: true
 
