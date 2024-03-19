@@ -94,7 +94,6 @@ func (o *Orchestrator) kvStatusPublisher(ctx context.Context) {
 				le.WithError(err).Warn("sending notification")
 				// notifications are advisory, so if we fail to notify we keep processing
 			}
-
 		}
 	}
 
