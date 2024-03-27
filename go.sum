@@ -569,8 +569,8 @@ github.com/mwitkow/go-conntrack v0.0.0-20161129095857-cc309e4a2223/go.mod h1:qRW
 github.com/mwitkow/go-conntrack v0.0.0-20190716064945-2f068394615f/go.mod h1:qRWi+5nqEBWmkhHvq77mSJWrCKwh8bxhgT7d/eI7P4U=
 github.com/nats-io/jwt/v2 v2.5.5 h1:ROfXb50elFq5c9+1ztaUbdlrArNFl2+fQWP6B8HGEq4=
 github.com/nats-io/jwt/v2 v2.5.5/go.mod h1:ZdWS1nZa6WMZfFwwgpEaqBV8EPGVgOTDHN/wTbz0Y5A=
-github.com/nats-io/nats-server/v2 v2.10.11 h1:yKUiLVincZISpo3A4YljJQ+HfLltGAgoNNJl99KL8I0=
-github.com/nats-io/nats-server/v2 v2.10.11/go.mod h1:dXtOqVWzbMTEj+tUyC/itXjJhW37xh0tUBrTAlqAfx8=
+github.com/nats-io/nats-server/v2 v2.10.12 h1:G6u+RDrHkw4bkwn7I911O5jqys7jJVRY6MwgndyUsnE=
+github.com/nats-io/nats-server/v2 v2.10.12/go.mod h1:H1n6zXtYLFCgXcf/SF8QNTSIFuS8tyZQMN9NguUHdEs=
 github.com/nats-io/nats.go v1.33.1 h1:8TxLZZ/seeEfR97qV0/Bl939tpDnt2Z2fK3HkPypj70=
 github.com/nats-io/nats.go v1.33.1/go.mod h1:Ubdu4Nh9exXdSz0RVWRFBbRfrbSxOYd26oF0wkWclB8=
 github.com/nats-io/nkeys v0.4.7 h1:RwNJbbIdYCoClSDNY7QVKZlyb/wfT6ugvFCiKy6vDvI=
@@ -737,10 +737,6 @@ go.etcd.io/etcd/client/v2 v2.305.4/go.mod h1:Ud+VUwIi9/uQHOMA+4ekToJ12lTxlv0zB/+
 go.etcd.io/etcd/client/v3 v3.5.4/go.mod h1:ZaRkVgBZC+L+dLCjTcF1hRXpgZXQPOvnA/Ak/gq3kiY=
 go.hollow.sh/serverservice v0.16.2 h1:0wt0XJC/rm4OdovB6g8Fsx7BT2X71pG0keJiiLZaY+w=
 go.hollow.sh/serverservice v0.16.2/go.mod h1:Zr99vSFO++ZlDjEf9rtPWi3TiMgMswJCW3D6LIFmMDM=
-go.hollow.sh/toolbox v0.6.3-0.20240327092555-715da40e51b2 h1:S++g6S33y+rlgByFXNyAH9cYLFsoIx86MrMhjdomILs=
-go.hollow.sh/toolbox v0.6.3-0.20240327092555-715da40e51b2/go.mod h1:nl+5RDDyYY/+wukOUzHHX2mOyWKRjlTOXUcGxny+tns=
-go.hollow.sh/toolbox v0.6.3-0.20240327094846-c05e5e15b9f5 h1:4odze3vzXhxOy7pCAoRnrV9OytGU133DpjAFdOzfws0=
-go.hollow.sh/toolbox v0.6.3-0.20240327094846-c05e5e15b9f5/go.mod h1:nl+5RDDyYY/+wukOUzHHX2mOyWKRjlTOXUcGxny+tns=
 go.hollow.sh/toolbox v0.6.3 h1:IJOjiGdiwWwXJ2QfOkJuSucSIqrdXJbUBFst3u6T6z4=
 go.hollow.sh/toolbox v0.6.3/go.mod h1:nl+5RDDyYY/+wukOUzHHX2mOyWKRjlTOXUcGxny+tns=
 go.infratographer.com/x v0.3.9 h1:fsfF/w5zHgiNAHvYmvsWlICNha2X53WNLVSKOkyPnWo=
