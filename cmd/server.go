@@ -72,8 +72,12 @@ var cmdServer = &cobra.Command{
 		}
 
 		if viper.GetViper().GetBool("oidc.enabled") {
-			app.Logger.Info("enabling OIDC")
+			if len(app.Config.APIServerJWTAuth) == 0 {
+				app.Logger.Fatal("OIDC enabled without configuration")
+			}
+
 			options = append(options, server.WithAuthMiddlewareConfig(app.Config.APIServerJWTAuth))
+			app.Logger.Info("OIDC enabled")
 		} else {
 			app.Logger.Info("OIDC disabled")
 		}
