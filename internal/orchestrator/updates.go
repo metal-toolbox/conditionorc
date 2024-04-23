@@ -434,28 +434,34 @@ func (o *Orchestrator) eventNeedsReconciliation(evt *v1types.ConditionUpdateEven
 	})
 
 	lastTime, err := registry.LastContact(evt.ControllerID)
-	if errors.Is(err, nats.ErrKeyNotFound) {
-		return true
+	if err != nil {
+		if errors.Is(err, nats.ErrKeyNotFound) {
+			return true
+		}
+
+		le.WithError(err).Warn("error checking registry")
+		return false
 	}
 
-	if err == nil {
-		since := time.Since(lastTime)
-		le.WithFields(logrus.Fields{
-			"last.update":    evt.UpdatedAt.String(),
-			"worker.checkin": since.String(),
-		}).Debug("long running event caught by reconciler")
-	} else {
-		le.WithError(err).Warn("error checking registry")
-	}
+	// we don't attempt to clean up, but collect metrics on it
+	since := time.Since(lastTime)
+	le.WithFields(logrus.Fields{
+		"last.update":    evt.UpdatedAt.String(),
+		"worker.checkin": since.String(),
+	}).Debug("long running event caught by reconciler")
+
+	metrics.ConditionReconcileStale.With(
+		prometheus.Labels{"conditionKind": string(evt.Kind)},
+	).Inc()
 
 	return false
 }
 
-func (o *Orchestrator) startReconciler(ctx context.Context, wg *sync.WaitGroup) {
-	wg.Add(1)
+func (o *Orchestrator) startReconciler(ctx context.Context) {
+	o.syncWG.Add(1)
 
 	go func() {
-		defer wg.Done()
+		defer o.syncWG.Done()
 
 		ticker := time.NewTicker(reconcilerCadence)
 		defer ticker.Stop()
