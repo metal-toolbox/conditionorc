@@ -2,7 +2,6 @@ package orchestrator
 
 import (
 	"context"
-	"strings"
 	"sync"
 
 	"github.com/metal-toolbox/conditionorc/internal/orchestrator/notify"
@@ -11,19 +10,16 @@ import (
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"go.hollow.sh/toolbox/events"
-	"go.opentelemetry.io/otel"
 
 	v1EventHandlers "github.com/metal-toolbox/conditionorc/pkg/api/v1/events"
 	rctypes "github.com/metal-toolbox/rivets/condition"
 )
 
 var (
-	concurrency         = 10
-	ErrPublishEvent     = errors.New("error publishing event")
-	ErrInvalidEvent     = errors.New("invalid event message")
-	pkgName             = "internal/orchestrator"
-	serverServiceOrigin = "serverservice"
-	defaultOrigin       = "default"
+	concurrency     = 10
+	ErrPublishEvent = errors.New("error publishing event")
+	ErrInvalidEvent = errors.New("invalid event message")
+	pkgName         = "internal/orchestrator"
 )
 
 // Orchestrator type holds attributes of the condition orchestrator service
@@ -138,56 +134,9 @@ func (o *Orchestrator) Run(ctx context.Context) {
 	}).Info("running orchestrator")
 	o.startWorkerLivenessCheckin(ctx)
 	o.startUpdateMonitor(ctx)
-	o.startEventListener(ctx)
+	o.startReconciler(ctx)
 
 	<-ctx.Done()
 	o.streamBroker.Close()
 	o.logger.Info("orchestrator shut down")
-}
-
-//nolint:gomnd,gocritic // shut it
-func findSubjectOrigin(subject string) string {
-	// XXX: ContainerOrc subjects from Server-Service follow a subject convention of
-	// "com.hollow.sh.serverservice.events.target.action". For example, a server
-	// inventory request would be 'com.hollow.sh.serverservice.events.server.create'
-	// XXX: ugh, why is inventory 'create'?
-
-	subjectElements := strings.Split(subject, ".")
-	origin := defaultOrigin
-	if len(subjectElements) > 3 {
-		origin = subjectElements[3]
-	}
-	return origin
-}
-
-func (o *Orchestrator) processEvent(ctx context.Context, event events.Message) {
-	// extract parent trace context from the event if any.
-	ctx = event.ExtractOtelTraceContext(ctx)
-	otelCtx, span := otel.Tracer(pkgName).Start(ctx, "processEvent")
-	defer span.End()
-
-	// route the message processing based on the subject
-
-	switch findSubjectOrigin(event.Subject()) {
-	case serverServiceOrigin:
-		o.eventHandler.ServerserviceEvent(otelCtx, event)
-	default:
-		// how did we get a message delivered on a subject that we're not subscribed to?
-		o.ackEvent(event, errors.Wrap(ErrInvalidEvent, "msg with unknown subject-pattern ignored"))
-	}
-}
-
-func (o *Orchestrator) ackEvent(event events.Message, err error) {
-	if err != nil {
-		// attempt to format the event as JSON
-		// so its easier to read in the logs.
-		logFields := logrus.Fields{"event_subject": event.Subject()}
-
-		// TODO: add metrics for dropped events
-		o.logger.WithError(err).WithFields(logFields).Warn("event with error ack'ed")
-	}
-
-	if err := event.Ack(); err != nil {
-		o.logger.WithError(err).Warn("error Ack'ing event")
-	}
 }
