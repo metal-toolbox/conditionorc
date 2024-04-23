@@ -194,7 +194,7 @@ func TestEventUpdateFromKV(t *testing.T) {
 	entry, err := writeHandle.Get(k1)
 	require.NoError(t, err)
 
-	upd1, err := eventUpdateFromKV(context.Background(), entry, rctypes.FirmwareInstall)
+	upd1, err := parseEventUpdateFromKV(context.Background(), entry, rctypes.FirmwareInstall)
 	require.NoError(t, err)
 	require.Equal(t, condID, upd1.ConditionUpdate.ConditionID)
 	require.Equal(t, rctypes.Pending, upd1.ConditionUpdate.State)
@@ -202,13 +202,13 @@ func TestEventUpdateFromKV(t *testing.T) {
 	// bogus state should error
 	entry, err = writeHandle.Get(k2)
 	require.NoError(t, err)
-	_, err = eventUpdateFromKV(context.Background(), entry, rctypes.FirmwareInstall)
+	_, err = parseEventUpdateFromKV(context.Background(), entry, rctypes.FirmwareInstall)
 	require.ErrorIs(t, errInvalidState, err)
 
 	// no controller id event should error as well
 	entry, err = writeHandle.Get(k3)
 	require.NoError(t, err)
-	_, err = eventUpdateFromKV(context.Background(), entry, rctypes.FirmwareInstall)
+	_, err = parseEventUpdateFromKV(context.Background(), entry, rctypes.FirmwareInstall)
 	require.ErrorIs(t, err, registry.ErrBadFormat)
 }
 
