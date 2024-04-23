@@ -163,8 +163,24 @@ func (o *Orchestrator) startConditionWatchers(ctx context.Context,
 					if err != nil {
 						o.logger.WithError(err).WithField("rctypes.kind", string(kind)).
 							Warn("error transforming status data")
+
+						metrics.NatsKVUpdateEvent.With(
+							prometheus.Labels{
+								"conditionKind": string(evt.Kind),
+								"valid":         "false",
+							},
+						).Inc()
+
 						continue
 					}
+
+					metrics.NatsKVUpdateEvent.With(
+						prometheus.Labels{
+							"conditionKind": string(evt.Kind),
+							"valid":         "true",
+						},
+					).Inc()
+
 					evtChan <- evt
 				}
 			}
@@ -285,6 +301,14 @@ func (o *Orchestrator) getEventsToReconcile(ctx context.Context) []*v1types.Cond
 				}).Warn("reconciler skipping malformed update")
 				continue
 			}
+
+			metrics.ConditionInKV.With(
+				prometheus.Labels{
+					"conditionKind": string(evt.Kind),
+					"state":         string(evt.ConditionUpdate.State),
+				},
+			).Inc()
+
 			if o.eventNeedsReconciliation(evt) {
 				if !rctypes.StateIsComplete(evt.ConditionUpdate.State) {
 					// we need to deal with this event, so mark it failed
@@ -295,6 +319,7 @@ func (o *Orchestrator) getEventsToReconcile(ctx context.Context) []*v1types.Cond
 			}
 		}
 	}
+
 	return evts
 }
 
@@ -449,10 +474,12 @@ func (o *Orchestrator) startReconciler(ctx context.Context, wg *sync.WaitGroup) 
 						"conditionState": string(evt.ConditionUpdate.State),
 						"kind":           string(evt.Kind),
 					})
+
 					if err := o.eventUpdate(ctx, evt); err != nil {
 						le.WithError(err).Warn("reconciler event update")
 						continue
 					}
+
 					if err := o.notifier.Send(evt); err != nil {
 						le.WithError(err).Warn("reconciler event notification")
 					}
