@@ -67,15 +67,17 @@ func (h *Handler) UpdateCondition(ctx context.Context, updEvt *v1types.Condition
 				"server_id":      updEvt.ConditionUpdate.ServerID,
 				"condition_id":   updEvt.ConditionUpdate.ConditionID,
 				"condition_kind": updEvt.Kind,
-			}).Error("no existing condition found for update")
+			}).Error("no existing pending/active condition found for update")
 			return err
 		}
 		return errors.Wrap(errRetryThis, err.Error())
 	}
 
-	// nothing to update
+	// apply update on changes to one of these fields
 	if existing.State == updEvt.ConditionUpdate.State &&
-		bytes.Equal(existing.Status, updEvt.ConditionUpdate.Status) {
+		// TODO: fix - if the JSON payload key/values are not in the same order, this will return true
+		bytes.Equal(existing.Status, updEvt.ConditionUpdate.Status) &&
+		existing.UpdatedAt == updEvt.UpdatedAt {
 		return nil
 	}
 
