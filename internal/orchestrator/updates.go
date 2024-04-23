@@ -303,67 +303,87 @@ func (o *Orchestrator) eventUpdate(ctx context.Context, evt *v1types.ConditionUp
 		return errors.Wrap(err, "updating condition")
 	}
 
-	if rctypes.StateIsComplete(evt.ConditionUpdate.State) {
-		// deal with the completed event
-		delErr := status.DeleteCondition(evt.Kind, o.facility, evt.ConditionUpdate.ConditionID.String())
-		if delErr != nil {
-			// if we fail to delete this event from the KV, the reconciler will catch it later
-			// and walk this code, so return early.
-			o.logger.WithError(delErr).WithFields(logrus.Fields{
-				"condition.id":   evt.ConditionUpdate.ConditionID,
-				"server.id":      evt.ConditionUpdate.ServerID,
-				"condition.kind": evt.Kind,
-			}).Warn("removing completed condition data")
-			return errors.Wrap(errCompleteEvent, delErr.Error())
-		}
-		metrics.ConditionCompleted.With(
-			prometheus.Labels{
-				"conditionKind": string(evt.Kind),
-				"state":         string(evt.ConditionUpdate.State),
-			},
-		).Inc()
+	// nothing else to do if the condition is not finalized
+	if !rctypes.StateIsComplete(evt.ConditionUpdate.State) {
+		return nil
+	}
 
-		// queue any follow-on work as required
-		active, err := o.repository.GetActiveCondition(ctx, evt.ConditionUpdate.ServerID)
-		if err != nil && errors.Is(err, store.ErrConditionNotFound) {
-			// nothing more to do
-			return nil
-		}
+	// deal with the completed event
+	delErr := status.DeleteCondition(evt.Kind, o.facility, evt.ConditionUpdate.ConditionID.String())
+	if delErr != nil {
+		// if we fail to delete this event from the KV, the reconciler will catch it later
+		// and walk this code, so return early.
+		o.logger.WithError(delErr).WithFields(logrus.Fields{
+			"condition.id":   evt.ConditionUpdate.ConditionID,
+			"server.id":      evt.ConditionUpdate.ServerID,
+			"condition.kind": evt.Kind,
+		}).Warn("removing completed condition data")
 
+		return errors.Wrap(errCompleteEvent, delErr.Error())
+	}
+
+	metrics.ConditionCompleted.With(
+		prometheus.Labels{
+			"conditionKind": string(evt.Kind),
+			"state":         string(evt.ConditionUpdate.State),
+		},
+	).Inc()
+
+	// queue any follow-on work as required
+	return o.queueFollowingCondition(ctx, evt)
+}
+
+// Queue up follow on conditions
+//
+// TODO: Q. how do we know the follow on work is ordered as expected, or is the assumption that there could be only one other condition queued for this server ?
+// TODO: Q. if the current condition has failed, we most likely don't want to queue the next condition?
+func (o *Orchestrator) queueFollowingCondition(ctx context.Context, evt *v1types.ConditionUpdateEvent) error {
+	active, err := o.repository.GetActiveCondition(ctx, evt.ConditionUpdate.ServerID)
+	if err != nil && errors.Is(err, store.ErrConditionNotFound) {
+		// nothing more to do
+		return nil
+	}
+
+	if err != nil {
+		o.logger.WithError(err).WithFields(logrus.Fields{
+			"condition.id": evt.ConditionUpdate.ConditionID,
+			"server.id":    evt.ConditionUpdate.ServerID,
+		}).Warn("retrieving next active condition")
+
+		metrics.DependencyError("nats", "retrieve active condition")
+
+		return errors.Wrap(errCompleteEvent, err.Error())
+	}
+
+	// Publish the next event if that event is in the pending state.
+	//
+	// Seeing as we only *just* completed this event it's hard to believe we'd
+	// lose the race to publish the next one, but it's possible I suppose.
+	if active != nil && active.State == rctypes.Pending {
+		byt := active.MustBytes()
+		subject := fmt.Sprintf("%s.servers.%s", o.facility, active.Kind)
+		err := o.streamBroker.Publish(ctx, subject, byt)
 		if err != nil {
 			o.logger.WithError(err).WithFields(logrus.Fields{
-				"condition.id": evt.ConditionUpdate.ConditionID,
-				"server.id":    evt.ConditionUpdate.ServerID,
-			}).Warn("retrieving next active condition")
-			metrics.DependencyError("nats", "retrieve active condition")
-			return errors.Wrap(errCompleteEvent, err.Error())
-		}
-
-		// Publish the next event iff that event is in the pending state.
-		// Seeing as we only *just* completed this event it's hard to believe we'd
-		// lose the race to publish the next one, but it's possible I suppose.
-		if active != nil && active.State == rctypes.Pending {
-			byt := active.MustBytes()
-			subject := fmt.Sprintf("%s.servers.%s", o.facility, active.Kind)
-			err := o.streamBroker.Publish(ctx, subject, byt)
-			if err != nil {
-				o.logger.WithError(err).WithFields(logrus.Fields{
-					"condition.id":   active.ID,
-					"server.id":      evt.ConditionUpdate.ServerID,
-					"condition.kind": active.Kind,
-				}).Warn("publishing next active condition")
-				metrics.DependencyError("nats", "publish-condition")
-				return errors.Wrap(errCompleteEvent, err.Error())
-			}
-			metrics.ConditionQueued.With(
-				prometheus.Labels{"conditionKind": string(active.Kind)},
-			).Inc()
-			o.logger.WithFields(logrus.Fields{
 				"condition.id":   active.ID,
 				"server.id":      evt.ConditionUpdate.ServerID,
 				"condition.kind": active.Kind,
-			}).Debug("published next condition in chain")
+			}).Warn("publishing next active condition")
+
+			metrics.DependencyError("nats", "publish-condition")
+
+			return errors.Wrap(errCompleteEvent, err.Error())
 		}
+
+		metrics.ConditionQueued.With(
+			prometheus.Labels{"conditionKind": string(active.Kind)},
+		).Inc()
+
+		o.logger.WithFields(logrus.Fields{
+			"condition.id":   active.ID,
+			"server.id":      evt.ConditionUpdate.ServerID,
+			"condition.kind": active.Kind,
+		}).Debug("published next condition in chain")
 	}
 
 	return nil
