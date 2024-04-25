@@ -1,4 +1,4 @@
-FROM golang:1.21.3-alpine3.18 AS build
+FROM golang:1.22-alpine3.19 AS build
 
 WORKDIR /go/src/github.com/metal-toolbox/conditionorc
 COPY go.mod go.sum ./
