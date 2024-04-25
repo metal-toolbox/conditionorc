@@ -25,6 +25,7 @@ require (
 	github.com/swaggo/gin-swagger v1.6.0
 	github.com/swaggo/swag v1.16.3
 	github.com/volatiletech/null/v8 v8.1.2
+	github.com/volatiletech/null/v9 v9.0.0
 	go.hollow.sh/serverservice v0.16.2
 	go.hollow.sh/toolbox v0.6.3
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.49.0
