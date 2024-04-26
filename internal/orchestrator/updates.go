@@ -342,6 +342,8 @@ func (o *Orchestrator) eventUpdate(ctx context.Context, evt *v1types.ConditionUp
 			"condition.kind": evt.Kind,
 		}).Warn("removing completed condition data")
 
+		metrics.DependencyError("nats", "remove completed condition condition")
+
 		return errors.Wrap(errCompleteEvent, delErr.Error())
 	}
 
@@ -357,9 +359,6 @@ func (o *Orchestrator) eventUpdate(ctx context.Context, evt *v1types.ConditionUp
 }
 
 // Queue up follow on conditions
-//
-// TODO: Q. how do we know the follow on work is ordered as expected, or is the assumption that there could be only one other condition queued for this server ?
-// TODO: Q. if the current condition has failed, we most likely don't want to queue the next condition?
 func (o *Orchestrator) queueFollowingCondition(ctx context.Context, evt *v1types.ConditionUpdateEvent) error {
 	active, err := o.repository.GetActiveCondition(ctx, evt.ConditionUpdate.ServerID)
 	if err != nil && errors.Is(err, store.ErrConditionNotFound) {
