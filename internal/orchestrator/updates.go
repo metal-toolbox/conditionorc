@@ -26,16 +26,14 @@ import (
 )
 
 var (
-	updOnce          sync.Once
-	expectedDots     = 1 // we expect keys for KV-based status updates to be facilityCode.conditionID
-	errKeyFormat     = errors.New("malformed update key")
-	errConditionID   = errors.New("bad condition uuid")
-	errInvalidState  = errors.New("invalid condition state")
-	errCompleteEvent = errors.New("unable to complete event")
-	// rivets.controllers check in every 30secs, 15 minutes a lot of time for no updates on a condition.
-	staleEventThreshold = 15 * time.Minute
-	reconcilerCadence   = 5 * time.Minute
-	failedByReconciler  = []byte(`{ "msg": "worker failed processing this event" }`)
+	updOnce            sync.Once
+	expectedDots       = 1 // we expect keys for KV-based status updates to be facilityCode.conditionID
+	errKeyFormat       = errors.New("malformed update key")
+	errConditionID     = errors.New("bad condition uuid")
+	errInvalidState    = errors.New("invalid condition state")
+	errCompleteEvent   = errors.New("unable to complete event")
+	reconcilerCadence  = 1 * time.Minute
+	failedByReconciler = []byte(`{ "msg": "worker failed processing this event" }`)
 )
 
 func (o *Orchestrator) startUpdateMonitor(ctx context.Context) {
@@ -417,7 +415,7 @@ func (o *Orchestrator) queueFollowingCondition(ctx context.Context, evt *v1types
 func (o *Orchestrator) eventNeedsReconciliation(evt *v1types.ConditionUpdateEvent) bool {
 	// the last update should be later than our internal threshold
 	// this might still be actively worked
-	if time.Since(evt.ConditionUpdate.UpdatedAt) < staleEventThreshold {
+	if time.Since(evt.ConditionUpdate.UpdatedAt) < rctypes.StaleThreshold {
 		return false
 	}
 
