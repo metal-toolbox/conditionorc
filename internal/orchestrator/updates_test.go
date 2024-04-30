@@ -133,22 +133,19 @@ func TestEventNeedsReconciliation(t *testing.T) {
 		ConditionUpdate: v1types.ConditionUpdate{
 			UpdatedAt: time.Now(),
 		},
+		ControllerID: registry.GetID("needs-reconciliation-test"),
 	}
-
-	require.False(t, o.eventNeedsReconciliation(evt))
+	require.False(t, o.eventNeedsReconciliation(evt), "Condition UpdatedAt")
 
 	evt.UpdatedAt = time.Now().Add(-90 * time.Minute)
 	evt.ConditionUpdate.State = rctypes.Failed
-
-	require.True(t, o.eventNeedsReconciliation(evt))
+	require.True(t, o.eventNeedsReconciliation(evt), "Condition finalized")
 
 	evt.ConditionUpdate.State = rctypes.Active
-	evt.ControllerID = registry.GetID("needs-reconciliation-test")
-
-	require.True(t, o.eventNeedsReconciliation(evt))
+	require.True(t, o.eventNeedsReconciliation(evt), "Condition finalized")
 
 	evt.ControllerID = liveWorker
-	require.False(t, o.eventNeedsReconciliation(evt))
+	require.False(t, o.eventNeedsReconciliation(evt), "controller active")
 }
 
 func TestEventUpdateFromKV(t *testing.T) {
