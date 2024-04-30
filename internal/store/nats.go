@@ -205,6 +205,7 @@ func (n *natsStore) CreateMultiple(ctx context.Context, serverID uuid.UUID, work
 	}
 	for _, condition := range work {
 		condition.ID = id
+		condition.Target = serverID
 		cr.Conditions = append(cr.Conditions, condition)
 	}
 
