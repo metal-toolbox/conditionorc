@@ -26,7 +26,6 @@ var (
 type Orchestrator struct {
 	// Logger is the app logger
 	logger        *logrus.Logger
-	syncWG        *sync.WaitGroup
 	listenAddress string
 	concurrency   int
 	repository    store.Repository
@@ -109,7 +108,7 @@ func WithConditionDefs(defs rctypes.Definitions) Option {
 
 // New returns a new orchestrator service with the given options set.
 func New(opts ...Option) *Orchestrator {
-	o := &Orchestrator{concurrency: concurrency, syncWG: &sync.WaitGroup{}}
+	o := &Orchestrator{concurrency: concurrency}
 
 	for _, opt := range opts {
 		opt(o)
@@ -126,6 +125,8 @@ func New(opts ...Option) *Orchestrator {
 
 // Run runs the orchestrator which listens for events to action.
 func (o *Orchestrator) Run(ctx context.Context) {
+	wg := &sync.WaitGroup{}
+
 	v := version.Current()
 	o.logger.WithFields(logrus.Fields{
 		"GitCommit":  v.GitCommit,
@@ -134,9 +135,10 @@ func (o *Orchestrator) Run(ctx context.Context) {
 	}).Info("running orchestrator")
 	o.startWorkerLivenessCheckin(ctx)
 	o.startUpdateMonitor(ctx)
-	o.startReconciler(ctx)
+	o.startReconciler(ctx, wg)
 
 	<-ctx.Done()
+	wg.Wait()
 	o.streamBroker.Close()
 	o.logger.Info("orchestrator shut down")
 }
