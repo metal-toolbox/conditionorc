@@ -22,8 +22,8 @@ import (
 )
 
 var (
-	bucketName = "active-conditions"
-	bucketOpts = []kv.Option{
+	ActiveConditionBucket = "active-conditions"
+	bucketOpts            = []kv.Option{
 		kv.WithDescription("tracking active conditions on servers"),
 		kv.WithTTL(10 * 24 * time.Hour), // XXX: we could keep more history here, but might need more storage
 	}
@@ -51,7 +51,7 @@ func newNatsRepository(log *logrus.Logger, stream events.Stream, replicaCount in
 		kvOpts = append(kvOpts, kv.WithReplicas(replicaCount))
 	}
 
-	kvHandle, err := kv.CreateOrBindKVBucket(evJS, bucketName, kvOpts...)
+	kvHandle, err := kv.CreateOrBindKVBucket(evJS, ActiveConditionBucket, kvOpts...)
 	if err != nil {
 		log.WithError(err).Debug("binding kv bucket")
 		return nil, errors.Wrap(err, "binding active conditions bucket")
@@ -60,6 +60,44 @@ func newNatsRepository(log *logrus.Logger, stream events.Stream, replicaCount in
 		log:    log,
 		bucket: kvHandle,
 	}, nil
+}
+
+// List returns all conditions listed in the active-conditions KV.
+func (n *natsStore) List(ctx context.Context) ([]*ConditionRecord, error) {
+	_, span := otel.Tracer(pkgName).Start(ctx, "NatsStore.List")
+	defer span.End()
+
+	found := []*ConditionRecord{}
+	watcher, err := n.bucket.WatchAll(nats.IgnoreDeletes())
+	if err != nil {
+		return nil, errors.Wrap(err, "error listing all conditions")
+	}
+
+	defer func() {
+		if errStop := watcher.Stop(); errStop != nil {
+			n.log.WithError(errStop).Warn("error stopping watcher")
+			natsError("watcher.stop")
+		}
+	}()
+
+	for kve := range watcher.Updates() {
+		if kve == nil {
+			// this is weird, and it's also in their code. The channel isn't closed
+			// until the internal watcher's subscription to the KV subject is shut down
+			// so getting an explicit nil here means "nothing more."
+			break
+		}
+
+		var cr ConditionRecord
+		if err = cr.FromJSON(kve.Value()); err != nil {
+			n.log.WithError(err).Warn("bad condition record")
+			continue
+		}
+
+		found = append(found, &cr)
+	}
+
+	return found, nil
 }
 
 // Get returns the last ConditionRecord for activity on the server. This might be an active,
