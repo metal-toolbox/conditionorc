@@ -63,6 +63,9 @@ type Repository interface {
 	// @serverID: required
 	// @condition: required
 	Update(ctx context.Context, serverID uuid.UUID, condition *rctypes.Condition) error
+
+	// List all condition records
+	List(ctx context.Context) ([]*ConditionRecord, error)
 }
 
 var (
