@@ -284,11 +284,11 @@ func (o *Orchestrator) getEventsToReconcile(ctx context.Context) []*v1types.Cond
 	evts := []*v1types.ConditionUpdateEvent{}
 	for _, def := range o.conditionDefs {
 		kind := def.Kind
-
 		entries, err := status.GetAllConditions(kind, o.facility)
 		if err != nil {
 			o.logger.WithError(err).WithField("rctypes.kind", string(kind)).
-				Warn("reconciler error on condition lookup")
+				Warn("reconciler error in condition status lookup")
+			continue
 		}
 
 		for _, kve := range entries {
@@ -424,6 +424,7 @@ func (o *Orchestrator) queueFollowingCondition(ctx context.Context, evt *v1types
 	return nil
 }
 
+// This reconciles conditions in the Condition status KV - $condition.$facility
 func (o *Orchestrator) eventNeedsReconciliation(evt *v1types.ConditionUpdateEvent) bool {
 	// the last update should be later than the condition stale threshold
 	if time.Since(evt.ConditionUpdate.UpdatedAt) < rctypes.StaleThreshold {
@@ -462,7 +463,7 @@ func (o *Orchestrator) eventNeedsReconciliation(evt *v1types.ConditionUpdateEven
 		le.WithField(
 			"last.checkin",
 			time.Since(lastTime),
-		).Info("controller not checked in time exceeded")
+		).Info("controller check in timed out")
 		return true
 	}
 
@@ -485,6 +486,7 @@ func (o *Orchestrator) startReconciler(ctx context.Context, wg *sync.WaitGroup) 
 				keepRunning = false
 
 			case <-ticker.C:
+				// reconcile status KV entries
 				evts := o.getEventsToReconcile(ctx)
 				for _, evt := range evts {
 					le := o.logger.WithFields(logrus.Fields{
