@@ -279,6 +279,110 @@ func parseEventUpdateFromKV(ctx context.Context, kve nats.KeyValueEntry,
 	return updEvent, nil
 }
 
+// statusKVEntries is a map of ServerIDs from the status KV for a condition kind
+func failedUpdateEventFromCondition(cond *rctypes.Condition) *v1types.ConditionUpdateEvent {
+	return &v1types.ConditionUpdateEvent{
+		ConditionUpdate: v1types.ConditionUpdate{
+			ConditionID: cond.ID,
+			ServerID:    cond.Target,
+			State:       rctypes.Failed,
+			Status:      failedByReconciler,
+			UpdatedAt:   time.Now(),
+		},
+		Kind: cond.Kind,
+	}
+}
+
+func filterPendingRecords(records []*store.ConditionRecord) (map[rctypes.Kind]bool, []*store.ConditionRecord) {
+	foundKinds := map[rctypes.Kind]bool{}
+	foundRecords := []*store.ConditionRecord{}
+
+	for _, cr := range records {
+		if len(cr.Conditions) == 0 {
+			continue
+		}
+
+		if !rctypes.StateIsComplete(cr.State) {
+			foundKinds[cr.Conditions[0].Kind] = true
+			foundRecords = append(foundRecords, cr)
+		}
+	}
+
+	return foundKinds, foundRecords
+}
+
+// Conditions are candidates for reconciling when it matches this criteria,
+//
+// - The State for a ConditionRecord in the active-condition KV is non-final
+// - The status KV entry does not exist for the condition listed in active-condition condition
+// - The first incomplete Condition has exceeded the stale threshold
+func filterConditionsToReconcile(records []*store.ConditionRecord, serverIDs map[string]struct{}) []*v1types.ConditionUpdateEvent {
+	forUpdate := []*v1types.ConditionUpdateEvent{}
+
+	for _, cr := range records {
+		firstCond := cr.Conditions[0]
+		_, exists := serverIDs[firstCond.Target.String()]
+
+		if !exists && time.Since(firstCond.CreatedAt) > rctypes.StaleThreshold {
+			forUpdate = append(forUpdate, failedUpdateEventFromCondition(firstCond))
+		}
+	}
+
+	return forUpdate
+}
+
+func (o *Orchestrator) activeConditionsToReconcile(ctx context.Context) []*v1types.ConditionUpdateEvent {
+	// list condition records from the active-conditions KV
+	records, err := o.repository.List(ctx)
+	if err != nil {
+		o.logger.WithError(err).Error("condition record lookup error")
+	}
+
+	// returned list
+	forUpdate := []*v1types.ConditionUpdateEvent{}
+
+	// filter condition Kinds and records to be reconciled
+	filteredKinds, pendingRecords := filterPendingRecords(records)
+
+	// List Conditions in the Status KV and prepare an update payload
+	// for those to be reconciled.
+	for kind := range filteredKinds {
+		// serverIDs from conditions found in the status KV
+		serverIDs := map[string]struct{}{}
+
+		// fetch all conditions statuses for kind
+		statusEntries, err := status.GetAllConditions(kind, o.facility)
+		if err != nil {
+			o.logger.WithError(err).WithField("rctypes.kind", string(kind)).
+				Warn("reconciler error in condition status lookup")
+			continue
+		}
+
+		// parse status entries
+		for _, kve := range statusEntries {
+			evt, err := parseEventUpdateFromKV(ctx, kve, kind)
+			if err != nil {
+				o.logger.WithError(err).WithFields(logrus.Fields{
+					"rctypes.kind": string(kind),
+					"kv.key":       kve.Key(),
+				}).Warn("reconciler skipping malformed update")
+				continue
+			}
+
+			if rctypes.StateIsComplete(evt.State) {
+				continue
+			}
+
+			serverIDs[evt.ServerID.String()] = struct{}{}
+		}
+
+		// filter based on reconcile criteria
+		forUpdate = append(forUpdate, filterConditionsToReconcile(pendingRecords, serverIDs)...)
+	}
+
+	return forUpdate
+}
+
 func (o *Orchestrator) getEventsToReconcile(ctx context.Context) []*v1types.ConditionUpdateEvent {
 	// collect all events across multiple condition definitions
 	evts := []*v1types.ConditionUpdateEvent{}
@@ -499,6 +603,29 @@ func (o *Orchestrator) startReconciler(ctx context.Context, wg *sync.WaitGroup) 
 						le.WithError(err).Warn("reconciler event update")
 						continue
 					}
+
+					le.Info("condition reconciled")
+
+					if err := o.notifier.Send(evt); err != nil {
+						le.WithError(err).Warn("reconciler event notification")
+					}
+				}
+
+				// reconcile active-condition KV entries
+				evts = o.activeConditionsToReconcile(ctx)
+				for _, evt := range evts {
+					le := o.logger.WithFields(logrus.Fields{
+						"conditionID":    evt.ConditionUpdate.ConditionID.String(),
+						"conditionState": string(evt.ConditionUpdate.State),
+						"kind":           string(evt.Kind),
+					})
+
+					if err := o.eventHandler.UpdateCondition(ctx, evt); err != nil {
+						le.WithError(err).Warn("reconciler event update")
+						continue
+					}
+
+					le.Info("condition reconciled")
 
 					if err := o.notifier.Send(evt); err != nil {
 						le.WithError(err).Warn("reconciler event notification")
