@@ -25,6 +25,7 @@ import (
 
 	v1types "github.com/metal-toolbox/conditionorc/pkg/api/v1/types"
 	rctypes "github.com/metal-toolbox/rivets/condition"
+	rcontroller "github.com/metal-toolbox/rivets/events/controller"
 )
 
 var (
@@ -150,22 +151,30 @@ func TestEventNeedsReconciliation(t *testing.T) {
 	require.False(t, o.eventNeedsReconciliation(evt), "controller active")
 }
 
-func TestFilterConditionsToReconcile(t *testing.T) {
+func TestFilterToReconcile(t *testing.T) {
 	t.Parallel()
 
-	// test condition ID
+	// test server, condition ID 1
 	cid1 := uuid.New()
-	// test server ID
 	sid1 := uuid.New()
 
+	// test server, condition ID 2
+	cid2 := uuid.New()
+	sid2 := uuid.New()
+
+	// test timestamps
+	createdTS := time.Now()
+	updatedTS := createdTS.Add(1 * time.Minute)
+
 	tests := []struct {
-		name      string
-		records   []*store.ConditionRecord
-		serverIDs map[string]struct{}
-		want      []*v1types.ConditionUpdateEvent
+		name         string
+		records      []*store.ConditionRecord                 // records in active-conditions
+		updateEvents map[string]*v1types.ConditionUpdateEvent // status updates from status KV
+		wantCreates  []*rctypes.Condition                     // expected creates
+		wantUpdates  []*v1types.ConditionUpdateEvent          // expected updates
 	}{
 		{
-			name: "pending in active-conditions, not in status KV",
+			name: "pending in active-conditions and pending in status KV",
 			records: []*store.ConditionRecord{
 				{
 					ID:    cid1,
@@ -186,8 +195,47 @@ func TestFilterConditionsToReconcile(t *testing.T) {
 					},
 				},
 			},
-			serverIDs: map[string]struct{}{},
-			want: []*v1types.ConditionUpdateEvent{
+			updateEvents: map[string]*v1types.ConditionUpdateEvent{
+				sid1.String(): {
+					ConditionUpdate: v1types.ConditionUpdate{
+						ServerID: sid1,
+						State:    rctypes.Pending,
+					},
+				},
+			},
+			wantCreates: nil,
+			wantUpdates: nil,
+		},
+		{
+			name: "pending in active-conditions exceeded stale threshold and not listed in status KV",
+			records: []*store.ConditionRecord{
+				{
+					ID:    cid1,
+					State: rctypes.Pending,
+					Conditions: []*rctypes.Condition{
+						{
+							ID:     cid1,
+							Kind:   rctypes.FirmwareInstall,
+							State:  rctypes.Pending,
+							Target: sid1,
+							// exceed thresholds
+							CreatedAt: createdTS.Add(-rctypes.StaleThreshold - 2*time.Minute),
+							UpdatedAt: updatedTS.Add(-rcontroller.StatusStaleThreshold - 2*time.Minute),
+						},
+						{
+							ID:        cid1,
+							Kind:      rctypes.Inventory,
+							State:     rctypes.Pending,
+							Target:    sid1,
+							CreatedAt: createdTS.Add(-rctypes.StaleThreshold + 1),
+							UpdatedAt: time.Time{},
+						},
+					},
+				},
+			},
+			updateEvents: map[string]*v1types.ConditionUpdateEvent{},
+			wantCreates:  nil,
+			wantUpdates: []*v1types.ConditionUpdateEvent{
 				{
 					ConditionUpdate: v1types.ConditionUpdate{
 						ConditionID: cid1,
@@ -200,57 +248,140 @@ func TestFilterConditionsToReconcile(t *testing.T) {
 			},
 		},
 		{
-			name: "pending in active-conditions, pending in status KV",
+			name: "pending in active-conditions within stale threshold and not listed in status KV",
 			records: []*store.ConditionRecord{
 				{
 					ID:    cid1,
 					State: rctypes.Pending,
 					Conditions: []*rctypes.Condition{
 						{
-							ID:     cid1,
-							Kind:   rctypes.FirmwareInstall,
-							State:  rctypes.Pending,
-							Target: sid1,
+							ID:        cid1,
+							Kind:      rctypes.FirmwareInstall,
+							State:     rctypes.Pending,
+							Target:    sid1,
+							CreatedAt: createdTS,
+							UpdatedAt: updatedTS,
 						},
 						{
-							ID:     cid1,
-							Kind:   rctypes.Inventory,
-							State:  rctypes.Pending,
-							Target: sid1,
+							ID:        cid1,
+							Kind:      rctypes.Inventory,
+							State:     rctypes.Pending,
+							Target:    sid1,
+							CreatedAt: createdTS,
+							UpdatedAt: updatedTS,
 						},
 					},
 				},
 			},
-			serverIDs: map[string]struct{}{
-				sid1.String(): struct{}{},
-			},
-			want: nil,
+			updateEvents: map[string]*v1types.ConditionUpdateEvent{},
+			wantCreates:  nil,
+			wantUpdates:  nil,
 		},
 		{
-			name:    "none pending in active-conditions, pending in status KV",
-			records: nil,
-			serverIDs: map[string]struct{}{
-				sid1.String(): struct{}{},
+			name:    "not listed in active-conditions and in-complete in status KV",
+			records: []*store.ConditionRecord{},
+			updateEvents: map[string]*v1types.ConditionUpdateEvent{
+				sid1.String(): {
+					ConditionUpdate: v1types.ConditionUpdate{
+						ConditionID: cid1,
+						ServerID:    sid1,
+						State:       rctypes.Active,
+						Status:      []byte(`{"msg": "running"}`),
+						UpdatedAt:   updatedTS,
+						CreatedAt:   createdTS,
+					},
+				},
 			},
-			want: nil,
+			wantCreates: []*rctypes.Condition{
+				{
+					Version:   rctypes.ConditionStructVersion,
+					ID:        cid1,
+					Target:    sid1,
+					State:     rctypes.Active,
+					Status:    []byte(`{"msg": "running"}`),
+					UpdatedAt: updatedTS,
+					CreatedAt: createdTS,
+				},
+			},
+			wantUpdates: nil,
+		},
+		{
+			name: "multiple updates and creates",
+			records: []*store.ConditionRecord{
+				// record to be updated
+				{
+					ID:    cid1,
+					State: rctypes.Active,
+					Conditions: []*rctypes.Condition{
+						{
+							ID:     cid1,
+							Kind:   rctypes.FirmwareInstall,
+							State:  rctypes.Pending,
+							Target: sid1,
+							// thresholds on record exceeded
+							CreatedAt: createdTS.Add(-rctypes.StaleThreshold - 2*time.Minute),
+							UpdatedAt: updatedTS.Add(-rcontroller.StatusStaleThreshold - 2*time.Minute),
+						},
+					},
+				},
+			},
+			updateEvents: map[string]*v1types.ConditionUpdateEvent{
+				// expect create for event
+				sid2.String(): {
+					ConditionUpdate: v1types.ConditionUpdate{
+						ConditionID: cid2,
+						ServerID:    sid2,
+						State:       rctypes.Active,
+						Status:      []byte(`{"msg": "running"}`),
+						UpdatedAt:   updatedTS,
+						CreatedAt:   createdTS,
+					},
+				},
+			},
+			wantCreates: []*rctypes.Condition{
+				{
+					Version:   rctypes.ConditionStructVersion,
+					ID:        cid2,
+					Target:    sid2,
+					State:     rctypes.Active,
+					Status:    []byte(`{"msg": "running"}`),
+					UpdatedAt: updatedTS,
+					CreatedAt: createdTS,
+				},
+			},
+			wantUpdates: []*v1types.ConditionUpdateEvent{
+				{
+					ConditionUpdate: v1types.ConditionUpdate{
+						ConditionID: cid1,
+						ServerID:    sid1,
+						State:       rctypes.Failed,
+						Status:      failedByReconciler,
+					},
+					Kind: rctypes.FirmwareInstall,
+				},
+			},
 		},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			got := filterConditionsToReconcile(tc.records, tc.serverIDs)
-			if len(tc.want) == 0 {
-				assert.Len(t, got, 0)
-				return
+			gotCreates, gotUpdates := filterToReconcile(tc.records, tc.updateEvents)
+			if len(tc.wantCreates) == 0 {
+				assert.Len(t, gotCreates, 0)
+			} else {
+				assert.Equal(t, tc.wantCreates, gotCreates)
 			}
 
-			assert.WithinDuration(t, time.Now(), got[0].UpdatedAt, 3*time.Second)
-			// zero time value for comparision
-			got[0].UpdatedAt = time.Time{}
-			assert.Equal(t, got, tc.want)
+			if len(tc.wantUpdates) == 0 {
+				assert.Len(t, gotUpdates, 0)
+			} else {
+				assert.Len(t, gotUpdates, 1)
+				assert.WithinDuration(t, time.Now(), gotUpdates[0].UpdatedAt, 3*time.Second)
+				gotUpdates[0].UpdatedAt = time.Time{}
+				assert.Equal(t, gotUpdates, tc.wantUpdates)
+			}
 		})
 	}
-
 }
 
 func TestEventUpdateFromKV(t *testing.T) {
