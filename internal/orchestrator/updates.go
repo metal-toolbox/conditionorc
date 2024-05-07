@@ -365,24 +365,27 @@ func filterToReconcile(records []*store.ConditionRecord, updateEvts map[string]*
 	return creates, updates
 }
 
-func (o *Orchestrator) activeConditionsToReconcile(ctx context.Context) []*v1types.ConditionUpdateEvent {
+func (o *Orchestrator) activeConditionsToReconcile(ctx context.Context) ([]*rctypes.Condition, []*v1types.ConditionUpdateEvent) {
 	// list condition records from the active-conditions KV
 	records, err := o.repository.List(ctx)
 	if err != nil {
 		o.logger.WithError(err).Error("condition record lookup error")
 	}
 
-	// returned list
-	forUpdate := []*v1types.ConditionUpdateEvent{}
+	// returned in-complete status KV updates to reconcile
+	updates := []*v1types.ConditionUpdateEvent{}
+
+	// returned missing conditions from active-conditions KV to reconcile
+	creates := []*rctypes.Condition{}
 
 	// filter condition Kinds and records to be reconciled
-	filteredKinds, pendingRecords := filterPendingRecords(records)
+	filteredKinds, filteredRecords := filterIncompleteRecords(records)
 
 	// List Conditions in the Status KV and prepare an update payload
 	// for those to be reconciled.
 	for kind := range filteredKinds {
-		// serverIDs from conditions found in the status KV
-		serverIDs := map[string]struct{}{}
+		// map of serverIDs to condition updates from the status KV
+		updateEvts := map[string]*v1types.ConditionUpdateEvent{}
 
 		// fetch all conditions statuses for kind
 		statusEntries, err := status.GetAllConditions(kind, o.facility)
@@ -407,14 +410,17 @@ func (o *Orchestrator) activeConditionsToReconcile(ctx context.Context) []*v1typ
 				continue
 			}
 
-			serverIDs[evt.ServerID.String()] = struct{}{}
+			updateEvts[evt.ServerID.String()] = evt
 		}
 
+		crts, updts := filterToReconcile(filteredRecords, updateEvts)
+
 		// filter based on reconcile criteria
-		forUpdate = append(forUpdate, filterConditionsToReconcile(pendingRecords, serverIDs)...)
+		updates = append(updates, updts...)
+		creates = append(creates, crts...)
 	}
 
-	return forUpdate
+	return creates, updates
 }
 
 func (o *Orchestrator) getEventsToReconcile(ctx context.Context) []*v1types.ConditionUpdateEvent {
