@@ -306,8 +306,7 @@ func conditionFromUpdateEvent(evt *v1types.ConditionUpdateEvent) *rctypes.Condit
 	}
 }
 
-func filterIncompleteRecords(records []*store.ConditionRecord) (map[rctypes.Kind]bool, []*store.ConditionRecord) {
-	foundKinds := map[rctypes.Kind]bool{}
+func filterIncompleteRecords(records []*store.ConditionRecord) []*store.ConditionRecord {
 	foundRecords := []*store.ConditionRecord{}
 
 	for _, cr := range records {
@@ -316,12 +315,11 @@ func filterIncompleteRecords(records []*store.ConditionRecord) (map[rctypes.Kind
 		}
 
 		if !rctypes.StateIsComplete(cr.State) {
-			foundKinds[cr.Conditions[0].Kind] = true
 			foundRecords = append(foundRecords, cr)
 		}
 	}
 
-	return foundKinds, foundRecords
+	return foundRecords
 }
 
 // Method returns a slice of Conditions along with a slice of ConditionUpdateEvents which
@@ -354,7 +352,7 @@ func filterToReconcile(records []*store.ConditionRecord, updateEvts map[string]*
 	}
 
 	//  creates
-	// - The non-final Condition Status entry has no corresponding Active Condition Record.
+	// - The Condition Status entry has no corresponding Active Condition Record.
 	for serverID, updateEvt := range updateEvts {
 		_, exists := currentCRs[serverID]
 		if !exists {
@@ -372,20 +370,15 @@ func (o *Orchestrator) activeConditionsToReconcile(ctx context.Context) ([]*rcty
 		o.logger.WithError(err).Error("condition record lookup error")
 	}
 
-	// returned in-complete status KV updates to reconcile
-	updates := []*v1types.ConditionUpdateEvent{}
-
-	// returned missing conditions from active-conditions KV to reconcile
-	creates := []*rctypes.Condition{}
-
 	// filter condition Kinds and records to be reconciled
-	filteredKinds, filteredRecords := filterIncompleteRecords(records)
+	filteredRecords := filterIncompleteRecords(records)
 
-	// List Conditions in the Status KV and prepare an update payload
-	// for those to be reconciled.
-	for kind := range filteredKinds {
-		// map of serverIDs to condition updates from the status KV
-		updateEvts := map[string]*v1types.ConditionUpdateEvent{}
+	// map of serverIDs to condition updates from the status KV
+	updateEvts := map[string]*v1types.ConditionUpdateEvent{}
+
+	// List Conditions in the Status KV and prepare an update payload for those to be reconciled.
+	for _, def := range o.conditionDefs {
+		kind := def.Kind
 
 		// fetch all conditions statuses for kind
 		statusEntries, err := status.GetAllConditions(kind, o.facility)
@@ -403,24 +396,18 @@ func (o *Orchestrator) activeConditionsToReconcile(ctx context.Context) ([]*rcty
 					"rctypes.kind": string(kind),
 					"kv.key":       kve.Key(),
 				}).Warn("reconciler skipping malformed update")
-				continue
-			}
-
-			if rctypes.StateIsComplete(evt.State) {
+				// TODO:
+				// we want to handle cases where the Controller has posted a malformed update
+				// although recreating a active-condition record using just ConditionID from the
+				// status entry key is impossible - since we have no idea what the Target/ServerID is.
 				continue
 			}
 
 			updateEvts[evt.ServerID.String()] = evt
 		}
-
-		crts, updts := filterToReconcile(filteredRecords, updateEvts)
-
-		// filter based on reconcile criteria
-		updates = append(updates, updts...)
-		creates = append(creates, crts...)
 	}
 
-	return creates, updates
+	return filterToReconcile(filteredRecords, updateEvts)
 }
 
 func (o *Orchestrator) getEventsToReconcile(ctx context.Context) (evts []*v1types.ConditionUpdateEvent) {
