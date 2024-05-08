@@ -674,11 +674,26 @@ func (o *Orchestrator) reconcileActiveConditionRecords(ctx context.Context) {
 			"kind":           string(cond.Kind),
 		})
 
-		if err := o.repository.Create(ctx, cond.Target, cond); err != nil {
-			le.WithError(err).Warn("reconciler condition record create")
+		_, err := o.repository.Get(ctx, cond.Target)
+		if err != nil {
+			// create record if it doesn't exist
+			if errors.Is(err, store.ErrConditionNotFound) {
+				if errCreate := o.repository.Create(ctx, cond.Target, cond); errCreate != nil {
+					le.WithError(errCreate).Warn("reconciler condition record create")
+				}
+
+				le.Info("active-condition KV condition record reconciled - created new record")
+				continue
+			}
+
+			le.WithError(err).Warn("reconciler condition record get")
 			continue
 		}
 
-		le.Info("active-condition KV condition record reconciled")
+		// update record if it exists
+		if errUpdate := o.repository.Update(ctx, cond.Target, cond); errUpdate != nil {
+			le.WithError(errUpdate).Warn("reconciler condition record create")
+		}
+		le.Info("active-condition KV condition record reconciled - updated existing record")
 	}
 }
