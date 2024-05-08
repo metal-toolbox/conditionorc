@@ -3,6 +3,7 @@ package orchestrator
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"sync"
@@ -10,6 +11,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/metal-toolbox/conditionorc/internal/app"
+	"github.com/metal-toolbox/conditionorc/internal/model"
 	"github.com/metal-toolbox/conditionorc/internal/status"
 	"github.com/metal-toolbox/conditionorc/internal/store"
 	"github.com/nats-io/nats-server/v2/server"
@@ -123,6 +126,178 @@ func TestParseStatusKey(t *testing.T) {
 	_, err = parseStatusKVKey(badId)
 	require.Error(t, err)
 	require.ErrorIs(t, err, errConditionID)
+}
+
+func newCleanStatusKV(t *testing.T, kind rctypes.Kind) nats.KeyValue {
+	t.Helper()
+
+	sKV, err := status.GetConditionKV(kind)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	kvDeleteAll(t, sKV)
+	return sKV
+}
+
+func newCleanActiveConditionsKV(t *testing.T) nats.KeyValue {
+	t.Helper()
+
+	// active-conditions KV handle
+	acKV, err := kv.CreateOrBindKVBucket(evJS, store.ActiveConditionBucket)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	kvDeleteAll(t, acKV)
+	return acKV
+}
+
+func kvDeleteAll(t *testing.T, kv nats.KeyValue) {
+	t.Helper()
+
+	// clean up all keys for this test
+	purge, err := kv.Keys()
+	if err != nil && !errors.Is(err, nats.ErrNoKeysFound) {
+		t.Fatal(err)
+	}
+
+	for _, k := range purge {
+		if err := kv.Delete(k); err != nil && !errors.Is(err, nats.ErrKeyNotFound) {
+			t.Fatal(err)
+		}
+	}
+}
+
+func TestActiveConditionsToReconcile_Creates(t *testing.T) {
+	o := Orchestrator{
+		logger:        logger,
+		streamBroker:  evJS,
+		facility:      "fc13",
+		conditionDefs: defs,
+	}
+
+	cfg := &app.Configuration{StoreKind: model.NATS}
+	repository, err := store.NewStore(cfg, logger, evJS)
+	if err != nil {
+		t.Fatal(err)
+	}
+	o.repository = repository
+
+	// init clean status KV
+	fwsKV := newCleanStatusKV(t, rctypes.FirmwareInstall)
+	_ = newCleanActiveConditionsKV(t)
+
+	sid1 := uuid.New()
+	cid1 := uuid.New()
+	sv1 := rctypes.StatusValue{
+		Target:    sid1.String(),
+		State:     string(rctypes.Active),
+		Status:    json.RawMessage(`{"msg":"foo"}`),
+		WorkerID:  registry.GetID("test1").String(),
+		CreatedAt: time.Now().Add(-20 * time.Minute),
+	}
+
+	_, err = fwsKV.Put(fmt.Sprintf("%s.%s", o.facility, cid1), sv1.MustBytes())
+	require.NoError(t, err)
+
+	sid2 := uuid.New()
+	cid2 := uuid.New()
+	sv2 := rctypes.StatusValue{
+		Target:    sid2.String(),
+		State:     string(rctypes.Pending),
+		Status:    json.RawMessage(`{"msg":"foo"}`),
+		WorkerID:  registry.GetID("test2").String(),
+		CreatedAt: time.Now().Add(-20 * time.Minute),
+	}
+	_, err = fwsKV.Put(fmt.Sprintf("%s.%s", o.facility, cid2), sv2.MustBytes())
+	require.NoError(t, err)
+
+	// record in pending state
+	ctx := context.Background()
+	creates, updates := o.activeConditionsToReconcile(ctx)
+	assert.Len(t, creates, 2, "creates")
+	assert.Len(t, updates, 0, "updates")
+
+}
+
+func TestActiveConditionsToReconcile_Updates(t *testing.T) {
+	o := Orchestrator{
+		logger:       logger,
+		streamBroker: evJS,
+	}
+
+	cfg := &app.Configuration{StoreKind: model.NATS}
+	repository, err := store.NewStore(cfg, logger, evJS)
+	if err != nil {
+		t.Fatal(err)
+	}
+	o.repository = repository
+
+	ctx := context.Background()
+
+	// conditions to be created
+	sid := uuid.New()
+	cid := uuid.New()
+	fwcond := &rctypes.Condition{
+		ID:        cid,
+		Kind:      rctypes.FirmwareInstall,
+		State:     rctypes.Pending,
+		Target:    sid,
+		CreatedAt: time.Now(),
+	}
+
+	invcond := &rctypes.Condition{
+		ID:        cid,
+		Kind:      rctypes.Inventory,
+		State:     rctypes.Pending,
+		Target:    sid,
+		CreatedAt: time.Now(),
+	}
+
+	// active-conditions handle
+	acKV := newCleanActiveConditionsKV(t)
+
+	if err := o.repository.CreateMultiple(ctx, sid, fwcond, invcond); err != nil {
+		t.Fatal(err)
+	}
+
+	records, err := o.repository.List(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// make sure we have one record added
+	assert.Len(t, records, 1)
+
+	// record in pending state
+	creates, updates := o.activeConditionsToReconcile(ctx)
+	assert.Len(t, creates, 0, "creates")
+	assert.Len(t, updates, 0, "updates")
+
+	// get current active-condition entry
+	entry, err := acKV.Get(sid.String())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var cr store.ConditionRecord
+	if err := cr.FromJSON(entry.Value()); err != nil {
+		t.Fatal(err)
+	}
+
+	// set condition CreatedAt to across the stale threshold
+	cr.Conditions[0].CreatedAt = time.Now().Add(-20 * time.Minute)
+
+	o.repository.Update(ctx, sid, cr.Conditions[0])
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// expect updates and no creates
+	creates, updates = o.activeConditionsToReconcile(ctx)
+	assert.Len(t, creates, 0, "creates")
+	assert.Len(t, updates, 1, "updates")
 }
 
 func TestEventNeedsReconciliation(t *testing.T) {
