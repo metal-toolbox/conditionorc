@@ -131,19 +131,24 @@ func (c *ConditionUpdateEvent) Validate() error {
 //
 // This method makes sure that update does not overwrite existing data inadvertently.
 func (c *ConditionUpdate) MergeExisting(existing *rctypes.Condition) (*rctypes.Condition, error) {
-	// 1. condition must already exist for update.
+	// condition must already exist for update.
 	if existing == nil {
-		return nil, errBadUpdateTarget
+		return nil, errors.Wrap(errBadUpdateTarget, "existing condition is nil")
 	}
 
+	// condition identifier must match
 	if existing.ID != c.ConditionID {
-		// condition identifier must match
-		return nil, errBadUpdateTarget
+		return nil, errors.Wrap(errBadUpdateTarget, "Condition ID's do not match")
 	}
 
 	// transition is valid
 	if !existing.State.TransitionValid(c.State) {
 		return nil, errInvalidStateTransition
+	}
+
+	// target identifiers must match
+	if existing.Target != c.ServerID {
+		return nil, errors.Wrap(errBadUpdateTarget, "Server ID's do not match")
 	}
 
 	return &rctypes.Condition{

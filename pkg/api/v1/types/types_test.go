@@ -62,6 +62,25 @@ func TestConditionUpdate_mergeExisting(t *testing.T) {
 			errBadUpdateTarget,
 		},
 		{
+			"Server ID mismatch error",
+			&ConditionUpdate{
+				ConditionID: uuid.New(),
+				ServerID:    uuid.New(),
+				State:       rctypes.Active,
+				Status:      []byte("{'foo': 'bar'}"),
+			},
+			&rctypes.Condition{
+				ID:         uuid.New(),
+				Target:     uuid.New(),
+				Kind:       rctypes.FirmwareInstall,
+				Parameters: nil,
+				State:      rctypes.Pending,
+				Status:     []byte("{'woo': 'alala'}"),
+			},
+			nil,
+			errBadUpdateTarget,
+		},
+		{
 			"existing merged with update",
 			&ConditionUpdate{
 				ConditionID: uuid.MustParse("48e632e0-d0af-013b-9540-2cde48001122"),
@@ -93,7 +112,7 @@ func TestConditionUpdate_mergeExisting(t *testing.T) {
 			got, err := tt.update.MergeExisting(tt.existing)
 			if tt.wantErr != nil {
 				require.Error(t, err, "no error when one is expected")
-				require.Equal(t, tt.wantErr, err, "error does not match expectation")
+				require.ErrorIs(t, err, tt.wantErr, "error does not match expectation")
 			} else {
 				require.NoError(t, err, "unexpected error")
 				require.Equal(t, tt.want, got, "received does not match expected")
