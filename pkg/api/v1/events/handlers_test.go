@@ -155,7 +155,6 @@ func TestUpdateEvent(t *testing.T) {
 			).Times(1).Return(&rctypes.Condition{
 				ID:     conditionID,
 				Kind:   testKind,
-				Target: serverID,
 				State:  rctypes.Active,
 				Status: []byte(`{ "msg":"still waiting" }`),
 			}, nil),
@@ -198,7 +197,6 @@ func TestUpdateEvent(t *testing.T) {
 			).Times(1).Return(&rctypes.Condition{
 				ID:     conditionID,
 				Kind:   testKind,
-				Target: serverID,
 				State:  rctypes.Active,
 				Status: []byte(`{ "msg":"still waiting" }`),
 			}, nil),
