@@ -23,7 +23,6 @@ import (
 
 	v1types "github.com/metal-toolbox/conditionorc/pkg/api/v1/types"
 	rctypes "github.com/metal-toolbox/rivets/condition"
-	rcontroller "github.com/metal-toolbox/rivets/events/controller"
 )
 
 var (
@@ -33,8 +32,8 @@ var (
 	errConditionID     = errors.New("bad condition uuid")
 	errInvalidState    = errors.New("invalid condition state")
 	errCompleteEvent   = errors.New("unable to complete event")
-	failedByReconciler = []byte(`{ "msg": "controller failed to process this condition in time" }`)
 	reconcilerCadence  = 1 * time.Minute
+	failedByReconciler = []byte(`{ "msg": "worker failed processing this event" }`)
 )
 
 func (o *Orchestrator) startUpdateMonitor(ctx context.Context) {
@@ -301,31 +300,19 @@ func (o *Orchestrator) getEventsToReconcile(ctx context.Context) []*v1types.Cond
 				continue
 			}
 
+			metrics.ConditionInKV.With(
+				prometheus.Labels{
+					"conditionKind": string(evt.Kind),
+					"state":         string(evt.ConditionUpdate.State),
+				},
+			).Inc()
+
 			if o.eventNeedsReconciliation(evt) {
 				if !rctypes.StateIsComplete(evt.ConditionUpdate.State) {
-					failedStatus := failedByReconciler
-
-					metrics.ConditionReconcileStale.With(
-						prometheus.Labels{"conditionKind": string(evt.Kind)},
-					).Inc()
-
-					// append to existing status record when its present
-					statusRecord, err := rctypes.StatusRecordFromMessage(evt.Status)
-					if err != nil {
-						o.logger.WithError(err).WithFields(logrus.Fields{
-							"condition.id": evt.ConditionID.String(),
-							"rctypes.kind": string(kind),
-							"kv.key":       kve.Key(),
-						}).Warn("error parsing existing status record from condition")
-					} else {
-						statusRecord.Append(string(failedStatus))
-					}
-
 					// we need to deal with this event, so mark it failed
 					evt.ConditionUpdate.State = rctypes.Failed
-					evt.ConditionUpdate.Status = failedStatus
+					evt.ConditionUpdate.Status = failedByReconciler
 				}
-
 				evts = append(evts, evt)
 			}
 		}
@@ -425,46 +412,44 @@ func (o *Orchestrator) queueFollowingCondition(ctx context.Context, evt *v1types
 }
 
 func (o *Orchestrator) eventNeedsReconciliation(evt *v1types.ConditionUpdateEvent) bool {
-	// the last update should be later than the condition stale threshold
+	// the last update should be later than our internal threshold
+	// this might still be actively worked
 	if time.Since(evt.ConditionUpdate.UpdatedAt) < rctypes.StaleThreshold {
 		return false
+	}
+
+	// if the event is in a final state it should be handled
+	if rctypes.StateIsComplete(evt.ConditionUpdate.State) {
+		return true
 	}
 
 	le := o.logger.WithFields(logrus.Fields{
 		"conditionID":    evt.ConditionUpdate.ConditionID.String(),
 		"conditionState": string(evt.ConditionUpdate.State),
-		"last.update":    evt.UpdatedAt.String(),
 		"kind":           string(evt.Kind),
-		"controllerID":   evt.ControllerID, //
+		"controllerID":   evt.ControllerID.String(),
 	})
 
-	// if the event is in a final state it should be handled
-	if rctypes.StateIsComplete(evt.ConditionUpdate.State) {
-		le.Info("condition in final state")
-		return true
-	}
-
-	// if the controller has not checked in within the liveliness TTL
 	lastTime, err := registry.LastContact(evt.ControllerID)
 	if err != nil {
 		if errors.Is(err, nats.ErrKeyNotFound) {
-			le.Info("controller not registered")
 			return true
 		}
 
 		le.WithError(err).Warn("error checking registry")
-		metrics.DependencyError("nats-active-conditions", "get")
 		return false
 	}
 
-	// controller most likely dead
-	if time.Since(lastTime) > rcontroller.LivenessStaleThreshold {
-		le.WithField(
-			"last.checkin",
-			time.Since(lastTime),
-		).Info("controller not checked in time exceeded")
-		return true
-	}
+	// we don't attempt to clean up, but collect metrics on it
+	since := time.Since(lastTime)
+	le.WithFields(logrus.Fields{
+		"last.update":    evt.UpdatedAt.String(),
+		"worker.checkin": since.String(),
+	}).Debug("long running event caught by reconciler")
+
+	metrics.ConditionReconcileStale.With(
+		prometheus.Labels{"conditionKind": string(evt.Kind)},
+	).Inc()
 
 	return false
 }
