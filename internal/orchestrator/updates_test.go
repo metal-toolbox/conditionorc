@@ -11,12 +11,10 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/metal-toolbox/conditionorc/internal/status"
-	"github.com/metal-toolbox/conditionorc/internal/store"
 	"github.com/nats-io/nats-server/v2/server"
 	srvtest "github.com/nats-io/nats-server/v2/test"
 	"github.com/nats-io/nats.go"
 	"github.com/sirupsen/logrus"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.hollow.sh/toolbox/events"
 	"go.hollow.sh/toolbox/events/pkg/kv"
@@ -148,109 +146,6 @@ func TestEventNeedsReconciliation(t *testing.T) {
 
 	evt.ControllerID = liveWorker
 	require.False(t, o.eventNeedsReconciliation(evt), "controller active")
-}
-
-func TestFilterConditionsToReconcile(t *testing.T) {
-	t.Parallel()
-
-	// test condition ID
-	cid1 := uuid.New()
-	// test server ID
-	sid1 := uuid.New()
-
-	tests := []struct {
-		name      string
-		records   []*store.ConditionRecord
-		serverIDs map[string]struct{}
-		want      []*v1types.ConditionUpdateEvent
-	}{
-		{
-			name: "pending in active-conditions, not in status KV",
-			records: []*store.ConditionRecord{
-				{
-					ID:    cid1,
-					State: rctypes.Pending,
-					Conditions: []*rctypes.Condition{
-						{
-							ID:     cid1,
-							Kind:   rctypes.FirmwareInstall,
-							State:  rctypes.Pending,
-							Target: sid1,
-						},
-						{
-							ID:     cid1,
-							Kind:   rctypes.Inventory,
-							State:  rctypes.Pending,
-							Target: sid1,
-						},
-					},
-				},
-			},
-			serverIDs: map[string]struct{}{},
-			want: []*v1types.ConditionUpdateEvent{
-				{
-					ConditionUpdate: v1types.ConditionUpdate{
-						ConditionID: cid1,
-						ServerID:    sid1,
-						State:       rctypes.Failed,
-						Status:      failedByReconciler,
-					},
-					Kind: rctypes.FirmwareInstall,
-				},
-			},
-		},
-		{
-			name: "pending in active-conditions, pending in status KV",
-			records: []*store.ConditionRecord{
-				{
-					ID:    cid1,
-					State: rctypes.Pending,
-					Conditions: []*rctypes.Condition{
-						{
-							ID:     cid1,
-							Kind:   rctypes.FirmwareInstall,
-							State:  rctypes.Pending,
-							Target: sid1,
-						},
-						{
-							ID:     cid1,
-							Kind:   rctypes.Inventory,
-							State:  rctypes.Pending,
-							Target: sid1,
-						},
-					},
-				},
-			},
-			serverIDs: map[string]struct{}{
-				sid1.String(): struct{}{},
-			},
-			want: nil,
-		},
-		{
-			name:    "none pending in active-conditions, pending in status KV",
-			records: nil,
-			serverIDs: map[string]struct{}{
-				sid1.String(): struct{}{},
-			},
-			want: nil,
-		},
-	}
-
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			got := filterConditionsToReconcile(tc.records, tc.serverIDs)
-			if len(tc.want) == 0 {
-				assert.Len(t, got, 0)
-				return
-			}
-
-			assert.WithinDuration(t, time.Now(), got[0].UpdatedAt, 3*time.Second)
-			// zero time value for comparision
-			got[0].UpdatedAt = time.Time{}
-			assert.Equal(t, got, tc.want)
-		})
-	}
-
 }
 
 func TestEventUpdateFromKV(t *testing.T) {
