@@ -380,8 +380,6 @@ func (o *Orchestrator) activeConditionsToReconcile(ctx context.Context) ([]*rcty
 	records, err := o.repository.List(ctx)
 	if err != nil {
 		o.logger.WithError(err).Error("condition record lookup error")
-
-		return nil, nil
 	}
 
 	// filter condition Kinds and records to be reconciled

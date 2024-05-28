@@ -28,7 +28,6 @@ var (
 		kv.WithTTL(10 * 24 * time.Hour), // XXX: we could keep more history here, but might need more storage
 	}
 	errBadData = errors.New("bad condition data")
-	ErrList    = errors.New("list query returned error")
 )
 
 type natsStore struct {
@@ -71,7 +70,6 @@ func (n *natsStore) List(ctx context.Context) ([]*ConditionRecord, error) {
 	found := []*ConditionRecord{}
 	watcher, err := n.bucket.WatchAll(nats.IgnoreDeletes())
 	if err != nil {
-		natsError("bucket.watchAll")
 		return nil, errors.Wrap(err, "error listing all conditions")
 	}
 
