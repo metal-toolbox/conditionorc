@@ -537,8 +537,8 @@ github.com/mattn/go-sqlite3 v1.14.14/go.mod h1:NyWgC/yNuGj7Q9rpYnZvas74GogHl5/Z4
 github.com/matttproud/golang_protobuf_extensions v1.0.1/go.mod h1:D8He9yQNgCq6Z5Ld7szi9bcBfOoFv/3dc6xSMkL2PC0=
 github.com/metal-toolbox/fleetdb v0.16.9 h1:cU8izN7tTi4dnGisP43MgK2ddtbrJJ4zLLwIS3wRABw=
 github.com/metal-toolbox/fleetdb v0.16.9/go.mod h1:L2FavoKCdpewj759/MepRmbInSE0JpuSOMnXJho9u3o=
-github.com/metal-toolbox/rivets v1.0.5-0.20240423145705-d3616d0ebde4 h1:NVZ3QsNkoI91eRfONLLOSq05dsjte0dphULPyONie3U=
-github.com/metal-toolbox/rivets v1.0.5-0.20240423145705-d3616d0ebde4/go.mod h1:EMQJRT1mjIyFRXxvKNaBlz7Z4Sp88rTaGO8W18olN2I=
+github.com/metal-toolbox/rivets v1.0.1 h1:eBVN1TucrP9IzXsrs5qqcUY6qYwKN3SBjnEGSOqOmlA=
+github.com/metal-toolbox/rivets v1.0.1/go.mod h1:KyxerbVyMrt9sMYulthYvxR+1Ji9kr87RCaWucxahjw=
 github.com/microsoft/go-mssqldb v0.17.0/go.mod h1:OkoNGhGEs8EZqchVTtochlXruEhEOaO4S0d2sB5aeGQ=
 github.com/miekg/dns v1.1.26/go.mod h1:bPDLeHnStXmXAq1m/Ch/hvfNHr14JKNPMBo3VZKjuso=
 github.com/miekg/dns v1.1.41/go.mod h1:p6aan82bvRIyn+zDIv9xYNUpwa73JcSh9BKwknJysuI=
@@ -679,8 +679,6 @@ github.com/stretchr/objx v0.1.1/go.mod h1:HFkY916IF+rwdDfMAkV7OtwuqBVzrE8GR6GFx+
 github.com/stretchr/objx v0.2.0/go.mod h1:qt09Ya8vawLte6SNmTgCsAVtYtaKzEcn8ATUoHMkEqE=
 github.com/stretchr/objx v0.4.0/go.mod h1:YvHI0jy2hoMjB+UWwv71VJQ9isScKT/TqJzVSSt89Yw=
 github.com/stretchr/objx v0.5.0/go.mod h1:Yh+to48EsGEfYuaHDzXPcE3xhTkx73EhmCGUpEOglKo=
-github.com/stretchr/objx v0.5.2 h1:xuMeJ0Sdp5ZMRXx/aWO6RZxdr3beISkG5/G/aIRr3pY=
-github.com/stretchr/objx v0.5.2/go.mod h1:FRsXN1f5AsAjCGJKqEizvkpNtU+EGNCLh3NxZ/8L+MA=
 github.com/stretchr/testify v1.2.2/go.mod h1:a8OnRcib4nhh0OaRAV+Yts87kKdq0PP7pXfy6kDkUVs=
 github.com/stretchr/testify v1.3.0/go.mod h1:M5WIy9Dh21IEIfnGCwXGc5bZfKNJtfHm1UVUgZn+9EI=
 github.com/stretchr/testify v1.4.0/go.mod h1:j7eGeouHqKxXV5pUuKE4zz7dFj8WfuZ+81PSLYec5m4=
@@ -739,6 +737,10 @@ go.etcd.io/etcd/client/v2 v2.305.4/go.mod h1:Ud+VUwIi9/uQHOMA+4ekToJ12lTxlv0zB/+
 go.etcd.io/etcd/client/v3 v3.5.4/go.mod h1:ZaRkVgBZC+L+dLCjTcF1hRXpgZXQPOvnA/Ak/gq3kiY=
 go.hollow.sh/serverservice v0.16.2 h1:0wt0XJC/rm4OdovB6g8Fsx7BT2X71pG0keJiiLZaY+w=
 go.hollow.sh/serverservice v0.16.2/go.mod h1:Zr99vSFO++ZlDjEf9rtPWi3TiMgMswJCW3D6LIFmMDM=
+go.hollow.sh/toolbox v0.6.3-0.20240327092555-715da40e51b2 h1:S++g6S33y+rlgByFXNyAH9cYLFsoIx86MrMhjdomILs=
+go.hollow.sh/toolbox v0.6.3-0.20240327092555-715da40e51b2/go.mod h1:nl+5RDDyYY/+wukOUzHHX2mOyWKRjlTOXUcGxny+tns=
+go.hollow.sh/toolbox v0.6.3-0.20240327094846-c05e5e15b9f5 h1:4odze3vzXhxOy7pCAoRnrV9OytGU133DpjAFdOzfws0=
+go.hollow.sh/toolbox v0.6.3-0.20240327094846-c05e5e15b9f5/go.mod h1:nl+5RDDyYY/+wukOUzHHX2mOyWKRjlTOXUcGxny+tns=
 go.hollow.sh/toolbox v0.6.3 h1:IJOjiGdiwWwXJ2QfOkJuSucSIqrdXJbUBFst3u6T6z4=
 go.hollow.sh/toolbox v0.6.3/go.mod h1:nl+5RDDyYY/+wukOUzHHX2mOyWKRjlTOXUcGxny+tns=
 go.infratographer.com/x v0.3.9 h1:fsfF/w5zHgiNAHvYmvsWlICNha2X53WNLVSKOkyPnWo=
