@@ -469,11 +469,11 @@ func (o *Orchestrator) eventNeedsReconciliation(evt *v1types.ConditionUpdateEven
 	return false
 }
 
-func (o *Orchestrator) startReconciler(ctx context.Context, wg *sync.WaitGroup) {
-	wg.Add(1)
+func (o *Orchestrator) startReconciler(ctx context.Context) {
+	o.syncWG.Add(1)
 
 	go func() {
-		defer wg.Done()
+		defer o.syncWG.Done()
 
 		ticker := time.NewTicker(reconcilerCadence)
 		defer ticker.Stop()
