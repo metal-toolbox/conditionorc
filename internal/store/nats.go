@@ -173,10 +173,6 @@ func (n *natsStore) GetActiveCondition(ctx context.Context, serverID uuid.UUID) 
 		}
 	}
 
-	if active == nil {
-		return nil, errors.Wrap(ErrConditionNotFound, "expected an active condition")
-	}
-
 	return active, nil
 }
 
