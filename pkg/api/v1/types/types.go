@@ -73,7 +73,6 @@ type ConditionUpdate struct {
 	State       rctypes.State   `json:"state,omitempty"`
 	Status      json.RawMessage `json:"status,omitempty"`
 	UpdatedAt   time.Time       `json:"updatedAt,omitempty"`
-	CreatedAt   time.Time       `json:"createdAt,omitempty"`
 }
 
 func (c *ConditionUpdate) Validate() error {
