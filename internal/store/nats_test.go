@@ -75,7 +75,7 @@ func TestMain(m *testing.M) {
 
 	// initialize the bucket here
 	var err error
-	bucket, err = kv.CreateOrBindKVBucket(evJS, ActiveConditionBucket)
+	bucket, err = kv.CreateOrBindKVBucket(evJS, bucketName)
 	if err != nil {
 		logger.WithError(err).Fatal("kv setup")
 	}

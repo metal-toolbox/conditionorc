@@ -100,21 +100,6 @@ func (mr *MockRepositoryMockRecorder) GetActiveCondition(ctx, serverID interface
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetActiveCondition", reflect.TypeOf((*MockRepository)(nil).GetActiveCondition), ctx, serverID)
 }
 
-// List mocks base method.
-func (m *MockRepository) List(ctx context.Context) ([]*store.ConditionRecord, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "List", ctx)
-	ret0, _ := ret[0].([]*store.ConditionRecord)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// List indicates an expected call of List.
-func (mr *MockRepositoryMockRecorder) List(ctx interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "List", reflect.TypeOf((*MockRepository)(nil).List), ctx)
-}
-
 // Update mocks base method.
 func (m *MockRepository) Update(ctx context.Context, serverID uuid.UUID, condition *condition.Condition) error {
 	m.ctrl.T.Helper()
