@@ -293,20 +293,7 @@ func failedUpdateEventFromCondition(cond *rctypes.Condition) *v1types.ConditionU
 	}
 }
 
-func conditionFromUpdateEvent(evt *v1types.ConditionUpdateEvent) *rctypes.Condition {
-	return &rctypes.Condition{
-		Version:   rctypes.ConditionStructVersion,
-		ID:        evt.ConditionID,
-		Target:    evt.ServerID,
-		Kind:      evt.Kind,
-		State:     evt.State,
-		Status:    evt.Status,
-		CreatedAt: evt.CreatedAt,
-		UpdatedAt: evt.UpdatedAt,
-	}
-}
-
-func filterIncompleteRecords(records []*store.ConditionRecord) (map[rctypes.Kind]bool, []*store.ConditionRecord) {
+func filterPendingRecords(records []*store.ConditionRecord) (map[rctypes.Kind]bool, []*store.ConditionRecord) {
 	foundKinds := map[rctypes.Kind]bool{}
 	foundRecords := []*store.ConditionRecord{}
 
@@ -324,45 +311,24 @@ func filterIncompleteRecords(records []*store.ConditionRecord) (map[rctypes.Kind
 	return foundKinds, foundRecords
 }
 
-// Method returns a slice of Conditions along with a slice of ConditionUpdateEvents which
-// are to be applied to the active-condition KV.
-func filterToReconcile(records []*store.ConditionRecord, updateEvts map[string]*v1types.ConditionUpdateEvent) ([]*rctypes.Condition, []*v1types.ConditionUpdateEvent) {
-	currentCRs := map[string]struct{}{}
+// Conditions are candidates for reconciling when it matches this criteria,
+//
+// - The State for a ConditionRecord in the active-condition KV is non-final
+// - The status KV entry does not exist for the condition listed in active-condition condition
+// - The first incomplete Condition has exceeded the stale threshold
+func filterConditionsToReconcile(records []*store.ConditionRecord, serverIDs map[string]struct{}) []*v1types.ConditionUpdateEvent {
+	forUpdate := []*v1types.ConditionUpdateEvent{}
 
-	// missing conditions in active-conditions KV to be created
-	creates := []*rctypes.Condition{}
-
-	// in-complete status KV updates to be applied
-	updates := []*v1types.ConditionUpdateEvent{}
-
-	stale := func(createdAt, updatedAt time.Time) bool {
-		return time.Since(createdAt) >= rctypes.StaleThreshold &&
-			time.Since(updatedAt) >= rcontroller.StatusStaleThreshold
-	}
-
-	// updates
-	// - The status KV entry does not exist for the condition listed in active-condition condition
-	// - The first incomplete Condition has exceeded the stale threshold
 	for _, cr := range records {
 		firstCond := cr.Conditions[0]
-		currentCRs[firstCond.Target.String()] = struct{}{}
+		_, exists := serverIDs[firstCond.Target.String()]
 
-		_, exists := updateEvts[firstCond.Target.String()]
-		if !exists && stale(firstCond.CreatedAt, firstCond.UpdatedAt) {
-			updates = append(updates, failedUpdateEventFromCondition(firstCond))
+		if !exists && time.Since(firstCond.CreatedAt) > rctypes.StaleThreshold {
+			forUpdate = append(forUpdate, failedUpdateEventFromCondition(firstCond))
 		}
 	}
 
-	//  creates
-	// - The non-final Condition Status entry has no corresponding Active Condition Record.
-	for serverID, updateEvt := range updateEvts {
-		_, exists := currentCRs[serverID]
-		if !exists {
-			creates = append(creates, conditionFromUpdateEvent(updateEvt))
-		}
-	}
-
-	return creates, updates
+	return forUpdate
 }
 
 func (o *Orchestrator) activeConditionsToReconcile(ctx context.Context) []*v1types.ConditionUpdateEvent {
