@@ -570,7 +570,7 @@ func (o *Orchestrator) queueFollowingCondition(ctx context.Context, evt *v1types
 // This reconciles conditions in the Condition status KV - $condition.$facility
 func (o *Orchestrator) eventNeedsReconciliation(evt *v1types.ConditionUpdateEvent) bool {
 	// the last update should be later than the condition stale threshold
-	if time.Since(evt.ConditionUpdate.UpdatedAt) < rcontroller.StatusStaleThreshold {
+	if time.Since(evt.ConditionUpdate.UpdatedAt) < rctypes.StaleThreshold {
 		return false
 	}
 
