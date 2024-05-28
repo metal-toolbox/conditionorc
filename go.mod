@@ -11,7 +11,7 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/hashicorp/go-retryablehttp v0.7.5
 	github.com/metal-toolbox/fleetdb v0.16.9
-	github.com/metal-toolbox/rivets v1.0.5-0.20240507101451-ee305d6c8428
+	github.com/metal-toolbox/rivets v1.0.5-0.20240502123110-b4bca7161ddb
 	github.com/nats-io/nats-server/v2 v2.10.11
 	github.com/nats-io/nats.go v1.33.1
 	github.com/pkg/errors v0.9.1
