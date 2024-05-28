@@ -423,8 +423,9 @@ func (o *Orchestrator) activeConditionsToReconcile(ctx context.Context) ([]*rcty
 	return creates, updates
 }
 
-func (o *Orchestrator) getEventsToReconcile(ctx context.Context) (evts []*v1types.ConditionUpdateEvent) {
+func (o *Orchestrator) getEventsToReconcile(ctx context.Context) []*v1types.ConditionUpdateEvent {
 	// collect all events across multiple condition definitions
+	evts := []*v1types.ConditionUpdateEvent{}
 	for _, def := range o.conditionDefs {
 		kind := def.Kind
 		entries, err := status.GetAllConditions(kind, o.facility)
@@ -629,69 +630,48 @@ func (o *Orchestrator) startReconciler(ctx context.Context, wg *sync.WaitGroup) 
 				keepRunning = false
 
 			case <-ticker.C:
-				o.reconcileStatusKVEntries(ctx)
-				o.reconcileActiveConditionRecords(ctx)
+				// reconcile status KV entries
+				evts := o.getEventsToReconcile(ctx)
+				for _, evt := range evts {
+					le := o.logger.WithFields(logrus.Fields{
+						"conditionID":    evt.ConditionUpdate.ConditionID.String(),
+						"conditionState": string(evt.ConditionUpdate.State),
+						"kind":           string(evt.Kind),
+					})
+
+					if err := o.eventUpdate(ctx, evt); err != nil {
+						le.WithError(err).Warn("reconciler event update")
+						continue
+					}
+
+					le.Info("condition reconciled")
+
+					if err := o.notifier.Send(evt); err != nil {
+						le.WithError(err).Warn("reconciler event notification")
+					}
+				}
+
+				// reconcile active-condition KV entries
+				evts = o.activeConditionsToReconcile(ctx)
+				for _, evt := range evts {
+					le := o.logger.WithFields(logrus.Fields{
+						"conditionID":    evt.ConditionUpdate.ConditionID.String(),
+						"conditionState": string(evt.ConditionUpdate.State),
+						"kind":           string(evt.Kind),
+					})
+
+					if err := o.eventHandler.UpdateCondition(ctx, evt); err != nil {
+						le.WithError(err).Warn("reconciler event update")
+						continue
+					}
+
+					le.Info("condition reconciled")
+
+					if err := o.notifier.Send(evt); err != nil {
+						le.WithError(err).Warn("reconciler event notification")
+					}
+				}
 			}
 		}
 	}()
-}
-
-func (o *Orchestrator) reconcileStatusKVEntries(ctx context.Context) {
-	evts := o.getEventsToReconcile(ctx)
-	for _, evt := range evts {
-		le := o.logger.WithFields(logrus.Fields{
-			"conditionID":    evt.ConditionUpdate.ConditionID.String(),
-			"conditionState": string(evt.ConditionUpdate.State),
-			"kind":           string(evt.Kind),
-		})
-
-		if err := o.eventUpdate(ctx, evt); err != nil {
-			le.WithError(err).Warn("reconciler event update")
-			continue
-		}
-
-		le.Info("condition reconciled")
-
-		if err := o.notifier.Send(evt); err != nil {
-			le.WithError(err).Warn("reconciler event notification")
-		}
-	}
-}
-
-// reconcile active-condition KV entries for missing status KV entries and missing active-condition entries
-func (o *Orchestrator) reconcileActiveConditionRecords(ctx context.Context) {
-	creates, updates := o.activeConditionsToReconcile(ctx)
-	for _, evt := range updates {
-		le := o.logger.WithFields(logrus.Fields{
-			"conditionID":    evt.ConditionUpdate.ConditionID.String(),
-			"conditionState": string(evt.ConditionUpdate.State),
-			"kind":           string(evt.Kind),
-		})
-
-		if err := o.eventHandler.UpdateCondition(ctx, evt); err != nil {
-			le.WithError(err).Warn("reconciler event update")
-			continue
-		}
-
-		le.Info("status KV condition reconciled")
-
-		if err := o.notifier.Send(evt); err != nil {
-			le.WithError(err).Warn("reconciler event notification")
-		}
-	}
-
-	for _, cond := range creates {
-		le := o.logger.WithFields(logrus.Fields{
-			"conditionID":    cond.ID.String(),
-			"conditionState": string(cond.State),
-			"kind":           string(cond.Kind),
-		})
-
-		if err := o.repository.Create(ctx, cond.Target, cond); err != nil {
-			le.WithError(err).Warn("reconciler condition record create")
-			continue
-		}
-
-		le.Info("active-condition KV condition record reconciled")
-	}
 }
