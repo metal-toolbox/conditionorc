@@ -145,13 +145,3 @@ func RegisterSpanEvent(span trace.Span, serverID, conditionID, conditionKind, ev
 		attribute.String("conditionKind", conditionKind),
 	))
 }
-
-func RegisterSpanEventKVParseError(span trace.Span, key, serverID, conditionID, conditionKind, err string) {
-	span.AddEvent("Status KV entry parse error", trace.WithAttributes(
-		attribute.String("key", key),
-		attribute.String("serverID", serverID),
-		attribute.String("conditionID", conditionID),
-		attribute.String("conditionKind", conditionKind),
-		attribute.String("err", err),
-	))
-}

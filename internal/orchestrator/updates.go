@@ -163,8 +163,22 @@ func (o *Orchestrator) startConditionWatchers(ctx context.Context,
 						o.logger.WithError(err).WithField("rctypes.kind", string(kind)).
 							Warn("error transforming status data")
 
+						metrics.NatsKVUpdateEvent.With(
+							prometheus.Labels{
+								"conditionKind": string(evt.Kind),
+								"valid":         "false",
+							},
+						).Inc()
+
 						continue
 					}
+
+					metrics.NatsKVUpdateEvent.With(
+						prometheus.Labels{
+							"conditionKind": string(evt.Kind),
+							"valid":         "true",
+						},
+					).Inc()
 
 					evtChan <- evt
 				}
@@ -200,35 +214,10 @@ func parseStatusKVKey(key string) (*statusKey, error) {
 // parseEventUpdateFromKV converts the stored rivets.StatusValue (the value from the KV) to a
 // ConditionOrchestrator-native type that ConditionOrc can more-easily use for its
 // own purposes.
-func parseEventUpdateFromKV(ctx context.Context, kve nats.KeyValueEntry, kind rctypes.Kind) (updEvent *v1types.ConditionUpdateEvent, err error) {
-	var parsedKey *statusKey
-
-	// deferred method collects telemetry on failed kve parse errors
-	defer func() {
-		if err == nil {
-			return
-		}
-
-		var conditionID, serverID string
-		if parsedKey != nil {
-			conditionID = parsedKey.conditionID.String()
-		}
-
-		if updEvent != nil {
-			serverID = updEvent.ServerID.String()
-		}
-
-		metrics.RegisterSpanEventKVParseError(
-			trace.SpanFromContext(ctx),
-			kve.Key(),
-			serverID,
-			conditionID,
-			string(kind),
-			err.Error(),
-		)
-	}()
-
-	parsedKey, err = parseStatusKVKey(kve.Key())
+func parseEventUpdateFromKV(ctx context.Context, kve nats.KeyValueEntry,
+	kind rctypes.Kind,
+) (*v1types.ConditionUpdateEvent, error) {
+	parsedKey, err := parseStatusKVKey(kve.Key())
 	if err != nil {
 		return nil, err
 	}
@@ -268,15 +257,14 @@ func parseEventUpdateFromKV(ctx context.Context, kve nats.KeyValueEntry, kind rc
 			TraceFlags: trace.FlagsSampled,
 		})
 
-		var span trace.Span
-		ctx, span = otel.Tracer(pkgName).Start(
+		_, span := otel.Tracer(pkgName).Start(
 			trace.ContextWithRemoteSpanContext(ctx, remoteSpan),
-			"parseEventUpdateFromKV",
+			"eventUpdateFromKV",
 		)
 		defer span.End()
 	}
 
-	updEvent = &v1types.ConditionUpdateEvent{
+	updEvent := &v1types.ConditionUpdateEvent{
 		ConditionUpdate: v1types.ConditionUpdate{
 			ConditionID: parsedKey.conditionID,
 			ServerID:    serverID,
