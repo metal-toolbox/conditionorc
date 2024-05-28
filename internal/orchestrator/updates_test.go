@@ -218,15 +218,15 @@ func TestConditionListenersExit(t *testing.T) {
 		streamBroker:  evJS,
 		facility:      "test",
 		conditionDefs: defs,
+		syncWG:        &sync.WaitGroup{},
 	}
 
 	// here we're acting in place of kvStatusPublisher to make sure that we can orchestrate the watchers
 	testChan := make(chan *v1types.ConditionUpdateEvent)
 	ctx, cancel := context.WithCancel(context.TODO())
 
-	wg := &sync.WaitGroup{}
-	o.startConditionWatchers(ctx, testChan, wg)
-	o.startReconciler(ctx, wg)
+	o.startConditionWatchers(ctx, testChan, o.syncWG)
+	o.startReconciler(ctx)
 
 	sentinelChan := make(chan struct{})
 	toCtx, toCancel := context.WithTimeout(context.TODO(), time.Second)
@@ -235,7 +235,7 @@ func TestConditionListenersExit(t *testing.T) {
 	var testPassed bool
 
 	go func() {
-		wg.Wait()
+		o.syncWG.Wait()
 		testPassed = true
 		close(sentinelChan)
 	}()
