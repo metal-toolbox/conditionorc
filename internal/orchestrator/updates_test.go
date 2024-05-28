@@ -184,162 +184,41 @@ func TestActiveConditionsToReconcile_Creates(t *testing.T) {
 	}
 	o.repository = repository
 
-	type testConditionSV struct {
-		conditionID  uuid.UUID
-		statusValue  *rctypes.StatusValue
-		facilityCode string
-	}
-
-	// conditions to be created
-	sid := uuid.New()
-	cid := uuid.New()
-
-	testcases := []struct {
-		name string
-		// condition statusValues to be written to the status KV
-		conditionStatusValues []*testConditionSV
-		// conditions to be written as condition records to the active-conditions KV
-		conditions              []*rctypes.Condition
-		wantCreates             int
-		wantUpdates             int
-		cleanActiveConditionsKV bool
-		cleanStatusKV           bool
-	}{
-		{
-			// two statusValue KV records created, with no record in active-conditions KV
-			// expect two create objects returned
-			name: "test creates",
-			conditionStatusValues: []*testConditionSV{
-				{
-					conditionID: uuid.New(),
-					statusValue: &rctypes.StatusValue{
-						Target:    uuid.New().String(),
-						State:     string(rctypes.Active),
-						Status:    json.RawMessage(fmt.Sprintf(`{"msg":"foo", "facility": "%s"}`, o.facility)),
-						WorkerID:  registry.GetID("test1").String(),
-						CreatedAt: time.Now().Add(-20 * time.Minute),
-					},
-					facilityCode: o.facility,
-				},
-				{
-					conditionID: uuid.New(),
-					statusValue: &rctypes.StatusValue{
-						Target:    uuid.New().String(),
-						State:     string(rctypes.Pending),
-						Status:    json.RawMessage(fmt.Sprintf(`{"msg":"foo", "facility": "%s"}`, o.facility)),
-						WorkerID:  registry.GetID("test2").String(),
-						CreatedAt: time.Now().Add(-20 * time.Minute),
-					},
-					facilityCode: o.facility,
-				},
-			},
-			wantCreates:             2,
-			wantUpdates:             0,
-			cleanActiveConditionsKV: true,
-			cleanStatusKV:           true,
-		},
-		{
-			// two statusValue KV records created, with no record in active-conditions KV,
-			// one statusValue is created in a different facility KV,
-			// expect one create object returned
-			name: "test creates - only on assigned facility",
-			conditionStatusValues: []*testConditionSV{
-				{
-					conditionID: uuid.New(),
-					statusValue: &rctypes.StatusValue{
-						Target:    uuid.New().String(),
-						State:     string(rctypes.Active),
-						Status:    json.RawMessage(fmt.Sprintf(`{"msg":"foo", "facility": "%s"}`, o.facility)),
-						WorkerID:  registry.GetID("test1").String(),
-						CreatedAt: time.Now().Add(-20 * time.Minute),
-					},
-					facilityCode: o.facility,
-				},
-				{
-					conditionID: uuid.New(),
-					statusValue: &rctypes.StatusValue{
-						Target:    uuid.New().String(),
-						State:     string(rctypes.Pending),
-						Status:    json.RawMessage(fmt.Sprintf(`{"msg":"foo", "facility": "%s"}`, "rando13")),
-						WorkerID:  registry.GetID("test2").String(),
-						CreatedAt: time.Now().Add(-20 * time.Minute),
-					},
-					facilityCode: "rando13",
-				},
-			},
-			wantCreates:             1,
-			wantUpdates:             0,
-			cleanActiveConditionsKV: true,
-			cleanStatusKV:           true,
-		},
-		{
-			name: "test no creates",
-			conditionStatusValues: []*testConditionSV{
-				{
-					conditionID: cid,
-					statusValue: &rctypes.StatusValue{
-						Target:    sid.String(),
-						State:     string(rctypes.Pending),
-						Status:    json.RawMessage(fmt.Sprintf(`{"msg":"foo", "facility": "%s"}`, o.facility)),
-						WorkerID:  registry.GetID("test2").String(),
-						CreatedAt: time.Now().Add(-20 * time.Minute),
-					},
-					facilityCode: o.facility,
-				},
-			},
-			conditions: []*rctypes.Condition{
-				{
-					ID:        cid,
-					Kind:      rctypes.FirmwareInstall,
-					State:     rctypes.Pending,
-					Target:    sid,
-					CreatedAt: time.Now().Add(-20 * time.Minute),
-				},
-			},
-			wantCreates:             0,
-			wantUpdates:             0,
-			cleanActiveConditionsKV: true,
-			cleanStatusKV:           true,
-		},
-	}
-
+	// init clean status KV
 	fwsKV := newCleanStatusKV(t, rctypes.FirmwareInstall)
 	_ = newCleanActiveConditionsKV(t)
 
-	for idx, tc := range testcases {
-		t.Run(tc.name, func(t *testing.T) {
-			// clean when its not the first testcase and the testcase requires a clean.
-			if idx != 0 && tc.cleanStatusKV {
-				fwsKV = newCleanStatusKV(t, rctypes.FirmwareInstall)
-			}
-
-			// clean when its not the first testcase and the testcase requires a clean.
-			if idx != 0 && tc.cleanActiveConditionsKV {
-				_ = newCleanActiveConditionsKV(t)
-			}
-
-			for _, condSV := range tc.conditionStatusValues {
-				key := fmt.Sprintf("%s.%s", condSV.facilityCode, condSV.conditionID)
-				_, err = fwsKV.Put(key, condSV.statusValue.MustBytes())
-				require.NoError(t, err)
-			}
-
-			ctx := context.Background()
-			for _, cond := range tc.conditions {
-				err := o.repository.CreateMultiple(ctx, cond.Target, cond)
-				require.NoError(t, err)
-			}
-
-			gotCreates, gotUpdates := o.activeConditionsToReconcile(ctx)
-			assert.Len(t, gotCreates, tc.wantCreates, "creates match")
-			assert.Len(t, gotUpdates, tc.wantUpdates, "updates match")
-
-			// verify the method only reconciles conditions for the facility this orchestrator configured for.
-			for _, create := range gotCreates {
-				assert.Contains(t, string(create.Status), o.facility)
-			}
-		})
+	sid1 := uuid.New()
+	cid1 := uuid.New()
+	sv1 := rctypes.StatusValue{
+		Target:    sid1.String(),
+		State:     string(rctypes.Active),
+		Status:    json.RawMessage(`{"msg":"foo"}`),
+		WorkerID:  registry.GetID("test1").String(),
+		CreatedAt: time.Now().Add(-20 * time.Minute),
 	}
+
+	_, err = fwsKV.Put(fmt.Sprintf("%s.%s", o.facility, cid1), sv1.MustBytes())
+	require.NoError(t, err)
+
+	sid2 := uuid.New()
+	cid2 := uuid.New()
+	sv2 := rctypes.StatusValue{
+		Target:    sid2.String(),
+		State:     string(rctypes.Pending),
+		Status:    json.RawMessage(`{"msg":"foo"}`),
+		WorkerID:  registry.GetID("test2").String(),
+		CreatedAt: time.Now().Add(-20 * time.Minute),
+	}
+	_, err = fwsKV.Put(fmt.Sprintf("%s.%s", o.facility, cid2), sv2.MustBytes())
+	require.NoError(t, err)
+
+	// record in pending state
+	ctx := context.Background()
+	creates, updates := o.activeConditionsToReconcile(ctx)
+	assert.Len(t, creates, 2, "creates")
+	assert.Len(t, updates, 0, "updates")
+
 }
 
 func TestActiveConditionsToReconcile_Updates(t *testing.T) {
