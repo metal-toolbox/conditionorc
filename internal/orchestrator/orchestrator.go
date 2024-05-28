@@ -127,6 +127,7 @@ func New(opts ...Option) *Orchestrator {
 // Run runs the orchestrator which listens for events to action.
 func (o *Orchestrator) Run(ctx context.Context) {
 	v := version.Current()
+	var wg sync.WaitGroup
 	o.logger.WithFields(logrus.Fields{
 		"GitCommit":  v.GitCommit,
 		"GitBranch":  v.GitBranch,
@@ -134,9 +135,10 @@ func (o *Orchestrator) Run(ctx context.Context) {
 	}).Info("running orchestrator")
 	o.startWorkerLivenessCheckin(ctx)
 	o.startUpdateMonitor(ctx)
-	o.startReconciler(ctx)
+	o.startReconciler(ctx, &wg)
 
 	<-ctx.Done()
+	wg.Wait()
 	o.streamBroker.Close()
 	o.logger.Info("orchestrator shut down")
 }
