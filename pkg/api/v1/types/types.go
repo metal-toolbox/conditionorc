@@ -152,7 +152,6 @@ func (c *ConditionUpdate) MergeExisting(existing *rctypes.Condition) (*rctypes.C
 		Parameters:            existing.Parameters,
 		State:                 c.State,
 		Status:                c.Status,
-		Target:                existing.Target,
 		FailOnCheckpointError: existing.FailOnCheckpointError,
 		UpdatedAt:             c.UpdatedAt,
 		CreatedAt:             existing.CreatedAt,

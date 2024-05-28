@@ -72,14 +72,12 @@ func TestConditionUpdate_mergeExisting(t *testing.T) {
 			&rctypes.Condition{
 				Kind:       rctypes.FirmwareInstall,
 				ID:         uuid.MustParse("48e632e0-d0af-013b-9540-2cde48001122"),
-				Target:     uuid.MustParse("f2cd1ef8-c759-4049-905e-f6fdf61719a9"),
 				Parameters: nil,
 				State:      rctypes.Pending,
 				Status:     []byte("{'woo': 'alala'}"),
 			},
 			&rctypes.Condition{
 				ID:         uuid.MustParse("48e632e0-d0af-013b-9540-2cde48001122"),
-				Target:     uuid.MustParse("f2cd1ef8-c759-4049-905e-f6fdf61719a9"),
 				Kind:       rctypes.FirmwareInstall,
 				Parameters: nil,
 				State:      rctypes.Active,
