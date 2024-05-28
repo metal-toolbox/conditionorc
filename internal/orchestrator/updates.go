@@ -26,15 +26,14 @@ import (
 )
 
 var (
-	updOnce          sync.Once
-	expectedDots     = 1 // we expect keys for KV-based status updates to be facilityCode.conditionID
-	errKeyFormat     = errors.New("malformed update key")
-	errConditionID   = errors.New("bad condition uuid")
-	errInvalidState  = errors.New("invalid condition state")
-	errCompleteEvent = errors.New("unable to complete event")
-	// rivets.controllers check in every 30secs, 15 minutes a lot of time for no updates on a condition.
-	staleEventThreshold = 15 * time.Minute
-	reconcilerCadence   = 5 * time.Minute
+	updOnce             sync.Once
+	expectedDots        = 1 // we expect keys for KV-based status updates to be facilityCode.conditionID
+	errKeyFormat        = errors.New("malformed update key")
+	errConditionID      = errors.New("bad condition uuid")
+	errInvalidState     = errors.New("invalid condition state")
+	errCompleteEvent    = errors.New("unable to complete event")
+	staleEventThreshold = 30 * time.Minute
+	reconcilerCadence   = 10 * time.Minute
 	failedByReconciler  = []byte(`{ "msg": "worker failed processing this event" }`)
 )
 
@@ -78,7 +77,7 @@ func (o *Orchestrator) kvStatusPublisher(ctx context.Context) {
 			o.logger.Debug("stopping KV update listener")
 			stop = true
 
-		// retrieve and process events sent by controllers KV updates.
+		// retrieve and process events sent by controllers.
 		case evt := <-evtChan:
 			le := o.logger.WithFields(logrus.Fields{
 				"conditionID":    evt.ConditionUpdate.ConditionID.String(),
@@ -159,7 +158,7 @@ func (o *Orchestrator) startConditionWatchers(ctx context.Context,
 						"entry.key":    entry.Key(),
 					}).Debug("KV update")
 
-					evt, err := parseEventUpdateFromKV(ctx, entry, kind)
+					evt, err := eventUpdateFromKV(ctx, entry, kind)
 					if err != nil {
 						o.logger.WithError(err).WithField("rctypes.kind", string(kind)).
 							Warn("error transforming status data")
@@ -196,10 +195,10 @@ func parseStatusKVKey(key string) (*statusKey, error) {
 	}, nil
 }
 
-// parseEventUpdateFromKV converts the stored rivets.StatusValue (the value from the KV) to a
+// eventUpdateFromKV converts the stored rivets.StatusValue (the value from the KV) to a
 // ConditionOrchestrator-native type that ConditionOrc can more-easily use for its
 // own purposes.
-func parseEventUpdateFromKV(ctx context.Context, kve nats.KeyValueEntry,
+func eventUpdateFromKV(ctx context.Context, kve nats.KeyValueEntry,
 	kind rctypes.Kind,
 ) (*v1types.ConditionUpdateEvent, error) {
 	parsedKey, err := parseStatusKVKey(kve.Key())
@@ -277,7 +276,7 @@ func (o *Orchestrator) getEventsToReconcile(ctx context.Context) []*v1types.Cond
 		}
 
 		for _, kve := range entries {
-			evt, err := parseEventUpdateFromKV(ctx, kve, kind)
+			evt, err := eventUpdateFromKV(ctx, kve, kind)
 			if err != nil {
 				o.logger.WithError(err).WithFields(logrus.Fields{
 					"rctypes.kind": string(kind),
