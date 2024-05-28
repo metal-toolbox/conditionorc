@@ -196,14 +196,9 @@ func (n *natsStore) Create(ctx context.Context, serverID uuid.UUID, condition *r
 		"conditionID":   condition.ID.String(),
 	})
 
-	state := rctypes.Pending
-	if condition.State != state {
-		state = condition.State
-	}
-
 	cr := ConditionRecord{
 		ID:    condition.ID,
-		State: state,
+		State: rctypes.Pending,
 		Conditions: []*rctypes.Condition{
 			condition,
 		},
