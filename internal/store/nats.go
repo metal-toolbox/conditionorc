@@ -203,6 +203,8 @@ func (n *natsStore) Create(ctx context.Context, serverID uuid.UUID, condition *r
 		state = condition.State
 	}
 
+	condition.Target = serverID
+
 	cr := ConditionRecord{
 		ID:    condition.ID,
 		State: state,
