@@ -1,10 +1,12 @@
 package types
 
 import (
+	"encoding/json"
 	"testing"
 
 	"github.com/google/uuid"
 	rctypes "github.com/metal-toolbox/rivets/condition"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -22,6 +24,27 @@ func TestValidate(t *testing.T) {
 	require.NoError(t, update.Validate(), "should be good")
 }
 
+func TestNewCondition(t *testing.T) {
+	createCond := &ConditionCreate{
+		Parameters: json.RawMessage(`{"hello"}`),
+		Fault:      &rctypes.Fault{},
+	}
+	target := uuid.New()
+
+	created := createCond.NewCondition(rctypes.FirmwareInstall, target)
+	expected := &rctypes.Condition{
+		ID:         created.ID,
+		Target:     target,
+		Version:    rctypes.ConditionStructVersion,
+		Kind:       rctypes.FirmwareInstall,
+		State:      rctypes.Pending,
+		Parameters: createCond.Parameters,
+		Fault:      createCond.Fault,
+		CreatedAt:  created.CreatedAt,
+	}
+
+	assert.Equal(t, expected, created)
+}
 func TestConditionUpdate_mergeExisting(t *testing.T) {
 	tests := []struct {
 		name     string
