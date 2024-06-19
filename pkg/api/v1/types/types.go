@@ -12,7 +12,7 @@ import (
 )
 
 var (
-	errBadUpdateTarget        error = errors.New("no existing condition found for update")
+	errConditionMerge         error = errors.New("condition merge error")
 	errInvalidStateTransition error = errors.New("invalid state transition")
 
 	ErrUpdatePayload error = errors.New("invalid payload for update")
@@ -134,12 +134,12 @@ func (c *ConditionUpdateEvent) Validate() error {
 func (c *ConditionUpdate) MergeExisting(existing *rctypes.Condition) (*rctypes.Condition, error) {
 	// condition must already exist for update.
 	if existing == nil {
-		return nil, errors.Wrap(errBadUpdateTarget, "existing condition is nil")
+		return nil, errors.Wrap(errConditionMerge, "existing condition is nil")
 	}
 
 	// condition identifier must match
 	if existing.ID != c.ConditionID {
-		return nil, errors.Wrap(errBadUpdateTarget, "Condition ID's do not match")
+		return nil, errors.Wrap(errConditionMerge, "Condition ID in update does not match existing")
 	}
 
 	// transition is valid
@@ -149,7 +149,7 @@ func (c *ConditionUpdate) MergeExisting(existing *rctypes.Condition) (*rctypes.C
 
 	// target identifiers must match
 	if existing.Target != c.ServerID {
-		return nil, errors.Wrap(errBadUpdateTarget, "Server ID's do not match")
+		return nil, errors.Wrap(errConditionMerge, "ServerID in update does not match existing")
 	}
 
 	return &rctypes.Condition{

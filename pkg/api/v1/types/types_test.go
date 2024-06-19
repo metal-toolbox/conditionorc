@@ -58,7 +58,7 @@ func TestConditionUpdate_mergeExisting(t *testing.T) {
 			&ConditionUpdate{},
 			nil,
 			nil,
-			errBadUpdateTarget,
+			errConditionMerge,
 		},
 		{
 			"transition state invalid error",
@@ -82,7 +82,7 @@ func TestConditionUpdate_mergeExisting(t *testing.T) {
 				Status:     []byte("{'woo': 'alala'}"),
 			},
 			nil,
-			errBadUpdateTarget,
+			errConditionMerge,
 		},
 		{
 			"Server ID mismatch error",
@@ -101,7 +101,7 @@ func TestConditionUpdate_mergeExisting(t *testing.T) {
 				Status:     []byte("{'woo': 'alala'}"),
 			},
 			nil,
-			errBadUpdateTarget,
+			errConditionMerge,
 		},
 		{
 			"existing merged with update",
