@@ -116,7 +116,7 @@ func (r *Routes) serverConditionCreate(c *gin.Context) (int, *v1types.ServerResp
 		}
 	}
 
-	newCondition := conditionCreate.NewCondition(kind)
+	newCondition := conditionCreate.NewCondition(kind, serverID)
 
 	return r.conditionCreate(otelCtx, newCondition, serverID, facilityCode)
 }
@@ -259,7 +259,7 @@ func (r *Routes) serverEnroll(c *gin.Context) (int, *v1types.ServerResponse) {
 		panic(err)
 	}
 	conditionCreate.Parameters = inventoryParams
-	newCondition := conditionCreate.NewCondition(rctypes.Inventory)
+	newCondition := conditionCreate.NewCondition(rctypes.Inventory, serverID)
 
 	st, resp := r.conditionCreate(otelCtx, newCondition, serverID, params.Facility)
 	if st != http.StatusOK {
