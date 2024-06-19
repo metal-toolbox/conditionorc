@@ -54,9 +54,10 @@ func (asp *AddServerParams) MustJSON() []byte {
 }
 
 // NewCondition returns a new Condition type.
-func (c *ConditionCreate) NewCondition(kind rctypes.Kind) *rctypes.Condition {
+func (c *ConditionCreate) NewCondition(kind rctypes.Kind, target uuid.UUID) *rctypes.Condition {
 	return &rctypes.Condition{
 		ID:         uuid.New(),
+		Target:     target,
 		Version:    rctypes.ConditionStructVersion,
 		Kind:       kind,
 		State:      rctypes.Pending,
