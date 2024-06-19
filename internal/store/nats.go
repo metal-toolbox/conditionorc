@@ -169,7 +169,7 @@ func (n *natsStore) GetActiveCondition(ctx context.Context, serverID uuid.UUID) 
 			le.WithFields(logrus.Fields{
 				"condition.id":    cond.ID,
 				"condition.state": string(cond.State),
-			}).Debug("found active condition for server")
+			}).Trace("found active condition for server")
 			active = cond
 			break
 		}
