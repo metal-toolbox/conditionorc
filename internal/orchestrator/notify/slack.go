@@ -44,7 +44,7 @@ func (ss *slackSender) Send(upd *v1types.ConditionUpdateEvent) error {
 		"conditionID": upd.ConditionUpdate.ConditionID.String(),
 	})
 
-	le.Debug("sending slack notification")
+	le.Trace("sending slack notification")
 
 	// cap the time we're willing to wait for Slack
 	ctx, cancel := context.WithTimeout(context.Background(), postTimeout)
