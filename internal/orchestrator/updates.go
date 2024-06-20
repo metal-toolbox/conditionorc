@@ -156,7 +156,7 @@ func (o *Orchestrator) startConditionWatchers(ctx context.Context,
 					o.logger.WithFields(logrus.Fields{
 						"rctypes.kind": string(kind),
 						"entry.key":    entry.Key(),
-					}).Debug("KV update")
+					}).Trace("KV update")
 
 					evt, err := parseEventUpdateFromKV(ctx, entry, kind)
 					if err != nil {
