@@ -408,7 +408,7 @@ func TestActiveConditionsToReconcile_Updates(t *testing.T) {
 	}
 
 	// set condition CreatedAt to across the stale threshold
-	cr.Conditions[0].CreatedAt = time.Now().Add(-20 * time.Minute)
+	cr.Conditions[0].CreatedAt = time.Now().Add(-1 * rctypes.StaleThreshold)
 
 	o.repository.Update(ctx, sid, cr.Conditions[0])
 	if err != nil {
@@ -436,7 +436,7 @@ func TestEventNeedsReconciliation(t *testing.T) {
 	}
 	require.False(t, o.eventNeedsReconciliation(evt), "Condition UpdatedAt")
 
-	evt.UpdatedAt = time.Now().Add(-90 * time.Minute)
+	evt.UpdatedAt = time.Now().Add(-1 * rctypes.StaleThreshold)
 	evt.ConditionUpdate.State = rctypes.Failed
 	require.True(t, o.eventNeedsReconciliation(evt), "Condition finalized")
 
