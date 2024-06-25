@@ -5,22 +5,22 @@ jobs:
   lint-test:
     runs-on: ubuntu-latest
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-    - name: Install Go
-      uses: actions/setup-go@v4
-      with:
-        go-version-file: go.mod
+      - name: Install Go
+        uses: actions/setup-go@v4
+        with:
+          go-version-file: go.mod
 
-    - name: golangci-lint
-      uses: golangci/golangci-lint-action@v3
-      with:
-        args: --config .golangci.yml --timeout 2m
-        version: v1.56.2
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v5
+        with:
+          args: --config .golangci.yml --timeout 2m
+          version: v1.56.2
 
-    - name: Test
-      run: go test ./...
+      - name: Test
+        run: go test ./...
 
   build:
     runs-on: ubuntu-latest
@@ -44,10 +44,10 @@ jobs:
         id: dockerbuild-conditionorc
         uses: docker/build-push-action@v5
         with:
-           context: .
-           push: false
-           tags: ghcr.io/metal-toolbox/conditionorc:latest
-           file: Dockerfile
+          context: .
+          push: false
+          tags: ghcr.io/metal-toolbox/conditionorc:latest
+          file: Dockerfile
 
       - name: Scan image
         id: scan-image
