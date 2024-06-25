@@ -18,6 +18,7 @@ jobs:
         with:
           args: --config .golangci.yml --timeout 2m
           version: v1.56.2
+          skip-cache: true
 
       - name: Test
         run: go test ./...
