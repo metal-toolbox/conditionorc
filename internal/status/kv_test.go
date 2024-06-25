@@ -25,6 +25,8 @@ func startJetStreamServer(t *testing.T) *server.Server {
 	opts := srvtest.DefaultTestOptions
 	opts.Port = -1
 	opts.JetStream = true
+	opts.StoreDir = t.TempDir()
+
 	return srvtest.RunServer(&opts)
 }
 

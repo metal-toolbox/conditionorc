@@ -44,10 +44,14 @@ func init() {
 	logrus.SetFormatter(&logrus.JSONFormatter{})
 }
 
-func startJetStreamServer() *server.Server {
+func startJetStreamServer(t *testing.T) *server.Server {
+	t.Helper()
+
 	opts := srvtest.DefaultTestOptions
 	opts.Port = -1
 	opts.JetStream = true
+	opts.StoreDir = t.TempDir()
+
 	return srvtest.RunServer(&opts)
 }
 
@@ -63,17 +67,9 @@ func jetStreamContext(s *server.Server) (*nats.Conn, nats.JetStreamContext) {
 	return nc, js
 }
 
-func shutdownJetStream(s *server.Server) {
-	var sd string
-	if config := s.JetStreamConfig(); config != nil {
-		sd = config.StoreDir
-	}
+func shutdownJetStream(t *testing.T, s *server.Server) {
+	t.Helper()
 	s.Shutdown()
-	if sd != "" {
-		if err := os.RemoveAll(sd); err != nil {
-			logger.Fatalf("Unable to remove storage %q: %v", sd, err)
-		}
-	}
 	s.WaitForShutdown()
 }
 
@@ -81,8 +77,9 @@ func shutdownJetStream(s *server.Server) {
 func TestMain(m *testing.M) {
 	logger = logrus.New()
 
-	srv := startJetStreamServer()
-	defer shutdownJetStream(srv)
+	t := &testing.T{}
+	srv := startJetStreamServer(t)
+	defer shutdownJetStream(t, srv)
 	nc, js = jetStreamContext(srv) // nc is closed on evJS.Close(), js needs no cleanup
 	evJS = events.NewJetstreamFromConn(nc)
 	defer evJS.Close()
