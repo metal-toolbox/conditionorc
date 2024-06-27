@@ -1,4 +1,4 @@
-FROM golang:1.21.3-alpine3.18 AS build
+FROM golang:1.22-alpine3.20 AS build
 
 WORKDIR /go/src/github.com/metal-toolbox/conditionorc
 COPY go.mod go.sum ./
@@ -21,7 +21,7 @@ RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o /usr/sbin/conditionorc \
 -X ${LDFLAG_LOCATION}.AppVersion=${VERSION} \
 -X ${LDFLAG_LOCATION}.BuildDate=${BUILD_DATE}"
 
-FROM alpine:3.19.0
+FROM alpine:3.20.1
 RUN apk -U add curl
 
 COPY --from=build /usr/sbin/conditionorc /usr/sbin/
