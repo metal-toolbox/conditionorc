@@ -284,7 +284,7 @@ func (r *Routes) serverEnroll(c *gin.Context) (int, *v1types.ServerResponse) {
 // @Router /servers/{uuid}/firmwareInstall [post]
 func (r *Routes) firmwareInstall(c *gin.Context) (int, *v1types.ServerResponse) {
 	id := c.Param("uuid")
-	otelCtx, span := otel.Tracer(pkgName).Start(c.Request.Context(), "Routes.serverEnroll")
+	otelCtx, span := otel.Tracer(pkgName).Start(c.Request.Context(), "Routes.firmwareInstall")
 	span.SetAttributes(attribute.KeyValue{Key: "serverId", Value: attribute.StringValue(id)})
 	defer span.End()
 
