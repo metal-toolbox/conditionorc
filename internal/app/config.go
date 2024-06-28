@@ -153,6 +153,20 @@ var (
 	defaultNatsConnectTimeout = 100 * time.Millisecond
 )
 
+func (a *App) OidcEnabled() bool {
+	if a.v.GetBool("oidc.enabled") {
+		if len(a.Config.APIServerJWTAuth) == 0 {
+			a.Logger.Fatal("OIDC enabled without configuration")
+		}
+		a.Logger.Info("OIDC enabled")
+
+		return true
+	}
+
+	a.Logger.Info("OIDC disabled")
+	return false
+}
+
 func (a *App) apiServerJWTAuthParams() error {
 	if !a.v.GetBool("oidc.enabled") {
 		return nil

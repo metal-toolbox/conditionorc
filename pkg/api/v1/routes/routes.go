@@ -29,12 +29,15 @@ var ginNoOp = func(_ *gin.Context) {
 
 // Routes type sets up the conditionorc API  router routes.
 type Routes struct {
-	authMW               *ginauth.MultiTokenMiddleware
-	fleetDBClient        fleetdb.FleetDB
-	repository           store.Repository
-	streamBroker         events.Stream
-	conditionDefinitions rctypes.Definitions
-	logger               *logrus.Logger
+	enableServerReservation bool
+	facilityCode            string
+	authMW                  *ginauth.MultiTokenMiddleware
+	fleetDBClient           fleetdb.FleetDB
+	repository              store.Repository
+	streamBroker            events.Stream
+	streamSubjectPrefix     string
+	conditionDefinitions    rctypes.Definitions
+	logger                  *logrus.Logger
 }
 
 // Option type sets a parameter on the Routes type.
@@ -55,9 +58,10 @@ func WithFleetDBClient(client fleetdb.FleetDB) Option {
 }
 
 // WithStreamBroker sets the event stream broker.
-func WithStreamBroker(broker events.Stream) Option {
+func WithStreamBroker(broker events.Stream, streamSubjectPrefix string) Option {
 	return func(r *Routes) {
 		r.streamBroker = broker
+		r.streamSubjectPrefix = streamSubjectPrefix
 	}
 }
 
@@ -79,6 +83,18 @@ func WithAuthMiddleware(authMW *ginauth.MultiTokenMiddleware) Option {
 func WithConditionDefinitions(defs rctypes.Definitions) Option {
 	return func(r *Routes) {
 		r.conditionDefinitions = defs
+	}
+}
+
+func WithServerReservationEnabled(b bool) Option {
+	return func(r *Routes) {
+		r.enableServerReservation = b
+	}
+}
+
+func WithFacilityCode(fc string) Option {
+	return func(r *Routes) {
+		r.facilityCode = fc
 	}
 }
 
@@ -155,6 +171,39 @@ func (r *Routes) Routes(g *gin.RouterGroup) {
 			r.composeAuthHandler(createScopes("condition")),
 			wrapAPICall(r.serverConditionCreate))
 	}
+}
+
+func (r *Routes) RoutesOrchestrator(g *gin.RouterGroup) {
+	controller := g.Group("/servers/:uuid")
+	controller.GET(
+		"/condition-queue/:conditionKind",
+		r.composeAuthHandler(readScopes("conditionQueuePop")),
+		wrapAPICall(r.conditionQueuePop),
+	)
+
+	controller.PUT(
+		"/condition-status/:conditionKind/:conditionID",
+		r.composeAuthHandler(createScopes("statusUpdate")),
+		wrapAPICall(r.conditionStatusUpdate),
+	)
+
+	controller.GET(
+		"/controller-checkin/:conditionID",
+		r.composeAuthHandler(createScopes("checkin")),
+		wrapAPICall(r.livenessCheckin),
+	)
+
+	controller.GET(
+		"/condition-task/:conditionKind",
+		r.composeAuthHandler(createScopes("taskQuery")),
+		wrapAPICall(r.taskQuery),
+	)
+
+	controller.POST(
+		"/condition-task/:conditionKind/:conditionID",
+		r.composeAuthHandler(createScopes("taskPublish")),
+		wrapAPICall(r.taskPublish),
+	)
 }
 
 func createScopes(items ...string) []string {

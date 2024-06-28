@@ -269,6 +269,77 @@ func (r *Routes) serverEnroll(c *gin.Context) (int, *v1types.ServerResponse) {
 	return st, resp
 }
 
+func (r *Routes) firmwareInstallComposite(serverID uuid.UUID, fwtp rctypes.FirmwareInstallTaskParameters) *rctypes.ServerConditions {
+	createTime := time.Now()
+
+	acquireCond := &rctypes.Condition{
+		Kind:    rctypes.BrokerAcquireServer,
+		Version: rctypes.ConditionStructVersion,
+		Parameters: rctypes.NewBrokerTaskParameters(
+			serverID,
+			rctypes.AcquireServer,
+			rctypes.PurposeFirmwareInstall,
+			"Marked for firmware install",
+		).MustMarshal(),
+		State:     rctypes.Pending,
+		CreatedAt: createTime,
+	}
+
+	// set PXE boot always &&
+	// set power cycle server
+
+	fwInbCondition := &rctypes.Condition{
+		Kind:       rctypes.FirmwareInstallInband,
+		Version:    rctypes.ConditionStructVersion,
+		Parameters: fwtp.MustJSON(),
+		State:      rctypes.Pending,
+		CreatedAt:  createTime,
+	}
+
+	fwOobCondition := &rctypes.Condition{
+		Kind:       rctypes.FirmwareInstall,
+		Version:    rctypes.ConditionStructVersion,
+		Parameters: fwtp.MustJSON(),
+		State:      rctypes.Pending,
+		CreatedAt:  createTime,
+	}
+
+	invCondition := &rctypes.Condition{
+		Kind:       rctypes.Inventory,
+		Version:    rctypes.ConditionStructVersion,
+		Parameters: rctypes.MustDefaultInventoryJSON(serverID),
+		State:      rctypes.Pending,
+		CreatedAt:  createTime,
+	}
+
+	releaseCond := &rctypes.Condition{
+		Kind:    rctypes.BrokerReleaseServer,
+		Version: rctypes.ConditionStructVersion,
+		Parameters: rctypes.NewBrokerTaskParameters(
+			serverID,
+			rctypes.ReleaseServer,
+			"",
+			"Firmware install process completed",
+		).MustMarshal(),
+		State:     rctypes.Pending,
+		CreatedAt: createTime,
+	}
+
+	// un-set PXE boot always &&
+	// power cycle server
+
+	serverConditions := &rctypes.ServerConditions{}
+	if r.enableServerReservation {
+		serverConditions.Conditions = append(serverConditions.Conditions, acquireCond, fwInbCondition, fwOobCondition, invCondition, releaseCond)
+		//serverConditions.Conditions = append(serverConditions.Conditions, acquireCond, fwInbCondition, releaseCond)
+	} else {
+		//	serverConditions.Conditions = append(serverConditions.Conditions, fwOobCondition, invCondition)
+		serverConditions.Conditions = append(serverConditions.Conditions, fwOobCondition)
+	}
+
+	return serverConditions
+}
+
 // @Summary Firmware Install
 // @Tag Conditions
 // @Description Installs firmware on a device and validates with a subsequent inventory
@@ -284,7 +355,7 @@ func (r *Routes) serverEnroll(c *gin.Context) (int, *v1types.ServerResponse) {
 // @Router /servers/{uuid}/firmwareInstall [post]
 func (r *Routes) firmwareInstall(c *gin.Context) (int, *v1types.ServerResponse) {
 	id := c.Param("uuid")
-	otelCtx, span := otel.Tracer(pkgName).Start(c.Request.Context(), "Routes.serverEnroll")
+	otelCtx, span := otel.Tracer(pkgName).Start(c.Request.Context(), "Routes.firmwareInstall")
 	span.SetAttributes(attribute.KeyValue{Key: "serverId", Value: attribute.StringValue(id)})
 	defer span.End()
 
@@ -313,27 +384,11 @@ func (r *Routes) firmwareInstall(c *gin.Context) (int, *v1types.ServerResponse) 
 		}
 	}
 
-	createTime := time.Now()
-
-	fwCondition := &rctypes.Condition{
-		Kind:                  rctypes.FirmwareInstall,
-		Version:               rctypes.ConditionStructVersion,
-		Parameters:            fw.MustJSON(),
-		State:                 rctypes.Pending,
-		FailOnCheckpointError: true,
-		CreatedAt:             createTime,
-	}
-
-	invCondition := &rctypes.Condition{
-		Kind:                  rctypes.Inventory,
-		Version:               rctypes.ConditionStructVersion,
-		Parameters:            rctypes.MustDefaultInventoryJSON(serverID),
-		State:                 rctypes.Pending,
-		FailOnCheckpointError: true,
-		CreatedAt:             createTime,
-	}
-
-	if err = r.repository.CreateMultiple(otelCtx, serverID, fwCondition, invCondition); err != nil {
+	// TODO: the client needs to pass in if the server should be acquired as a parameter in the Condition
+	// since this method only accepts FirmwareInstallTaskParameters, we're unable to pass that value in here.
+	// Can this be generalized to function under ConditionCreate instead?
+	serverConditions := r.firmwareInstallComposite(serverID, fw)
+	if err = r.repository.CreateMultiple(otelCtx, serverID, serverConditions.Conditions...); err != nil {
 		if errors.Is(err, store.ErrActiveCondition) {
 			return http.StatusConflict, &v1types.ServerResponse{
 				Message: err.Error(),
@@ -345,12 +400,12 @@ func (r *Routes) firmwareInstall(c *gin.Context) (int, *v1types.ServerResponse) 
 		}
 	}
 
-	if err = r.publishCondition(otelCtx, serverID, facilityCode, fwCondition); err != nil {
+	if err = r.publishCondition(otelCtx, serverID, facilityCode, serverConditions.Conditions[0], false); err != nil {
 		r.logger.WithError(err).Warn("publishing firmware-install condition")
 		// mark firmwareInstall as failed
-		fwCondition.State = rctypes.Failed
-		fwCondition.Status = failedPublishStatus
-		if markErr := r.repository.Update(otelCtx, serverID, fwCondition); markErr != nil {
+		serverConditions.Conditions[0].State = rctypes.Failed
+		serverConditions.Conditions[0].Status = failedPublishStatus
+		if markErr := r.repository.Update(otelCtx, serverID, serverConditions.Conditions[0]); markErr != nil {
 			// an operator is going to have to sort this out
 			r.logger.WithError(err).Warn("marking unpublished condition failed")
 		}
@@ -366,12 +421,9 @@ func (r *Routes) firmwareInstall(c *gin.Context) (int, *v1types.ServerResponse) 
 	return http.StatusOK, &v1types.ServerResponse{
 		Message: "firmware install scheduled",
 		Records: &v1types.ConditionsResponse{
-			ServerID: serverID,
-			State:    rctypes.Pending,
-			Conditions: []*rctypes.Condition{
-				fwCondition,
-				invCondition,
-			},
+			ServerID:   serverID,
+			State:      rctypes.Pending,
+			Conditions: serverConditions.Conditions,
 		},
 	}
 }
@@ -388,7 +440,7 @@ func (r *Routes) conditionCreate(otelCtx context.Context, newCondition *rctypes.
 	}
 
 	// publish the condition and in case of publish failure - revert.
-	err = r.publishCondition(otelCtx, serverID, facilityCode, newCondition)
+	err = r.publishCondition(otelCtx, serverID, facilityCode, newCondition, false)
 	if err != nil {
 		r.logger.WithError(err).Warn("condition create failed to publish")
 
@@ -453,7 +505,12 @@ func RegisterSpanEvent(span trace.Span, serverID, conditionID, conditionKind, ev
 	))
 }
 
-func (r *Routes) publishCondition(ctx context.Context, serverID uuid.UUID, facilityCode string, publishCondition *rctypes.Condition) error {
+// returns the stream subject to publish the condition on for controllers
+func (r *Routes) streamSubject(facilityCode string, conditionKind rctypes.Kind) string {
+	return fmt.Sprintf("%s.servers.%s", facilityCode, conditionKind)
+}
+
+func (r *Routes) publishCondition(ctx context.Context, serverID uuid.UUID, facilityCode string, publishCondition *rctypes.Condition, rollup bool) error {
 	errPublish := errors.New("error publishing condition")
 
 	otelCtx, span := otel.Tracer(pkgName).Start(
@@ -480,22 +537,23 @@ func (r *Routes) publishCondition(ctx context.Context, serverID uuid.UUID, facil
 		return errors.Wrap(errPublish, "condition marshal error: "+err.Error())
 	}
 
-	subjectSuffix := fmt.Sprintf("%s.servers.%s", facilityCode, publishCondition.Kind)
 	if err := r.streamBroker.Publish(
 		otelCtx,
-		subjectSuffix,
+		r.streamSubject(facilityCode, publishCondition.Kind),
 		byt,
+		rollup,
 	); err != nil {
 		return errors.Wrap(errPublish, err.Error())
 	}
 
 	r.logger.WithFields(
 		logrus.Fields{
-			"serverID":     serverID,
-			"facilityCode": facilityCode,
-			"conditionID":  publishCondition.ID,
+			"serverID":      serverID,
+			"facilityCode":  facilityCode,
+			"conditionID":   publishCondition.ID,
+			"conditionKind": publishCondition.Kind,
 		},
-	).Trace("condition published")
+	).Info("condition published")
 
 	return nil
 }

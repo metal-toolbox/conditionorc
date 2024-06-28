@@ -2,16 +2,20 @@ package cmd
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
+	"net/http"
 
 	"github.com/equinix-labs/otel-init-go/otelinit"
 
 	"github.com/metal-toolbox/conditionorc/internal/app"
+	"github.com/metal-toolbox/conditionorc/internal/fleetdb"
 	"github.com/metal-toolbox/conditionorc/internal/metrics"
 	"github.com/metal-toolbox/conditionorc/internal/model"
 	"github.com/metal-toolbox/conditionorc/internal/orchestrator"
 	"github.com/metal-toolbox/conditionorc/internal/orchestrator/notify"
+	"github.com/metal-toolbox/conditionorc/internal/server"
 	"github.com/metal-toolbox/conditionorc/internal/store"
 	"github.com/metal-toolbox/conditionorc/internal/version"
 	"github.com/spf13/cobra"
@@ -62,9 +66,40 @@ var cmdOrchestrator = &cobra.Command{
 			app.Logger.Fatal(err)
 		}
 
+		// Orchestrator API server
+		fleetDBClient, err := fleetdb.NewFleetDBClient(ctx, app.Config, app.Config.ConditionDefinitions, app.Logger)
+		if err != nil {
+			app.Logger.Fatal(err)
+		}
+
+		optionsSrv := []server.Option{
+			server.WithLogger(app.Logger),
+			server.WithListenAddress(app.Config.ListenAddress),
+			server.WithStore(repository),
+			server.WithFleetDBClient(fleetDBClient),
+			server.WithStreamBroker(streamBroker, app.Config.NatsOptions.PublisherSubjectPrefix),
+			server.WithConditionDefinitions(app.Config.ConditionDefinitions),
+			server.WithAsOrchestrator(),
+			server.WithFacilityCode(facility),
+		}
+
+		if app.OidcEnabled() {
+			optionsSrv = append(optionsSrv, server.WithAuthMiddlewareConfig(app.Config.APIServerJWTAuth))
+		}
+
+		app.Logger.Info(version.Current().String())
+
+		srv := server.New(optionsSrv...)
+		go func() {
+			if err := srv.ListenAndServe(); err != nil && errors.Is(err, http.ErrServerClosed) {
+				app.Logger.Fatal(err)
+			}
+		}()
+
+		// Orchestrator
 		notifier := notify.New(app.Logger, app.Config.Notifications)
 
-		options := []orchestrator.Option{
+		optionsOrc := []orchestrator.Option{
 			orchestrator.WithLogger(app.Logger),
 			orchestrator.WithListenAddress(app.Config.ListenAddress),
 			orchestrator.WithStore(repository),
@@ -78,13 +113,20 @@ var cmdOrchestrator = &cobra.Command{
 			app.Logger.WithField("replication",
 				fmt.Sprintf("%d", app.Config.NatsOptions.KVReplicationFactor)).
 				Info("configuring status KV support")
-			options = append(options, orchestrator.WithReplicas(app.Config.NatsOptions.KVReplicationFactor))
+			optionsOrc = append(optionsOrc, orchestrator.WithReplicas(app.Config.NatsOptions.KVReplicationFactor))
 		}
 
 		app.Logger.Info(version.Current().String())
 
-		orc := orchestrator.New(options...)
+		orc := orchestrator.New(optionsOrc...)
 		orc.Run(ctx)
+
+		// shutdown server when orchestrator Run method returns
+		ctx, cancel := context.WithTimeout(cmd.Context(), shutdownTimeout)
+		defer cancel()
+		if err := srv.Shutdown(ctx); err != nil {
+			app.Logger.Fatal("server shutdown error:", err)
+		}
 	},
 }
 

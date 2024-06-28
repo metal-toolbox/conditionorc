@@ -3,7 +3,6 @@ package orchestrator
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"strings"
 	"sync"
 	"time"
@@ -499,7 +498,7 @@ func (o *Orchestrator) eventUpdate(ctx context.Context, evt *v1types.ConditionUp
 			"condition.kind": evt.Kind,
 		}).Warn("removing completed condition data")
 
-		metrics.DependencyError("nats", "remove completed condition condition")
+		metrics.DependencyError("nats", "remove completed condition status")
 
 		return errors.Wrap(errCompleteEvent, delErr.Error())
 	}
@@ -511,6 +510,23 @@ func (o *Orchestrator) eventUpdate(ctx context.Context, evt *v1types.ConditionUp
 		},
 	).Inc()
 
+	// TODO: we'd want to keep task data around, and let it be cleaned up by the reconciler or the key TTL
+	// for this events/controllers needs to purge a Task if it currently exists.
+	//
+	// for now the task deletion error is informative, since not all controllers use Tasks as yet.
+	delTaskErr := status.DeleteTask(o.facility, evt.Kind, evt.ConditionUpdate.ServerID.String())
+	if delTaskErr != nil {
+		o.logger.WithError(delErr).WithFields(logrus.Fields{
+			"condition.id":   evt.ConditionUpdate.ConditionID,
+			"server.id":      evt.ConditionUpdate.ServerID,
+			"condition.kind": evt.Kind,
+		}).Warn("removing completed condition data")
+
+		metrics.DependencyError("nats", "remove completed condition task")
+
+		//	return errors.Wrap(errCompleteEvent, delErr.Error())
+	}
+
 	// queue any follow-on work as required
 	return o.queueFollowingCondition(ctx, evt)
 }
@@ -519,6 +535,10 @@ func (o *Orchestrator) eventUpdate(ctx context.Context, evt *v1types.ConditionUp
 func (o *Orchestrator) queueFollowingCondition(ctx context.Context, evt *v1types.ConditionUpdateEvent) error {
 	active, err := o.repository.GetActiveCondition(ctx, evt.ConditionUpdate.ServerID)
 	if err != nil && errors.Is(err, store.ErrConditionNotFound) {
+		o.logger.WithError(err).WithFields(logrus.Fields{
+			"condition.id": evt.ConditionUpdate.ConditionID,
+			"server.id":    evt.ConditionUpdate.ServerID,
+		}).Debug("no further conditions to be queued")
 		// nothing more to do
 		return nil
 	}
@@ -540,13 +560,18 @@ func (o *Orchestrator) queueFollowingCondition(ctx context.Context, evt *v1types
 	// lose the race to publish the next one, but it's possible I suppose.
 	if active != nil && active.State == rctypes.Pending {
 		byt := active.MustBytes()
-		subject := fmt.Sprintf("%s.servers.%s", o.facility, active.Kind)
-		err := o.streamBroker.Publish(ctx, subject, byt)
+
+		// TODO: move this into condition definitions
+		// or should move all conditions to be published with the serverID suffix
+		rollup := (active.Kind == rctypes.FirmwareInstallInband)
+
+		err := o.streamBroker.Publish(ctx, active.StreamPublishSubject(o.facility), byt, rollup)
 		if err != nil {
 			o.logger.WithError(err).WithFields(logrus.Fields{
 				"condition.id":   active.ID,
 				"server.id":      evt.ConditionUpdate.ServerID,
 				"condition.kind": active.Kind,
+				"stream.subject": active.StreamPublishSubject(o.facility),
 			}).Warn("publishing next active condition")
 
 			metrics.DependencyError("nats", "publish-condition")
@@ -562,6 +587,7 @@ func (o *Orchestrator) queueFollowingCondition(ctx context.Context, evt *v1types
 			"condition.id":   active.ID,
 			"server.id":      evt.ConditionUpdate.ServerID,
 			"condition.kind": active.Kind,
+			"stream.subject": active.StreamPublishSubject(o.facility),
 		}).Debug("published next condition in chain")
 	}
 

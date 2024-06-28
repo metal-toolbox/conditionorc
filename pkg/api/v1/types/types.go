@@ -26,15 +26,17 @@ type ServerResponse struct {
 
 // ConditionsResponse is the response returned for listing multiple conditions on a server.
 type ConditionsResponse struct {
-	ServerID   uuid.UUID            `json:"serverID,omitempty"`
-	State      rctypes.State        `json:"state,omitempty"`
-	Conditions []*rctypes.Condition `json:"conditions,omitempty"`
+	ServerID   uuid.UUID                 `json:"serverID,omitempty"`
+	State      rctypes.State             `json:"state,omitempty"`
+	Conditions []*rctypes.Condition      `json:"conditions,omitempty"`
+	Tasks      []*rctypes.Task[any, any] `json:"task,omitempty"`
 }
 
 // ConditionCreate is the request payload to create a condition with its parameters on server.
 type ConditionCreate struct {
-	Parameters json.RawMessage `json:"parameters"`
-	Fault      *rctypes.Fault  `json:"fault,omitempty"`
+	Parameters    json.RawMessage `json:"parameters"`
+	AcquireTarget bool            `json:"acquire_target"`
+	Fault         *rctypes.Fault  `json:"fault,omitempty"`
 }
 
 // AddServerParams is the request payload to add a server to fleetdb.

@@ -31,10 +31,12 @@ var (
 
 // Server type holds attributes of the condition orc server
 type Server struct {
-	// Logger is the app logger
+	orchestrator         bool
+	facilityCode         string
 	authMWConfigs        []ginjwt.AuthConfig
 	logger               *logrus.Logger
 	streamBroker         events.Stream
+	streamSubjectPrefix  string
 	listenAddress        string
 	conditionDefinitions rctypes.Definitions
 	repository           store.Repository
@@ -73,9 +75,10 @@ func WithListenAddress(addr string) Option {
 }
 
 // WithStreamBroker sets the event stream broker.
-func WithStreamBroker(broker events.Stream) Option {
+func WithStreamBroker(broker events.Stream, streamSubjectPrefix string) Option {
 	return func(s *Server) {
 		s.streamBroker = broker
+		s.streamSubjectPrefix = streamSubjectPrefix
 	}
 }
 
@@ -90,6 +93,19 @@ func WithConditionDefinitions(defs rctypes.Definitions) Option {
 func WithAuthMiddlewareConfig(authMWConfigs []ginjwt.AuthConfig) Option {
 	return func(s *Server) {
 		s.authMWConfigs = authMWConfigs
+	}
+}
+
+// WithAsOrchestrator registers just the Orchestrator routes, excluding any Condition API routes.
+func WithAsOrchestrator() Option {
+	return func(s *Server) {
+		s.orchestrator = true
+	}
+}
+
+func WithFacilityCode(fc string) Option {
+	return func(s *Server) {
+		s.facilityCode = fc
 	}
 }
 
@@ -109,8 +125,14 @@ func New(opts ...Option) *http.Server {
 		routes.WithLogger(s.logger),
 		routes.WithStore(s.repository),
 		routes.WithFleetDBClient(s.fleetDBClient),
-		routes.WithStreamBroker(s.streamBroker),
+		routes.WithStreamBroker(s.streamBroker, s.streamSubjectPrefix),
 		routes.WithConditionDefinitions(s.conditionDefinitions),
+		routes.WithServerReservationEnabled(true),
+	}
+
+	// orchestrator functions on a facility level
+	if s.orchestrator {
+		options = append(options, routes.WithFacilityCode(s.facilityCode))
 	}
 
 	// add auth middleware
@@ -128,7 +150,13 @@ func New(opts ...Option) *http.Server {
 		s.logger.Fatal(errors.Wrap(err, ErrRoutes.Error()))
 	}
 
-	v1Router.Routes(g.Group(routes.PathPrefix))
+	if s.orchestrator {
+		v1Router.RoutesOrchestrator(g.Group(routes.PathPrefix))
+		s.logger.Info("Orchestrator API server routes registered.")
+	} else {
+		v1Router.Routes(g.Group(routes.PathPrefix))
+		s.logger.Info("Condition API server routes registered.")
+	}
 
 	g.NoRoute(func(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"message": "invalid request - route not found"})

@@ -55,8 +55,37 @@ func ConnectToKVStores(s events.Stream, log *logrus.Logger,
 			}
 			kvCollection[kind] = hdl
 		}
+
+		// NOTE: discuss how we want this to be managed.
+		bucket, err := kv.CreateOrBindKVBucket(js, rctypes.TaskKVRepositoryBucket, statusOpts...)
+		if err != nil {
+			log.WithError(err).
+				WithField("kv.bucket", rctypes.TaskKVRepositoryBucket).
+				Fatal("unable to initialize NATS KV for Task's")
+		}
+		kvCollection[rctypes.TaskKVRepositoryBucket] = bucket
+
 		kvReady = true
 	})
+}
+
+func taskKVBucket() (nats.KeyValue, error) {
+	bucket, ok := kvCollection[rctypes.TaskKVRepositoryBucket]
+	if !ok {
+		return nil, errors.Wrap(errNoKV, string(rctypes.TaskKVRepositoryBucket))
+	}
+
+	return bucket, nil
+}
+
+func DeleteTask(facilityCode string, kind rctypes.Kind, serverID string) error {
+	bucket, err := taskKVBucket()
+	if err != nil {
+		return err
+	}
+
+	key := rctypes.TaskKVRepositoryKey(facilityCode, kind, serverID)
+	return bucket.Delete(key)
 }
 
 func getKVBucket(kind rctypes.Kind) (nats.KeyValue, error) {

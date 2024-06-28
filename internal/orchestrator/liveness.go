@@ -12,13 +12,13 @@ import (
 	"go.hollow.sh/toolbox/events/registry"
 
 	"github.com/metal-toolbox/conditionorc/internal/metrics"
+	"github.com/metal-toolbox/rivets/condition"
 	"github.com/nats-io/nats.go"
 )
 
 var (
 	livOnce        sync.Once
 	checkinCadence = 30 * time.Second
-	livenessTTL    = 3 * time.Minute
 )
 
 // This starts a go-routine to peridocally check in with the NATS kv
@@ -31,7 +31,7 @@ func (o *Orchestrator) startWorkerLivenessCheckin(ctx context.Context) {
 		}
 
 		opts := []kv.Option{
-			kv.WithTTL(livenessTTL),
+			kv.WithTTL(condition.StaleThreshold),
 		}
 
 		// only set replicas if we need them

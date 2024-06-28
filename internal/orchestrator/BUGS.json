@@ -1,0 +1,33 @@
+{
+    "task_version": "1.0",
+    "id": "910e03b0-f84d-4c88-9eeb-e07f35710d03",
+    "kind": "firmwareInstall",
+    "state": "pending",
+    "status": {
+        "records": null
+    },
+    "data": {
+        "empty": true
+    },
+    "parameters": {
+        "param": "value"
+    },
+    "fault": {
+        "panic": true
+    },
+    "facility_code": "",
+    "asset": {
+        "ID": "ed483ef9-098e-4892-bfcf-1696c44fd7a9",
+        "BmcAddress": "",
+        "BmcUsername": "",
+        "BmcPassword": "",
+        "State": "",
+        "Vendor": "",
+        "Model": "",
+        "Serial": "",
+        "FacilityCode": "",
+        "Components": null
+    },
+    "traceID": "",
+    "spanID": "",
+    "created_at":"0001-01-01T00: 00: 00Z","updated_at":"0001-01-01T00: 00: 00Z","completed_at":"0001-01-01T00: 00: 00Z"}
