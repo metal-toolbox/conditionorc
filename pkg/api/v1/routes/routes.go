@@ -141,6 +141,10 @@ func (r *Routes) Routes(g *gin.RouterGroup) {
 		servers.POST("/firmwareInstall", r.composeAuthHandler(createScopes("condition")),
 			wrapAPICall(r.firmwareInstall))
 
+		// Install a given firmware set and run some basic tests on it
+		servers.POST("/testFirmware", r.composeAuthHandler(createScopes("condition")),
+			wrapAPICall(r.testFirmware))
+
 		// Generalized API for any condition status (for cases where some server work
 		// has multiple conditions involved and the caller doesn't know what they might be)
 		servers.GET("/status", r.composeAuthHandler(readScopes("condition")),

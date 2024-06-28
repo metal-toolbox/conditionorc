@@ -269,33 +269,8 @@ func (r *Routes) serverEnroll(c *gin.Context) (int, *v1types.ServerResponse) {
 	return st, resp
 }
 
-// @Summary Firmware Install
-// @Tag Conditions
-// @Description Installs firmware on a device and validates with a subsequent inventory
-// @Description Sample firmwareInstall payload, response: https://github.com/metal-toolbox/conditionorc/blob/main/sample/firmwareInstall.md
-// @Param uuid path string true "Server ID"
-// @Param data body rctypes.FirmwareInstallTaskParameters true "firmware install options"
-// @Accept json
-// @Produce json
-// @Success 200 {object} v1types.ServerResponse
-// Failure 400 {object} v1types.ServerResponse
-// Failure 500 {object} v1types.ServerResponse
-// Failure 503 {object} v1types.ServerResponse
-// @Router /servers/{uuid}/firmwareInstall [post]
-func (r *Routes) firmwareInstall(c *gin.Context) (int, *v1types.ServerResponse) {
-	id := c.Param("uuid")
-	otelCtx, span := otel.Tracer(pkgName).Start(c.Request.Context(), "Routes.firmwareInstall")
-	span.SetAttributes(attribute.KeyValue{Key: "serverId", Value: attribute.StringValue(id)})
-	defer span.End()
-
-	serverID, err := uuid.Parse(id)
-	if err != nil {
-		r.logger.WithError(err).WithField("serverID", id).Warn("bad serverID")
-
-		return http.StatusBadRequest, &v1types.ServerResponse{
-			Message: "server id: " + err.Error(),
-		}
-	}
+func (r *Routes) doFirmwareInstall(otelCtx context.Context, serverID uuid.UUID, fw rctypes.FirmwareInstallTaskParameters) (int, *v1types.ServerResponse) {
+	createTime := time.Now()
 
 	facilityCode, err := r.serverFacilityCode(otelCtx, serverID)
 	if err != nil {
@@ -303,17 +278,6 @@ func (r *Routes) firmwareInstall(c *gin.Context) (int, *v1types.ServerResponse) 
 			Message: "server facility: " + err.Error(),
 		}
 	}
-
-	var fw rctypes.FirmwareInstallTaskParameters
-	if err = c.ShouldBindJSON(&fw); err != nil {
-		r.logger.WithError(err).Warn("unmarshal firmwareInstall payload")
-
-		return http.StatusBadRequest, &v1types.ServerResponse{
-			Message: "invalid firmware install payload: " + err.Error(),
-		}
-	}
-
-	createTime := time.Now()
 
 	fwCondition := &rctypes.Condition{
 		Kind:                  rctypes.FirmwareInstall,
@@ -333,7 +297,7 @@ func (r *Routes) firmwareInstall(c *gin.Context) (int, *v1types.ServerResponse) 
 		CreatedAt:             createTime,
 	}
 
-	if err = r.repository.CreateMultiple(otelCtx, serverID, fwCondition, invCondition); err != nil {
+	if err := r.repository.CreateMultiple(otelCtx, serverID, fwCondition, invCondition); err != nil {
 		if errors.Is(err, store.ErrActiveCondition) {
 			return http.StatusConflict, &v1types.ServerResponse{
 				Message: err.Error(),
@@ -345,7 +309,7 @@ func (r *Routes) firmwareInstall(c *gin.Context) (int, *v1types.ServerResponse) 
 		}
 	}
 
-	if err = r.publishCondition(otelCtx, serverID, facilityCode, fwCondition); err != nil {
+	if err := r.publishCondition(otelCtx, serverID, facilityCode, fwCondition); err != nil {
 		r.logger.WithError(err).Warn("publishing firmware-install condition")
 		// mark firmwareInstall as failed
 		fwCondition.State = rctypes.Failed
@@ -374,6 +338,96 @@ func (r *Routes) firmwareInstall(c *gin.Context) (int, *v1types.ServerResponse) 
 			},
 		},
 	}
+}
+
+// @Summary Firmware Install
+// @Tag Conditions
+// @Description Installs firmware on a device and validates with a subsequent inventory
+// @Description Sample firmwareInstall payload, response: https://github.com/metal-toolbox/conditionorc/blob/main/sample/firmwareInstall.md
+// @Param uuid path string true "Server ID"
+// @Param data body rctypes.FirmwareInstallTaskParameters true "firmware install options"
+// @Accept json
+// @Produce json
+// @Success 200 {object} v1types.ServerResponse
+// Failure 400 {object} v1types.ServerResponse
+// Failure 500 {object} v1types.ServerResponse
+// Failure 503 {object} v1types.ServerResponse
+// @Router /servers/{uuid}/firmwareInstall [post]
+func (r *Routes) firmwareInstall(c *gin.Context) (int, *v1types.ServerResponse) {
+	id := c.Param("uuid")
+	otelCtx, span := otel.Tracer(pkgName).Start(c.Request.Context(), "Routes.firmwareInstall")
+	span.SetAttributes(attribute.KeyValue{Key: "serverId", Value: attribute.StringValue(id)})
+	defer span.End()
+
+	serverID, err := uuid.Parse(id)
+	if err != nil {
+		r.logger.WithError(err).WithField("serverID", id).Warn("bad serverID")
+
+		return http.StatusBadRequest, &v1types.ServerResponse{
+			Message: "server id: " + err.Error(),
+		}
+	}
+
+	var fw rctypes.FirmwareInstallTaskParameters
+	if err = c.ShouldBindJSON(&fw); err != nil {
+		r.logger.WithError(err).Warn("unmarshal firmwareInstall payload")
+
+		return http.StatusBadRequest, &v1types.ServerResponse{
+			Message: "invalid firmware install payload: " + err.Error(),
+		}
+	}
+
+	return r.doFirmwareInstall(otelCtx, serverID, fw);
+}
+
+func (r *Routes) testFirmware(c *gin.Context) (int, *v1types.ServerResponse) {
+	id := c.Param("uuid")
+	otelCtx, span := otel.Tracer(pkgName).Start(c.Request.Context(), "Routes.testFirmware")
+	span.SetAttributes(attribute.KeyValue{Key: "serverId", Value: attribute.StringValue(id)})
+	defer span.End()
+
+	serverID, err := uuid.Parse(id)
+	if err != nil {
+		r.logger.WithError(err).WithField("serverID", id).Warn("bad serverID")
+
+		return http.StatusBadRequest, &v1types.ServerResponse{
+			Message: "server id: " + err.Error(),
+		}
+	}
+
+	var fw rctypes.FirmwareInstallTaskParameters
+	if err = c.ShouldBindJSON(&fw); err != nil {
+		r.logger.WithError(err).Warn("unmarshal firmwareInstall payload")
+
+		return http.StatusBadRequest, &v1types.ServerResponse{
+			Message: "invalid firmware install payload: " + err.Error(),
+		}
+	}
+
+	status, resp := r.doFirmwareInstall(otelCtx, serverID, fw);
+	if status != http.StatusOK {
+		return status, resp;
+	}
+
+	for {
+		// FIXME: what are the semantics of cr.State?  Does it work to
+		// use it as a shortcut for the fwinstall & inventory steps,
+		// or do we need to check each of those individually?
+		cr, err := r.repository.Get(otelCtx, serverID);
+		if err != nil {
+			panic(err); // FIXME
+		}
+
+		if cr.State == rctypes.Succeeded {
+			break;
+		} else if cr.State == rctypes.Failed {
+			panic("oops"); // FIXME
+		} else {
+			time.Sleep(10 * time.Second);
+		}
+	}
+
+	return http.StatusOK, nil // FIXME
 }
 
 func (r *Routes) conditionCreate(otelCtx context.Context, newCondition *rctypes.Condition, serverID uuid.UUID, facilityCode string) (int, *v1types.ServerResponse) {
