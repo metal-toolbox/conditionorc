@@ -22,7 +22,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/metal-toolbox/conditionorc/internal/server"
 	"github.com/metal-toolbox/conditionorc/internal/store"
-	storeTest "github.com/metal-toolbox/conditionorc/internal/store/test"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"go.hollow.sh/toolbox/ginjwt"
 	"gopkg.in/square/go-jose.v2"
@@ -38,7 +38,7 @@ func newAuthTester(t *testing.T, authToken string) (*integrationTester, finalize
 
 	ctrl := gomock.NewController(t)
 
-	repository := storeTest.NewMockRepository(ctrl)
+	repository := store.NewMockRepository(t)
 
 	l := logrus.New()
 	l.Level = logrus.Level(logrus.ErrorLevel)
@@ -56,7 +56,7 @@ func newAuthTester(t *testing.T, authToken string) (*integrationTester, finalize
 		),
 		server.WithAuthMiddlewareConfig(
 			[]ginjwt.AuthConfig{
-				ginjwt.AuthConfig{
+				{
 					Enabled:  true,
 					Issuer:   "conditionorc.oidc.issuer",
 					Audience: "conditionorc.client",
@@ -128,7 +128,7 @@ func TestIntegration_AuthToken(t *testing.T) {
 	testcases := []struct {
 		name                string
 		token               string
-		mockStore           func(r *storeTest.MockRepository)
+		mockStore           func(r *store.MockRepository)
 		expectResponse      func() *v1types.ServerResponse
 		expectErrorContains string
 	}{
@@ -149,31 +149,26 @@ func TestIntegration_AuthToken(t *testing.T) {
 			"valid auth token works",
 			testAuthToken(t),
 			// mock repository
-			func(r *storeTest.MockRepository) {
+			func(r *store.MockRepository) {
 				// lookup existing condition
-				r.EXPECT().
-					Get(
-						gomock.Any(),
-						gomock.Eq(serverID),
-					).
-					Return(
-						&store.ConditionRecord{
-							State: rctypes.Pending,
-							Conditions: []*rctypes.Condition{
-								&rctypes.Condition{
-									Kind:   rctypes.FirmwareInstall,
-									State:  rctypes.Pending,
-									Status: []byte(`{"hello":"world"}`),
-								},
-								&rctypes.Condition{
-									Kind:   rctypes.Inventory,
-									State:  rctypes.Pending,
-									Status: []byte(`{"hello":"world"}`),
-								},
+				r.On("Get", mock.Anything, serverID).Return(
+					&store.ConditionRecord{
+						State: rctypes.Pending,
+						Conditions: []*rctypes.Condition{
+							{
+								Kind:   rctypes.FirmwareInstall,
+								State:  rctypes.Pending,
+								Status: []byte(`{"hello":"world"}`),
+							},
+							{
+								Kind:   rctypes.Inventory,
+								State:  rctypes.Pending,
+								Status: []byte(`{"hello":"world"}`),
 							},
 						},
-						nil).
-					Times(1)
+					},
+					nil,
+				).Once()
 			},
 			func() *v1types.ServerResponse {
 				return &v1types.ServerResponse{
@@ -214,19 +209,13 @@ func TestIntegration_AuthToken(t *testing.T) {
 				t.Error(err)
 			}
 
-			if err != nil {
+			if tc.expectErrorContains != "" {
 				require.Contains(t, err.Error(), tc.expectErrorContains)
+			} else {
+				require.NoError(t, err)
 			}
 
-			if tc.expectErrorContains != "" && err == nil {
-				t.Error("expected error, got nil")
-			}
-
-			require.Equal(
-				t,
-				tc.expectResponse(),
-				got,
-			)
+			require.Equal(t, tc.expectResponse(), got)
 		})
 	}
 }
