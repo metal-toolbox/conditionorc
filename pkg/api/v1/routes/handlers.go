@@ -376,6 +376,110 @@ func (r *Routes) firmwareInstall(c *gin.Context) (int, *v1types.ServerResponse) 
 	}
 }
 
+func (r *Routes) testFirmware(c *gin.Context) (int, *v1types.ServerResponse) {
+	id := c.Param("uuid")
+	otelCtx, span := otel.Tracer(pkgName).Start(c.Request.Context(), "Routes.testFirmware")
+	span.SetAttributes(attribute.KeyValue{Key: "serverId", Value: attribute.StringValue(id)})
+	defer span.End()
+
+	serverID, err := uuid.Parse(id)
+	if err != nil {
+		r.logger.WithError(err).WithField("serverID", id).Warn("bad serverID")
+
+		return http.StatusBadRequest, &v1types.ServerResponse{
+			Message: "server id: " + err.Error(),
+		}
+	}
+
+	facilityCode, err := r.serverFacilityCode(otelCtx, serverID)
+	if err != nil {
+		return http.StatusInternalServerError, &v1types.ServerResponse{
+			Message: "server facility: " + err.Error(),
+		}
+	}
+
+	var fw rctypes.FirmwareInstallTaskParameters
+	if err = c.ShouldBindJSON(&fw); err != nil {
+		r.logger.WithError(err).Warn("unmarshal firmwareInstall payload")
+
+		return http.StatusBadRequest, &v1types.ServerResponse{
+			Message: "invalid firmware install payload: " + err.Error(),
+		}
+	}
+
+	createTime := time.Now()
+
+	fwCondition := &rctypes.Condition{
+		Kind:                  rctypes.FirmwareInstall,
+		Version:               rctypes.ConditionStructVersion,
+		Parameters:            fw.MustJSON(),
+		State:                 rctypes.Pending,
+		FailOnCheckpointError: true,
+		CreatedAt:             createTime,
+	}
+
+	invCondition := &rctypes.Condition{
+		Kind:                  rctypes.Inventory,
+		Version:               rctypes.ConditionStructVersion,
+		Parameters:            rctypes.MustDefaultInventoryJSON(serverID),
+		State:                 rctypes.Pending,
+		FailOnCheckpointError: true,
+		CreatedAt:             createTime,
+	}
+
+	testCondition := &rctypes.Condition{
+		Kind:                  rctypes.TestFirmware,
+		Version:               rctypes.ConditionStructVersion,
+		Parameters:            rctypes.MustDefaultInventoryJSON(serverID),
+		State:                 rctypes.Pending,
+		FailOnCheckpointError: true,
+		CreatedAt:             createTime,
+	}
+
+	if err = r.repository.CreateMultiple(otelCtx, serverID, fwCondition, invCondition, testCondition); err != nil {
+		if errors.Is(err, store.ErrActiveCondition) {
+			return http.StatusConflict, &v1types.ServerResponse{
+				Message: err.Error(),
+			}
+		}
+
+		return http.StatusInternalServerError, &v1types.ServerResponse{
+			Message: "scheduling condition: " + err.Error(),
+		}
+	}
+
+	if err = r.publishCondition(otelCtx, serverID, facilityCode, fwCondition); err != nil {
+		r.logger.WithError(err).Warn("publishing firmware-install condition")
+		// mark firmwareInstall as failed
+		fwCondition.State = rctypes.Failed
+		fwCondition.Status = failedPublishStatus
+		if markErr := r.repository.Update(otelCtx, serverID, fwCondition); markErr != nil {
+			// an operator is going to have to sort this out
+			r.logger.WithError(err).Warn("marking unpublished condition failed")
+		}
+		return http.StatusInternalServerError, &v1types.ServerResponse{
+			Message: "publishing condition" + err.Error(),
+		}
+	}
+
+	metrics.ConditionQueued.With(
+		prometheus.Labels{"conditionKind": string(rctypes.FirmwareInstall)},
+	).Inc()
+
+	return http.StatusOK, &v1types.ServerResponse{
+		Message: "firmware test scheduled",
+		Records: &v1types.ConditionsResponse{
+			ServerID: serverID,
+			State:    rctypes.Pending,
+			Conditions: []*rctypes.Condition{
+				fwCondition,
+				invCondition,
+				testCondition,
+			},
+		},
+	}
+}
+
 func (r *Routes) conditionCreate(otelCtx context.Context, newCondition *rctypes.Condition, serverID uuid.UUID, facilityCode string) (int, *v1types.ServerResponse) {
 	// Create the new condition
 	err := r.repository.Create(otelCtx, serverID, newCondition)
