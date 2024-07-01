@@ -9,13 +9,13 @@ import (
 	rctypes "github.com/metal-toolbox/rivets/condition"
 
 	"github.com/google/uuid"
+	"github.com/metal-toolbox/rivets/events"
+	"github.com/metal-toolbox/rivets/events/pkg/kv"
 	"github.com/nats-io/nats-server/v2/server"
 	srvtest "github.com/nats-io/nats-server/v2/test"
 	"github.com/nats-io/nats.go"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
-	"go.hollow.sh/toolbox/events"
-	"go.hollow.sh/toolbox/events/pkg/kv"
 )
 
 var (

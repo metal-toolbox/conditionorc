@@ -7,9 +7,9 @@ import (
 	"sync"
 	"time"
 
-	"go.hollow.sh/toolbox/events"
-	"go.hollow.sh/toolbox/events/pkg/kv"
-	"go.hollow.sh/toolbox/events/registry"
+	"github.com/metal-toolbox/rivets/events"
+	"github.com/metal-toolbox/rivets/events/pkg/kv"
+	"github.com/metal-toolbox/rivets/events/registry"
 
 	"github.com/metal-toolbox/conditionorc/internal/metrics"
 	"github.com/nats-io/nats.go"

@@ -14,8 +14,8 @@ import (
 	"github.com/metal-toolbox/conditionorc/internal/orchestrator/notify"
 	"github.com/metal-toolbox/conditionorc/internal/store"
 	"github.com/metal-toolbox/conditionorc/internal/version"
+	"github.com/metal-toolbox/rivets/events"
 	"github.com/spf13/cobra"
-	"go.hollow.sh/toolbox/events"
 )
 
 var (

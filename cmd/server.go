@@ -16,9 +16,9 @@ import (
 	"github.com/metal-toolbox/conditionorc/internal/server"
 	"github.com/metal-toolbox/conditionorc/internal/store"
 	"github.com/metal-toolbox/conditionorc/internal/version"
+	"github.com/metal-toolbox/rivets/events"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-	"go.hollow.sh/toolbox/events"
 	"go.hollow.sh/toolbox/ginjwt"
 )
 

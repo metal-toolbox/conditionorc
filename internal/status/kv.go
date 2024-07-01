@@ -8,10 +8,10 @@ import (
 
 	"github.com/pkg/errors"
 
+	"github.com/metal-toolbox/rivets/events"
+	"github.com/metal-toolbox/rivets/events/pkg/kv"
 	"github.com/nats-io/nats.go"
 	"github.com/sirupsen/logrus"
-	"go.hollow.sh/toolbox/events"
-	"go.hollow.sh/toolbox/events/pkg/kv"
 
 	rctypes "github.com/metal-toolbox/rivets/condition"
 )

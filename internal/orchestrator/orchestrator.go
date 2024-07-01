@@ -7,9 +7,9 @@ import (
 	"github.com/metal-toolbox/conditionorc/internal/orchestrator/notify"
 	"github.com/metal-toolbox/conditionorc/internal/store"
 	"github.com/metal-toolbox/conditionorc/internal/version"
+	"github.com/metal-toolbox/rivets/events"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
-	"go.hollow.sh/toolbox/events"
 
 	v1EventHandlers "github.com/metal-toolbox/conditionorc/pkg/api/v1/events"
 	rctypes "github.com/metal-toolbox/rivets/condition"
