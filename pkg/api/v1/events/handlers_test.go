@@ -4,29 +4,26 @@ import (
 	"context"
 	"testing"
 
-	"github.com/golang/mock/gomock"
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	"github.com/metal-toolbox/conditionorc/internal/store"
-	storeTest "github.com/metal-toolbox/conditionorc/internal/store/test"
 	v1types "github.com/metal-toolbox/conditionorc/pkg/api/v1/types"
 
 	rctypes "github.com/metal-toolbox/rivets/condition"
-	mock_events "go.hollow.sh/toolbox/events/mock"
+	eventsm "github.com/metal-toolbox/rivets/events"
 )
 
 func TestUpdateEvent(t *testing.T) {
 	t.Parallel()
 	t.Run("invalid update", func(t *testing.T) {
 		t.Parallel()
-		ctrl := gomock.NewController(t)
-		defer ctrl.Finish()
 
-		stream := mock_events.NewMockStream(ctrl)
-		repo := storeTest.NewMockRepository(ctrl)
+		stream := eventsm.NewMockStream(t)
+		repo := store.NewMockRepository(t)
 
 		handler := NewHandler(repo, stream, logrus.New())
 
@@ -36,23 +33,18 @@ func TestUpdateEvent(t *testing.T) {
 	})
 	t.Run("read for existing condition fails", func(t *testing.T) {
 		t.Parallel()
-		ctrl := gomock.NewController(t)
-		defer ctrl.Finish()
 
-		stream := mock_events.NewMockStream(ctrl)
-		repo := storeTest.NewMockRepository(ctrl)
+		stream := eventsm.NewMockStream(t)
+		repo := store.NewMockRepository(t)
 
 		handler := NewHandler(repo, stream, logrus.New())
 		serverID := uuid.New()
 		testKind := rctypes.Kind("test")
 		conditionID := uuid.New()
 		status := []byte(`{ "msg":"it's happening!" }`)
-		gomock.InOrder(
-			repo.EXPECT().GetActiveCondition(
-				gomock.Any(),
-				serverID,
-			).Times(1).Return(nil, errors.New("not today")),
-		)
+
+		repo.On("GetActiveCondition", mock.Anything, serverID).
+			Return(nil, errors.New("not today")).Once()
 
 		arg := v1types.ConditionUpdateEvent{
 			Kind: testKind,
@@ -68,23 +60,18 @@ func TestUpdateEvent(t *testing.T) {
 	})
 	t.Run("no existing condition", func(t *testing.T) {
 		t.Parallel()
-		ctrl := gomock.NewController(t)
-		defer ctrl.Finish()
 
-		stream := mock_events.NewMockStream(ctrl)
-		repo := storeTest.NewMockRepository(ctrl)
+		stream := eventsm.NewMockStream(t)
+		repo := store.NewMockRepository(t)
 
 		handler := NewHandler(repo, stream, logrus.New())
 		serverID := uuid.New()
 		testKind := rctypes.Kind("test")
 		conditionID := uuid.New()
 		status := []byte(`{ "msg":"it's happening!" }`)
-		gomock.InOrder(
-			repo.EXPECT().GetActiveCondition(
-				gomock.Any(),
-				serverID,
-			).Times(1).Return(nil, store.ErrConditionNotFound),
-		)
+
+		repo.On("GetActiveCondition", mock.Anything, serverID).
+			Return(nil, store.ErrConditionNotFound).Once()
 
 		arg := v1types.ConditionUpdateEvent{
 			Kind: testKind,
@@ -100,28 +87,23 @@ func TestUpdateEvent(t *testing.T) {
 	})
 	t.Run("no-op update", func(t *testing.T) {
 		t.Parallel()
-		ctrl := gomock.NewController(t)
-		defer ctrl.Finish()
 
-		stream := mock_events.NewMockStream(ctrl)
-		repo := storeTest.NewMockRepository(ctrl)
+		stream := eventsm.NewMockStream(t)
+		repo := store.NewMockRepository(t)
 
 		handler := NewHandler(repo, stream, logrus.New())
 		serverID := uuid.New()
 		testKind := rctypes.Kind("test")
 		conditionID := uuid.New()
 		status := []byte(`{ "msg":"it's happening!" }`)
-		gomock.InOrder(
-			repo.EXPECT().GetActiveCondition(
-				gomock.Any(),
-				serverID,
-			).Times(1).Return(&rctypes.Condition{
+
+		repo.On("GetActiveCondition", mock.Anything, serverID).
+			Return(&rctypes.Condition{
 				ID:     conditionID,
 				Kind:   testKind,
 				State:  rctypes.Active,
 				Status: status,
-			}, nil),
-		)
+			}, nil).Once()
 
 		arg := v1types.ConditionUpdateEvent{
 			Kind: testKind,
@@ -137,34 +119,29 @@ func TestUpdateEvent(t *testing.T) {
 	})
 	t.Run("update fails", func(t *testing.T) {
 		t.Parallel()
-		ctrl := gomock.NewController(t)
-		defer ctrl.Finish()
 
-		stream := mock_events.NewMockStream(ctrl)
-		repo := storeTest.NewMockRepository(ctrl)
+		stream := eventsm.NewMockStream(t)
+		repo := store.NewMockRepository(t)
 
 		handler := NewHandler(repo, stream, logrus.New())
 		serverID := uuid.New()
 		testKind := rctypes.Kind("test")
 		conditionID := uuid.New()
 
-		gomock.InOrder(
-			repo.EXPECT().GetActiveCondition(
-				gomock.Any(),
-				serverID,
-			).Times(1).Return(&rctypes.Condition{
+		get := repo.On("GetActiveCondition", mock.Anything, serverID).
+			Return(&rctypes.Condition{
 				ID:     conditionID,
 				Kind:   testKind,
 				Target: serverID,
 				State:  rctypes.Active,
 				Status: []byte(`{ "msg":"still waiting" }`),
-			}, nil),
-			repo.EXPECT().Update(
-				gomock.Any(),
-				serverID,
-				gomock.Any(),
-			).Times(1).Return(errors.New("not happening")),
-		)
+			}, nil).Once()
+
+		update := repo.On("Update", mock.Anything, serverID, mock.Anything).
+			Return(errors.New("not happening")).Once()
+
+		// get before update
+		update.NotBefore(get)
 
 		arg := v1types.ConditionUpdateEvent{
 			Kind: testKind,
@@ -180,34 +157,28 @@ func TestUpdateEvent(t *testing.T) {
 	})
 	t.Run("update succeeds", func(t *testing.T) {
 		t.Parallel()
-		ctrl := gomock.NewController(t)
-		defer ctrl.Finish()
 
-		stream := mock_events.NewMockStream(ctrl)
-		repo := storeTest.NewMockRepository(ctrl)
+		stream := eventsm.NewMockStream(t)
+		repo := store.NewMockRepository(t)
 
 		handler := NewHandler(repo, stream, logrus.New())
 		serverID := uuid.New()
 		testKind := rctypes.Kind("test")
 		conditionID := uuid.New()
 
-		gomock.InOrder(
-			repo.EXPECT().GetActiveCondition(
-				gomock.Any(),
-				serverID,
-			).Times(1).Return(&rctypes.Condition{
+		get := repo.On("GetActiveCondition", mock.Anything, serverID).
+			Return(&rctypes.Condition{
 				ID:     conditionID,
 				Kind:   testKind,
 				Target: serverID,
 				State:  rctypes.Active,
 				Status: []byte(`{ "msg":"still waiting" }`),
-			}, nil),
-			repo.EXPECT().Update(
-				gomock.Any(),
-				serverID,
-				gomock.Any(), // we test the merge function elsewhere, don't bother here
-			).Times(1).Return(nil),
-		)
+			}, nil).Once()
+
+		update := repo.On("Update", mock.Anything, serverID, mock.Anything).
+			Return(nil).Once()
+
+		update.NotBefore(get)
 
 		arg := v1types.ConditionUpdateEvent{
 			Kind: testKind,

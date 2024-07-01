@@ -6,9 +6,9 @@ import (
 
 	"github.com/metal-toolbox/conditionorc/internal/metrics"
 	"github.com/metal-toolbox/conditionorc/internal/store"
+	"github.com/metal-toolbox/rivets/events"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
-	"go.hollow.sh/toolbox/events"
 	"go.opentelemetry.io/otel"
 
 	v1types "github.com/metal-toolbox/conditionorc/pkg/api/v1/types"
