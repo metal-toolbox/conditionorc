@@ -16,16 +16,15 @@ import (
 	"github.com/metal-toolbox/conditionorc/internal/fleetdb"
 	"github.com/metal-toolbox/conditionorc/internal/model"
 	"github.com/metal-toolbox/conditionorc/internal/store"
-	storeTest "github.com/metal-toolbox/conditionorc/internal/store/test"
 	"github.com/metal-toolbox/conditionorc/pkg/api/v1/types"
 	v1types "github.com/metal-toolbox/conditionorc/pkg/api/v1/types"
 	rctypes "github.com/metal-toolbox/rivets/condition"
+	"github.com/metal-toolbox/rivets/events"
+	eventsm "github.com/metal-toolbox/rivets/events"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
-	"go.hollow.sh/toolbox/events"
-	mockevents "go.hollow.sh/toolbox/events/mock"
+	"github.com/stretchr/testify/mock"
 )
 
 func mockserver(t *testing.T, logger *logrus.Logger, fleetDBClient fleetdb.FleetDB, repository store.Repository, stream events.Stream) (*gin.Engine, error) {
@@ -86,21 +85,13 @@ func asJSONBytes(t *testing.T, s *v1types.ServerResponse) []byte {
 	return b
 }
 
-func setupTestServer(t *testing.T) (*storeTest.MockRepository, *fleetdb.MockFleetDB, *mockevents.MockStream, *gin.Engine, error) {
+func setupTestServer(t *testing.T) (*store.MockRepository, *fleetdb.MockFleetDB, *eventsm.MockStream, *gin.Engine, error) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	repository := storeTest.NewMockRepository(ctrl)
-
-	fleetDBCtrl := gomock.NewController(t)
-	defer fleetDBCtrl.Finish()
-
-	fleetDBClient := fleetdb.NewMockFleetDB(fleetDBCtrl)
-
-	streamCtrl := gomock.NewController(t)
-	defer streamCtrl.Finish()
-
-	stream := mockevents.NewMockStream(streamCtrl)
+	repository := store.NewMockRepository(t)
+	fleetDBClient := fleetdb.NewMockFleetDB(t)
+	stream := eventsm.NewMockStream(t)
 
 	server, err := mockserver(t, logrus.New(), fleetDBClient, repository, stream)
 
@@ -135,57 +126,40 @@ func TestAddServer(t *testing.T) {
 	var generatedServerID uuid.UUID
 	testcases := []struct {
 		name              string
-		mockStore         func(r *storeTest.MockRepository)
+		mockStore         func(r *store.MockRepository)
 		mockFleetDBClient func(f *fleetdb.MockFleetDB)
-		mockStream        func(r *mockevents.MockStream)
+		mockStream        func(r *eventsm.MockStream)
 		request           func(t *testing.T) *http.Request
 		assertResponse    func(t *testing.T, r *httptest.ResponseRecorder)
 	}{
 		{
-			"add server success",
+			name: "add server success",
 			// mock repository
-			func(r *storeTest.MockRepository) {
+			mockStore: func(r *store.MockRepository) {
 				// create condition query
-				r.EXPECT().
-					Create(
-						gomock.Any(),
-						gomock.Eq(mockServerID),
-						gomock.Any(),
-					).
-					DoAndReturn(func(_ context.Context, _ uuid.UUID, c *rctypes.Condition) error {
+				r.On("Create", mock.Anything, mockServerID, mock.Anything).
+					Return(nil).
+					Run(func(args mock.Arguments) {
+						c := args.Get(2).(*rctypes.Condition)
 						assert.Equal(t, rctypes.ConditionStructVersion, c.Version, "condition version mismatch")
 						assert.Equal(t, rctypes.Inventory, c.Kind, "condition kind mismatch")
 						assert.Equal(t, json.RawMessage(expectedInventoryParams(mockServerID.String())), c.Parameters, "condition parameters mismatch")
 						assert.Equal(t, rctypes.Pending, c.State, "condition state mismatch")
-						return nil
 					}).
-					Times(1)
+					Once()
 			},
-			func(r *fleetdb.MockFleetDB) {
+			mockFleetDBClient: func(f *fleetdb.MockFleetDB) {
 				// lookup for an existing condition
-				r.EXPECT().
-					AddServer(
-						gomock.Any(),
-						gomock.Eq(mockServerID),
-						gomock.Eq(mockFacilityCode),
-						gomock.Eq(mockIP),
-						gomock.Eq(mockUser),
-						gomock.Eq(mockPwd),
-					).
+				f.On("AddServer", mock.Anything, mockServerID, mockFacilityCode, mockIP, mockUser, mockPwd).
 					Return(nopRollback, nil). // no condition exists
-					Times(1)
+					Once()
 			},
-			func(r *mockevents.MockStream) {
-				r.EXPECT().
-					Publish(
-						gomock.Any(),
-						gomock.Eq(fmt.Sprintf("%s.servers.%s", mockFacilityCode, rctypes.Inventory)),
-						gomock.Any(),
-					).
+			mockStream: func(r *eventsm.MockStream) {
+				r.On("Publish", mock.Anything, fmt.Sprintf("%s.servers.%s", mockFacilityCode, rctypes.Inventory), mock.Anything).
 					Return(nil).
-					Times(1)
+					Once()
 			},
-			func(t *testing.T) *http.Request {
+			request: func(t *testing.T) *http.Request {
 				payload, err := json.Marshal(&v1types.ConditionCreate{Parameters: validParams.MustJSON()})
 				if err != nil {
 					t.Error()
@@ -199,16 +173,16 @@ func TestAddServer(t *testing.T) {
 
 				return request
 			},
-			func(t *testing.T, r *httptest.ResponseRecorder) {
+			assertResponse: func(t *testing.T, r *httptest.ResponseRecorder) {
 				assert.Equal(t, http.StatusOK, r.Code)
 			},
 		},
 		{
-			"add server invalid params",
-			nil,
-			nil,
-			nil,
-			func(t *testing.T) *http.Request {
+			name:              "add server invalid params",
+			mockStore:         nil,
+			mockFleetDBClient: nil,
+			mockStream:        nil,
+			request: func(t *testing.T) *http.Request {
 				payload := []byte("invalid json")
 				url := fmt.Sprintf("/api/v1/serverEnroll/%v", mockServerID)
 				request, err := http.NewRequestWithContext(context.TODO(), http.MethodPost, url, bytes.NewReader(payload))
@@ -218,30 +192,22 @@ func TestAddServer(t *testing.T) {
 
 				return request
 			},
-			func(t *testing.T, r *httptest.ResponseRecorder) {
+			assertResponse: func(t *testing.T, r *httptest.ResponseRecorder) {
 				assert.Equal(t, http.StatusBadRequest, r.Code)
 				assert.Contains(t, string(asBytes(t, r.Body)), "invalid ConditionCreate payload")
 			},
 		},
 		{
-			"no bmc user",
-			nil,
-			func(r *fleetdb.MockFleetDB) {
+			name:      "no bmc user",
+			mockStore: nil,
+			mockFleetDBClient: func(f *fleetdb.MockFleetDB) {
 				// lookup for an existing condition
-				r.EXPECT().
-					AddServer(
-						gomock.Any(),
-						gomock.Eq(mockServerID),
-						gomock.Eq(mockFacilityCode),
-						gomock.Eq(mockIP),
-						gomock.Eq(""),
-						gomock.Eq(mockPwd),
-					).
+				f.On("AddServer", mock.Anything, mockServerID, mockFacilityCode, mockIP, "", mockPwd).
 					Return(nopRollback, fleetdb.ErrBMCCredentials). // no condition exists
-					Times(1)
+					Once()
 			},
-			nil,
-			func(t *testing.T) *http.Request {
+			mockStream: nil,
+			request: func(t *testing.T) *http.Request {
 				noUserParams := types.AddServerParams{
 					Facility: "mock-facility-code",
 					IP:       "mock-ip",
@@ -260,30 +226,22 @@ func TestAddServer(t *testing.T) {
 
 				return request
 			},
-			func(t *testing.T, r *httptest.ResponseRecorder) {
+			assertResponse: func(t *testing.T, r *httptest.ResponseRecorder) {
 				assert.Equal(t, http.StatusInternalServerError, r.Code)
 				assert.Contains(t, string(asBytes(t, r.Body)), fleetdb.ErrBMCCredentials.Error())
 			},
 		},
 		{
-			"no bmc password",
-			nil,
-			func(r *fleetdb.MockFleetDB) {
+			name:      "no bmc password",
+			mockStore: nil,
+			mockFleetDBClient: func(f *fleetdb.MockFleetDB) {
 				// lookup for an existing condition
-				r.EXPECT().
-					AddServer(
-						gomock.Any(),
-						gomock.Eq(mockServerID),
-						gomock.Eq(mockFacilityCode),
-						gomock.Eq(mockIP),
-						gomock.Eq(mockUser),
-						gomock.Eq(""),
-					).
+				f.On("AddServer", mock.Anything, mockServerID, mockFacilityCode, mockIP, mockUser, "").
 					Return(nopRollback, fleetdb.ErrBMCCredentials). // no condition exists
-					Times(1)
+					Once()
 			},
-			nil,
-			func(t *testing.T) *http.Request {
+			mockStream: nil,
+			request: func(t *testing.T) *http.Request {
 				noPwdParams := types.AddServerParams{
 					Facility: "mock-facility-code",
 					IP:       "mock-ip",
@@ -302,60 +260,44 @@ func TestAddServer(t *testing.T) {
 
 				return request
 			},
-			func(t *testing.T, r *httptest.ResponseRecorder) {
+			assertResponse: func(t *testing.T, r *httptest.ResponseRecorder) {
 				assert.Equal(t, http.StatusInternalServerError, r.Code)
 				assert.Contains(t, string(asBytes(t, r.Body)), fleetdb.ErrBMCCredentials.Error())
 			},
 		},
 		{
-			"add server success no uuid param",
+			name: "add server success no uuid param",
 			// mock repository
-			func(r *storeTest.MockRepository) {
+			mockStore: func(r *store.MockRepository) {
 				// create condition query
-				r.EXPECT().
-					Create(
-						gomock.Any(),
-						gomock.Any(),
-						gomock.Any(),
-					).
-					DoAndReturn(func(_ context.Context, id uuid.UUID, c *rctypes.Condition) error {
+				r.On("Create", mock.Anything, mock.Anything, mock.Anything).
+					Return(nil).
+					Run(func(args mock.Arguments) {
+						id := args.Get(1).(uuid.UUID)
+						c := args.Get(2).(*rctypes.Condition)
 						assert.Equal(t, generatedServerID, id, "server ID mismatch")
 						assert.Equal(t, json.RawMessage(expectedInventoryParams(generatedServerID.String())), c.Parameters, "condition parameters mismatch")
 						assert.Equal(t, rctypes.ConditionStructVersion, c.Version, "condition version mismatch")
 						assert.Equal(t, rctypes.Inventory, c.Kind, "condition kind mismatch")
 						assert.Equal(t, rctypes.Pending, c.State, "condition state mismatch")
-						return nil
 					}).
-					Times(1)
+					Once()
 			},
-			func(r *fleetdb.MockFleetDB) {
+			mockFleetDBClient: func(f *fleetdb.MockFleetDB) {
 				// lookup for an existing condition
-				r.EXPECT().
-					AddServer(
-						gomock.Any(),
-						gomock.Any(),
-						gomock.Eq(mockFacilityCode),
-						gomock.Eq(mockIP),
-						gomock.Eq(mockUser),
-						gomock.Eq(mockPwd),
-					).
-					DoAndReturn(func(ctx context.Context, serverID uuid.UUID, _, _, _, _ string) (func() error, error) {
+				f.On("AddServer", mock.Anything, mock.Anything, mockFacilityCode, mockIP, mockUser, mockPwd).
+					Return(func(ctx context.Context, serverID uuid.UUID, _, _, _, _ string) (func() error, error) {
 						generatedServerID = serverID
 						return nopRollback, nil
 					}).
-					Times(1)
+					Once()
 			},
-			func(r *mockevents.MockStream) {
-				r.EXPECT().
-					Publish(
-						gomock.Any(),
-						gomock.Eq(fmt.Sprintf("%s.servers.%s", mockFacilityCode, rctypes.Inventory)),
-						gomock.Any(),
-					).
+			mockStream: func(r *eventsm.MockStream) {
+				r.On("Publish", mock.Anything, fmt.Sprintf("%s.servers.%s", mockFacilityCode, rctypes.Inventory), mock.Anything).
 					Return(nil).
-					Times(1)
+					Once()
 			},
-			func(t *testing.T) *http.Request {
+			request: func(t *testing.T) *http.Request {
 				payload, err := json.Marshal(&v1types.ConditionCreate{Parameters: validParams.MustJSON()})
 				if err != nil {
 					t.Error()
@@ -369,7 +311,7 @@ func TestAddServer(t *testing.T) {
 
 				return request
 			},
-			func(t *testing.T, r *httptest.ResponseRecorder) {
+			assertResponse: func(t *testing.T, r *httptest.ResponseRecorder) {
 				assert.Equal(t, http.StatusOK, r.Code)
 			},
 		},
@@ -393,6 +335,17 @@ func TestAddServer(t *testing.T) {
 			server.ServeHTTP(recorder, tc.request(t))
 
 			tc.assertResponse(t, recorder)
+
+			// Assert all expectations
+			if tc.mockStore != nil {
+				repository.AssertExpectations(t)
+			}
+			if tc.mockFleetDBClient != nil {
+				fleetDBClient.AssertExpectations(t)
+			}
+			if tc.mockStream != nil {
+				stream.AssertExpectations(t)
+			}
 		})
 	}
 }
@@ -407,35 +360,27 @@ func TestDeleteServer(t *testing.T) {
 	mockServerID := uuid.New()
 	testcases := []struct {
 		name              string
-		mockStore         func(r *storeTest.MockRepository)
+		mockStore         func(r *store.MockRepository)
 		mockFleetDBClient func(f *fleetdb.MockFleetDB)
 		request           func(t *testing.T) *http.Request
 		assertResponse    func(t *testing.T, r *httptest.ResponseRecorder)
 	}{
 		{
-			"delete server success",
+			name: "delete server success",
 			// mock repository
-			func(r *storeTest.MockRepository) {
+			mockStore: func(r *store.MockRepository) {
 				// create condition query
-				r.EXPECT().
-					GetActiveCondition(
-						gomock.Any(),
-						gomock.Eq(mockServerID),
-					).
+				r.On("GetActiveCondition", mock.Anything, mockServerID).
 					Return(nil, nil).
-					Times(1)
+					Once()
 			},
-			func(r *fleetdb.MockFleetDB) {
+			mockFleetDBClient: func(r *fleetdb.MockFleetDB) {
 				// lookup for an existing condition
-				r.EXPECT().
-					DeleteServer(
-						gomock.Any(),
-						gomock.Eq(mockServerID),
-					).
-					Return(nil). // no condition exists
-					Times(1)
+				r.On("DeleteServer", mock.Anything, mockServerID).
+					Return(nil).
+					Once()
 			},
-			func(t *testing.T) *http.Request {
+			request: func(t *testing.T) *http.Request {
 				url := fmt.Sprintf("/api/v1/servers/%v", mockServerID)
 				request, err := http.NewRequestWithContext(context.TODO(), http.MethodDelete, url, nil)
 				if err != nil {
@@ -444,34 +389,16 @@ func TestDeleteServer(t *testing.T) {
 
 				return request
 			},
-			func(t *testing.T, r *httptest.ResponseRecorder) {
+			assertResponse: func(t *testing.T, r *httptest.ResponseRecorder) {
 				assert.Equal(t, http.StatusOK, r.Code)
 			},
 		},
 		{
-			"invalid ID",
+			name: "invalid ID",
 			// mock repository
-			func(r *storeTest.MockRepository) {
-				// create condition query
-				r.EXPECT().
-					GetActiveCondition(
-						gomock.Any(),
-						gomock.Eq(mockServerID),
-					).
-					Return(&rctypes.Condition{}, nil).
-					Times(0)
-			},
-			func(r *fleetdb.MockFleetDB) {
-				// lookup for an existing condition
-				r.EXPECT().
-					DeleteServer(
-						gomock.Any(),
-						gomock.Eq(mockServerID),
-					).
-					Return(nil). // no condition exists
-					Times(0)
-			},
-			func(t *testing.T) *http.Request {
+			mockStore:         func(r *store.MockRepository) {},
+			mockFleetDBClient: func(r *fleetdb.MockFleetDB) {},
+			request: func(t *testing.T) *http.Request {
 				url := fmt.Sprintf("/api/v1/servers/%v", "invalidID")
 				request, err := http.NewRequestWithContext(context.TODO(), http.MethodDelete, url, nil)
 				if err != nil {
@@ -480,34 +407,21 @@ func TestDeleteServer(t *testing.T) {
 
 				return request
 			},
-			func(t *testing.T, r *httptest.ResponseRecorder) {
+			assertResponse: func(t *testing.T, r *httptest.ResponseRecorder) {
 				assert.Equal(t, http.StatusBadRequest, r.Code)
 			},
 		},
 		{
-			"active condition",
+			name: "active condition",
 			// mock repository
-			func(r *storeTest.MockRepository) {
+			mockStore: func(r *store.MockRepository) {
 				// create condition query
-				r.EXPECT().
-					GetActiveCondition(
-						gomock.Any(),
-						gomock.Eq(mockServerID),
-					).
+				r.On("GetActiveCondition", mock.Anything, mockServerID).
 					Return(&rctypes.Condition{}, nil).
-					Times(1)
+					Once()
 			},
-			func(r *fleetdb.MockFleetDB) {
-				// lookup for an existing condition
-				r.EXPECT().
-					DeleteServer(
-						gomock.Any(),
-						gomock.Eq(mockServerID),
-					).
-					Return(nil). // no condition exists
-					Times(0)
-			},
-			func(t *testing.T) *http.Request {
+			mockFleetDBClient: func(r *fleetdb.MockFleetDB) {},
+			request: func(t *testing.T) *http.Request {
 				url := fmt.Sprintf("/api/v1/servers/%v", mockServerID)
 				request, err := http.NewRequestWithContext(context.TODO(), http.MethodDelete, url, nil)
 				if err != nil {
@@ -516,34 +430,21 @@ func TestDeleteServer(t *testing.T) {
 
 				return request
 			},
-			func(t *testing.T, r *httptest.ResponseRecorder) {
+			assertResponse: func(t *testing.T, r *httptest.ResponseRecorder) {
 				assert.Equal(t, http.StatusBadRequest, r.Code)
 			},
 		},
 		{
-			"check active condition error",
+			name: "check active condition error",
 			// mock repository
-			func(r *storeTest.MockRepository) {
+			mockStore: func(r *store.MockRepository) {
 				// create condition query
-				r.EXPECT().
-					GetActiveCondition(
-						gomock.Any(),
-						gomock.Eq(mockServerID),
-					).
+				r.On("GetActiveCondition", mock.Anything, mockServerID).
 					Return(nil, fmt.Errorf("fake check condition error")).
-					Times(1)
+					Once()
 			},
-			func(r *fleetdb.MockFleetDB) {
-				// lookup for an existing condition
-				r.EXPECT().
-					DeleteServer(
-						gomock.Any(),
-						gomock.Eq(mockServerID),
-					).
-					Return(fmt.Errorf("fake delete error")). // no condition exists
-					Times(0)
-			},
-			func(t *testing.T) *http.Request {
+			mockFleetDBClient: func(r *fleetdb.MockFleetDB) {},
+			request: func(t *testing.T) *http.Request {
 				url := fmt.Sprintf("/api/v1/servers/%v", mockServerID)
 				request, err := http.NewRequestWithContext(context.TODO(), http.MethodDelete, url, nil)
 				if err != nil {
@@ -552,34 +453,26 @@ func TestDeleteServer(t *testing.T) {
 
 				return request
 			},
-			func(t *testing.T, r *httptest.ResponseRecorder) {
+			assertResponse: func(t *testing.T, r *httptest.ResponseRecorder) {
 				assert.Equal(t, http.StatusServiceUnavailable, r.Code)
 			},
 		},
 		{
-			"delete error",
+			name: "delete error",
 			// mock repository
-			func(r *storeTest.MockRepository) {
+			mockStore: func(r *store.MockRepository) {
 				// create condition query
-				r.EXPECT().
-					GetActiveCondition(
-						gomock.Any(),
-						gomock.Eq(mockServerID),
-					).
+				r.On("GetActiveCondition", mock.Anything, mockServerID).
 					Return(nil, nil).
-					Times(1)
+					Once()
 			},
-			func(r *fleetdb.MockFleetDB) {
+			mockFleetDBClient: func(r *fleetdb.MockFleetDB) {
 				// lookup for an existing condition
-				r.EXPECT().
-					DeleteServer(
-						gomock.Any(),
-						gomock.Eq(mockServerID),
-					).
-					Return(fmt.Errorf("fake delete error")). // no condition exists
-					Times(1)
+				r.On("DeleteServer", mock.Anything, mockServerID).
+					Return(fmt.Errorf("fake delete error")).
+					Once()
 			},
-			func(t *testing.T) *http.Request {
+			request: func(t *testing.T) *http.Request {
 				url := fmt.Sprintf("/api/v1/servers/%v", mockServerID)
 				request, err := http.NewRequestWithContext(context.TODO(), http.MethodDelete, url, nil)
 				if err != nil {
@@ -588,7 +481,7 @@ func TestDeleteServer(t *testing.T) {
 
 				return request
 			},
-			func(t *testing.T, r *httptest.ResponseRecorder) {
+			assertResponse: func(t *testing.T, r *httptest.ResponseRecorder) {
 				assert.Equal(t, http.StatusInternalServerError, r.Code)
 			},
 		},
@@ -618,20 +511,17 @@ func TestAddServerRollback(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-
 	rollbackCallCounter := 0
 	rollback := func() error {
 		rollbackCallCounter += 1
 		return nil
 	}
-
 	mockServerID := uuid.New()
 	validParams := fmt.Sprintf(`{"facility":"%v","ip":"192.168.0.1","user":"foo","pwd":"bar"}`, mockServerID)
 	payload, err := json.Marshal(&v1types.ConditionCreate{Parameters: []byte(validParams)})
 	if err != nil {
 		t.Error()
 	}
-
 	requestFunc := func(t *testing.T) *http.Request {
 		url := fmt.Sprintf("/api/v1/serverEnroll/%v", mockServerID)
 		request, err := http.NewRequestWithContext(context.TODO(), http.MethodPost, url, bytes.NewReader(payload))
@@ -640,12 +530,10 @@ func TestAddServerRollback(t *testing.T) {
 		}
 		return request
 	}
-
 	type mockError struct {
 		calledTime int
 		err        error
 	}
-
 	testcases := []struct {
 		name                 string
 		mockStoreCreateErr   mockError
@@ -657,116 +545,97 @@ func TestAddServerRollback(t *testing.T) {
 		expectRollback       int
 	}{
 		{
-			"no error",
-			mockError{1, nil},
-			mockError{1, nil},
-			mockError{1, nil},
-			mockError{0, nil},
-			requestFunc,
-			func(t *testing.T, r *httptest.ResponseRecorder) {
+			name:                 "no error",
+			mockStoreCreateErr:   mockError{calledTime: 1, err: nil},
+			mockFleetDBClientErr: mockError{calledTime: 1, err: nil},
+			mockStreamErr:        mockError{calledTime: 1, err: nil},
+			mockStoreUpdateErr:   mockError{calledTime: 0, err: nil},
+			request:              requestFunc,
+			assertResponse: func(t *testing.T, r *httptest.ResponseRecorder) {
 				assert.Equal(t, http.StatusOK, r.Code)
 			},
-			0,
+			expectRollback: 0,
 		},
 		{
-			"fleetdb error",
-			mockError{0, nil},
-			mockError{1, fmt.Errorf("fake fleetdb error")},
-			mockError{0, nil},
-			mockError{0, nil},
-			requestFunc,
-			func(t *testing.T, r *httptest.ResponseRecorder) {
+			name:                 "fleetdb error",
+			mockStoreCreateErr:   mockError{calledTime: 0, err: nil},
+			mockFleetDBClientErr: mockError{calledTime: 1, err: fmt.Errorf("fake fleetdb error")},
+			mockStreamErr:        mockError{calledTime: 0, err: nil},
+			mockStoreUpdateErr:   mockError{calledTime: 0, err: nil},
+			request:              requestFunc,
+			assertResponse: func(t *testing.T, r *httptest.ResponseRecorder) {
 				assert.Equal(t, http.StatusInternalServerError, r.Code)
 			},
-			1,
+			expectRollback: 1,
 		},
 		{
-			"repository create error",
-			mockError{1, fmt.Errorf("fake repository create error")},
-			mockError{1, nil},
-			mockError{0, nil},
-			mockError{0, nil},
-			requestFunc,
-			func(t *testing.T, r *httptest.ResponseRecorder) {
+			name:                 "repository create error",
+			mockStoreCreateErr:   mockError{calledTime: 1, err: fmt.Errorf("fake repository create error")},
+			mockFleetDBClientErr: mockError{calledTime: 1, err: nil},
+			mockStreamErr:        mockError{calledTime: 0, err: nil},
+			mockStoreUpdateErr:   mockError{calledTime: 0, err: nil},
+			request:              requestFunc,
+			assertResponse: func(t *testing.T, r *httptest.ResponseRecorder) {
 				assert.Equal(t, http.StatusInternalServerError, r.Code)
 			},
-			1,
+			expectRollback: 1,
 		},
 		{
-			"stream error",
-			mockError{1, nil},
-			mockError{1, nil},
-			mockError{1, fmt.Errorf("fake stream error")},
-			mockError{1, nil},
-			requestFunc,
-			func(t *testing.T, r *httptest.ResponseRecorder) {
+			name:                 "stream error",
+			mockStoreCreateErr:   mockError{calledTime: 1, err: nil},
+			mockFleetDBClientErr: mockError{calledTime: 1, err: nil},
+			mockStreamErr:        mockError{calledTime: 1, err: fmt.Errorf("fake stream error")},
+			mockStoreUpdateErr:   mockError{calledTime: 1, err: nil},
+			request:              requestFunc,
+			assertResponse: func(t *testing.T, r *httptest.ResponseRecorder) {
 				assert.Equal(t, http.StatusInternalServerError, r.Code)
 			},
-			1,
+			expectRollback: 1,
 		},
 		{
-			"stream delete error",
-			mockError{1, nil},
-			mockError{1, nil},
-			mockError{1, fmt.Errorf("fake stream error")},
-			mockError{1, fmt.Errorf("fake repository delete error")},
-			requestFunc,
-			func(t *testing.T, r *httptest.ResponseRecorder) {
+			name:                 "stream delete error",
+			mockStoreCreateErr:   mockError{calledTime: 1, err: nil},
+			mockFleetDBClientErr: mockError{calledTime: 1, err: nil},
+			mockStreamErr:        mockError{calledTime: 1, err: fmt.Errorf("fake stream error")},
+			mockStoreUpdateErr:   mockError{calledTime: 1, err: fmt.Errorf("fake repository delete error")},
+			request:              requestFunc,
+			assertResponse: func(t *testing.T, r *httptest.ResponseRecorder) {
 				assert.Equal(t, http.StatusInternalServerError, r.Code)
 			},
-			1,
+			expectRollback: 1,
 		},
 	}
-
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
 			rollbackCallCounter = 0
+			if tc.mockStoreCreateErr.calledTime > 0 {
+				repository.On("Create", mock.Anything, mock.Anything, mock.Anything).
+					Return(tc.mockStoreCreateErr.err).
+					Times(tc.mockStoreCreateErr.calledTime)
+			}
 
-			repository.EXPECT().
-				Create(
-					gomock.Any(),
-					gomock.Any(),
-					gomock.Any(),
-				).
-				DoAndReturn(func(_ context.Context, _ uuid.UUID, c *rctypes.Condition) error {
-					return tc.mockStoreCreateErr.err
-				}).
-				Times(tc.mockStoreCreateErr.calledTime)
+			if tc.mockFleetDBClientErr.calledTime > 0 {
+				fleetDBClient.On("AddServer", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+					Return(rollback, tc.mockFleetDBClientErr.err).
+					Times(tc.mockFleetDBClientErr.calledTime)
+			}
 
-			fleetDBClient.EXPECT().
-				AddServer(
-					gomock.Any(),
-					gomock.Any(),
-					gomock.Any(),
-					gomock.Any(),
-					gomock.Any(),
-					gomock.Any(),
-				).
-				Return(rollback, tc.mockFleetDBClientErr.err). // no condition exists
-				Times(tc.mockFleetDBClientErr.calledTime)
+			if tc.mockStreamErr.calledTime > 0 {
+				stream.On("Publish", mock.Anything, mock.Anything, mock.Anything).
+					Return(tc.mockStreamErr.err).
+					Times(tc.mockStreamErr.calledTime)
+			}
 
-			stream.EXPECT().
-				Publish(
-					gomock.Any(),
-					gomock.Any(),
-					gomock.Any(),
-				).
-				Return(tc.mockStreamErr.err).
-				Times(tc.mockStreamErr.calledTime)
-
-			repository.EXPECT().
-				Update(
-					gomock.Any(),
-					gomock.Any(),
-					gomock.Any(),
-				).
-				Return(tc.mockStoreUpdateErr.err).
-				Times(tc.mockStoreUpdateErr.calledTime)
+			if tc.mockStoreUpdateErr.calledTime > 0 {
+				repository.On("Update", mock.Anything, mock.Anything, mock.Anything).
+					Return(tc.mockStoreUpdateErr.err).
+					Times(tc.mockStoreUpdateErr.calledTime)
+			}
 
 			recorder := httptest.NewRecorder()
 			server.ServeHTTP(recorder, tc.request(t))
-
 			tc.assertResponse(t, recorder)
+
 			if rollbackCallCounter != tc.expectRollback {
 				t.Errorf("rollback called %v times, expect %v", rollbackCallCounter, tc.expectRollback)
 			}
@@ -779,21 +648,9 @@ func TestServerConditionCreate(t *testing.T) {
 	serverID := uuid.New()
 	facilityCode := "foo-42"
 
-	// mock repository
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	repository := storeTest.NewMockRepository(ctrl)
-
-	fleetDBCtrl := gomock.NewController(t)
-	defer fleetDBCtrl.Finish()
-
-	fleetDBClient := fleetdb.NewMockFleetDB(fleetDBCtrl)
-
-	streamCtrl := gomock.NewController(t)
-	defer streamCtrl.Finish()
-
-	stream := mockevents.NewMockStream(streamCtrl)
+	repository := store.NewMockRepository(t)
+	fleetDBClient := fleetdb.NewMockFleetDB(t)
+	stream := eventsm.NewMockStream(t)
 
 	server, err := mockserver(t, logrus.New(), fleetDBClient, repository, stream)
 	if err != nil {
@@ -802,175 +659,133 @@ func TestServerConditionCreate(t *testing.T) {
 
 	testcases := []struct {
 		name              string
-		mockStore         func(r *storeTest.MockRepository)
+		mockStore         func(r *store.MockRepository)
 		mockFleetDBClient func(f *fleetdb.MockFleetDB)
-		mockStream        func(r *mockevents.MockStream)
+		mockStream        func(r *eventsm.MockStream)
 		request           func(t *testing.T) *http.Request
 		assertResponse    func(t *testing.T, r *httptest.ResponseRecorder)
 	}{
 		{
-			"invalid server ID error",
-			nil,
-			nil,
-			nil,
-			func(t *testing.T) *http.Request {
+			name:              "invalid server ID error",
+			mockStore:         nil,
+			mockFleetDBClient: nil,
+			mockStream:        nil,
+			request: func(t *testing.T) *http.Request {
 				url := fmt.Sprintf("/api/v1/servers/%s/condition/%s", "123", "invalid")
 				request, err := http.NewRequestWithContext(context.TODO(), http.MethodPost, url, http.NoBody)
 				if err != nil {
 					t.Fatal(err)
 				}
-
 				return request
 			},
-			func(t *testing.T, r *httptest.ResponseRecorder) {
+			assertResponse: func(t *testing.T, r *httptest.ResponseRecorder) {
 				assert.Equal(t, http.StatusBadRequest, r.Code)
 				assert.Contains(t, string(asBytes(t, r.Body)), "invalid UUID")
 			},
 		},
 		{
-			"invalid server condition state",
-			nil,
-			nil,
-			nil,
-			func(t *testing.T) *http.Request {
+			name:              "invalid server condition state",
+			mockStore:         nil,
+			mockFleetDBClient: nil,
+			mockStream:        nil,
+			request: func(t *testing.T) *http.Request {
 				url := fmt.Sprintf("/api/v1/servers/%s/condition/%s", uuid.New().String(), "asdasd")
 				request, err := http.NewRequestWithContext(context.TODO(), http.MethodPost, url, http.NoBody)
 				if err != nil {
 					t.Fatal(err)
 				}
-
 				return request
 			},
-			func(t *testing.T, r *httptest.ResponseRecorder) {
+			assertResponse: func(t *testing.T, r *httptest.ResponseRecorder) {
 				assert.Equal(t, http.StatusBadRequest, r.Code)
 				assert.Contains(t, string(asBytes(t, r.Body)), "unsupported condition")
 			},
 		},
 		{
-			"invalid server condition payload returns error",
-			nil,
-			nil,
-			nil,
-			func(t *testing.T) *http.Request {
+			name:              "invalid server condition payload returns error",
+			mockStore:         nil,
+			mockFleetDBClient: nil,
+			mockStream:        nil,
+			request: func(t *testing.T) *http.Request {
 				url := fmt.Sprintf("/api/v1/servers/%s/condition/%s", serverID.String(), rctypes.FirmwareInstall)
 				request, err := http.NewRequestWithContext(context.TODO(), http.MethodPost, url, bytes.NewReader([]byte(``)))
 				if err != nil {
 					t.Fatal(err)
 				}
-
 				return request
 			},
-			func(t *testing.T, r *httptest.ResponseRecorder) {
+			assertResponse: func(t *testing.T, r *httptest.ResponseRecorder) {
 				assert.Equal(t, http.StatusBadRequest, r.Code)
 				assert.Contains(t, string(asBytes(t, r.Body)), "invalid ConditionCreate payload")
 			},
 		},
 		{
-			"server with no facility code returns error",
-			nil,
-			func(m *fleetdb.MockFleetDB) {
-				// facility code lookup
-				m.EXPECT().
-					GetServer(
-						gomock.Any(),
-						gomock.Eq(serverID),
-					).
-					Return(
-						&model.Server{ID: serverID, FacilityCode: ""},
-						nil,
-					).
-					Times(1)
+			name:      "server with no facility code returns error",
+			mockStore: nil,
+			mockFleetDBClient: func(m *fleetdb.MockFleetDB) {
+				m.On("GetServer", mock.Anything, serverID).
+					Return(&model.Server{ID: serverID, FacilityCode: ""}, nil).
+					Once()
 			},
-			nil,
-			func(t *testing.T) *http.Request {
+			mockStream: nil,
+			request: func(t *testing.T) *http.Request {
 				payload, err := json.Marshal(&v1types.ConditionCreate{Parameters: []byte(`{"some param": "1"}`)})
 				if err != nil {
 					t.Error()
 				}
-
 				url := fmt.Sprintf("/api/v1/servers/%s/condition/%s", serverID.String(), rctypes.FirmwareInstall)
 				request, err := http.NewRequestWithContext(context.TODO(), http.MethodPost, url, bytes.NewReader(payload))
 				if err != nil {
 					t.Fatal(err)
 				}
-
 				return request
 			},
-			func(t *testing.T, r *httptest.ResponseRecorder) {
+			assertResponse: func(t *testing.T, r *httptest.ResponseRecorder) {
 				assert.Equal(t, http.StatusInternalServerError, r.Code)
 				assert.Contains(t, string(asBytes(t, r.Body)), "no facility code")
 			},
 		},
 		{
-			"valid server condition created",
-			// mock repository
-			func(r *storeTest.MockRepository) {
+			name: "valid server condition created",
+			mockStore: func(r *store.MockRepository) {
 				parametersJSON, _ := json.Marshal(json.RawMessage(`{"some param": "1"}`))
-
-				// lookup for an existing condition
-				r.EXPECT().
-					GetActiveCondition(
-						gomock.Any(),
-						gomock.Eq(serverID),
-					).
-					Return(nil, nil). // no condition exists
-					Times(1)
-				// create condition query
-				r.EXPECT().
-					Create(
-						gomock.Any(),
-						gomock.Eq(serverID),
-						gomock.Any(),
-					).
-					DoAndReturn(func(_ context.Context, _ uuid.UUID, c *rctypes.Condition) error {
+				r.On("GetActiveCondition", mock.Anything, serverID).
+					Return(nil, nil).
+					Once()
+				r.On("Create", mock.Anything, serverID, mock.IsType(&rctypes.Condition{})).
+					Run(func(args mock.Arguments) {
+						c := args.Get(2).(*rctypes.Condition)
 						assert.Equal(t, rctypes.ConditionStructVersion, c.Version, "condition version mismatch")
 						assert.Equal(t, rctypes.FirmwareInstall, c.Kind, "condition kind mismatch")
 						assert.Equal(t, json.RawMessage(parametersJSON), c.Parameters, "condition parameters mismatch")
 						assert.Equal(t, rctypes.Pending, c.State, "condition state mismatch")
-						return nil
 					}).
-					Times(1)
-			},
-
-			func(m *fleetdb.MockFleetDB) {
-				// facility code lookup
-				m.EXPECT().
-					GetServer(
-						gomock.Any(),
-						gomock.Eq(serverID),
-					).
-					Return(
-						&model.Server{ID: serverID, FacilityCode: facilityCode},
-						nil,
-					).
-					Times(1)
-			},
-
-			func(r *mockevents.MockStream) {
-				r.EXPECT().
-					Publish(
-						gomock.Any(),
-						gomock.Eq(fmt.Sprintf("%s.servers.%s", facilityCode, rctypes.FirmwareInstall)),
-						gomock.Any(),
-					).
 					Return(nil).
-					Times(1)
+					Once()
 			},
-			func(t *testing.T) *http.Request {
+			mockFleetDBClient: func(m *fleetdb.MockFleetDB) {
+				m.On("GetServer", mock.Anything, serverID).
+					Return(&model.Server{ID: serverID, FacilityCode: facilityCode}, nil).
+					Once()
+			},
+			mockStream: func(r *eventsm.MockStream) {
+				r.On("Publish", mock.Anything, fmt.Sprintf("%s.servers.%s", facilityCode, rctypes.FirmwareInstall), mock.Anything).
+					Return(nil).
+					Once()
+			},
+			request: func(t *testing.T) *http.Request {
 				payload, err := json.Marshal(&v1types.ConditionCreate{Parameters: []byte(`{"some param": "1"}`)})
 				if err != nil {
 					t.Error()
 				}
-
 				url := fmt.Sprintf("/api/v1/servers/%s/condition/%s", serverID.String(), rctypes.FirmwareInstall)
 				request, err := http.NewRequestWithContext(context.TODO(), http.MethodPost, url, bytes.NewReader(payload))
 				if err != nil {
 					t.Fatal(err)
 				}
-
 				return request
 			},
-			func(t *testing.T, r *httptest.ResponseRecorder) {
+			assertResponse: func(t *testing.T, r *httptest.ResponseRecorder) {
 				assert.Equal(t, http.StatusOK, r.Code)
 				var resp v1types.ServerResponse
 				err := json.Unmarshal(r.Body.Bytes(), &resp)
@@ -980,72 +795,47 @@ func TestServerConditionCreate(t *testing.T) {
 			},
 		},
 		{
-			"condition with Fault created",
-			// mock repository
-			func(r *storeTest.MockRepository) {
-				// lookup for an existing condition
-				r.EXPECT().
-					GetActiveCondition(
-						gomock.Any(),
-						gomock.Eq(serverID),
-					).
-					Return(nil, nil). // no condition exists
-					Times(1)
+			name: "condition with Fault created",
+			mockStore: func(r *store.MockRepository) {
+				get := r.On("GetActiveCondition", mock.Anything, serverID).
+					Return(nil, nil).
+					Once()
 
-				// create condition query
-				r.EXPECT().
-					Create(
-						gomock.Any(),
-						gomock.Eq(serverID),
-						gomock.Any(),
-					).
-					DoAndReturn(func(_ context.Context, _ uuid.UUID, c *rctypes.Condition) error {
+				create := r.On("Create", mock.Anything, serverID, mock.IsType(&rctypes.Condition{})).
+					Run(func(args mock.Arguments) {
+						c := args.Get(2).(*rctypes.Condition)
 						expect := &rctypes.Fault{Panic: true, DelayDuration: "10s", FailAt: "foobar"}
 						assert.Equal(t, c.Fault, expect)
-						return nil
 					}).
-					Times(1)
-			},
-			func(m *fleetdb.MockFleetDB) {
-				// facility code lookup
-				m.EXPECT().
-					GetServer(
-						gomock.Any(),
-						gomock.Eq(serverID),
-					).
-					Return(
-						&model.Server{ID: serverID, FacilityCode: facilityCode},
-						nil,
-					).
-					Times(1)
-			},
-
-			func(r *mockevents.MockStream) {
-				r.EXPECT().
-					Publish(
-						gomock.Any(),
-						gomock.Eq(fmt.Sprintf("%s.servers.%s", facilityCode, rctypes.FirmwareInstall)),
-						gomock.Any(),
-					).
 					Return(nil).
 					Times(1)
+
+				create.NotBefore(get)
 			},
-			func(t *testing.T) *http.Request {
+			mockFleetDBClient: func(m *fleetdb.MockFleetDB) {
+				m.On("GetServer", mock.Anything, serverID).
+					Return(&model.Server{ID: serverID, FacilityCode: facilityCode}, nil).
+					Once()
+			},
+			mockStream: func(r *eventsm.MockStream) {
+				r.On("Publish", mock.Anything, fmt.Sprintf("%s.servers.%s", facilityCode, rctypes.FirmwareInstall), mock.Anything).
+					Return(nil).
+					Once()
+			},
+			request: func(t *testing.T) *http.Request {
 				fault := rctypes.Fault{Panic: true, DelayDuration: "10s", FailAt: "foobar"}
 				payload, err := json.Marshal(&v1types.ConditionCreate{Parameters: []byte(`{"some param": "1"}`), Fault: &fault})
 				if err != nil {
 					t.Error(err)
 				}
-
 				url := fmt.Sprintf("/api/v1/servers/%s/condition/%s", serverID.String(), rctypes.FirmwareInstall)
 				request, err := http.NewRequestWithContext(context.TODO(), http.MethodPost, url, bytes.NewReader(payload))
 				if err != nil {
 					t.Fatal(err)
 				}
-
 				return request
 			},
-			func(t *testing.T, r *httptest.ResponseRecorder) {
+			assertResponse: func(t *testing.T, r *httptest.ResponseRecorder) {
 				assert.Equal(t, http.StatusOK, r.Code)
 				var resp v1types.ServerResponse
 				err := json.Unmarshal(r.Body.Bytes(), &resp)
@@ -1055,128 +845,83 @@ func TestServerConditionCreate(t *testing.T) {
 			},
 		},
 		{
-			"server condition exists in non-finalized state",
-			// mock repository
-			func(r *storeTest.MockRepository) {
-				// lookup existing condition
-				r.EXPECT().
-					GetActiveCondition(
-						gomock.Any(),
-						gomock.Eq(serverID),
-					).
-					Return(&rctypes.Condition{ // condition present
+			name: "server condition exists in non-finalized state",
+			mockStore: func(r *store.MockRepository) {
+				r.On("GetActiveCondition", mock.Anything, serverID).
+					Return(&rctypes.Condition{
 						Kind:       rctypes.FirmwareInstall,
 						State:      rctypes.Pending,
 						Parameters: []byte(`{"hello":"world"}`),
 					}, nil).
-					Times(1)
+					Once()
 			},
-			func(m *fleetdb.MockFleetDB) {
-				// facility code lookup
-				m.EXPECT().
-					GetServer(
-						gomock.Any(),
-						gomock.Eq(serverID),
-					).
-					Return(
-						&model.Server{ID: serverID, FacilityCode: facilityCode},
-						nil,
-					).
-					Times(1)
+			mockFleetDBClient: func(m *fleetdb.MockFleetDB) {
+				m.On("GetServer", mock.Anything, serverID).
+					Return(&model.Server{ID: serverID, FacilityCode: facilityCode}, nil).
+					Once()
 			},
-			nil,
-			func(t *testing.T) *http.Request {
+			mockStream: nil,
+			request: func(t *testing.T) *http.Request {
 				url := fmt.Sprintf("/api/v1/servers/%s/condition/%s", serverID.String(), rctypes.FirmwareInstall)
 				request, err := http.NewRequestWithContext(context.TODO(), http.MethodPost, url, bytes.NewReader([]byte(`{"hello":"world"}`)))
 				if err != nil {
 					t.Fatal(err)
 				}
-
 				return request
 			},
-			func(t *testing.T, r *httptest.ResponseRecorder) {
+			assertResponse: func(t *testing.T, r *httptest.ResponseRecorder) {
 				assert.Equal(t, http.StatusBadRequest, r.Code)
 				assert.Contains(t, string(asBytes(t, r.Body)), "server has an active condition")
 			},
 		},
 		{
-			"server condition publish failure results in created condition deletion",
-			// mock repository
-			func(r *storeTest.MockRepository) {
+			name: "server condition publish failure results in created condition deletion",
+			mockStore: func(r *store.MockRepository) {
 				parametersJSON, _ := json.Marshal(json.RawMessage(`{"some param": "1"}`))
-
-				// lookup for an existing condition
-				r.EXPECT().
-					GetActiveCondition(
-						gomock.Any(),
-						gomock.Eq(serverID),
-					).
-					Return(nil, nil). // no condition exists
-					Times(1)
-				// create condition query
-				r.EXPECT().
-					Create(
-						gomock.Any(),
-						gomock.Eq(serverID),
-						gomock.Any(),
-					).
-					DoAndReturn(func(_ context.Context, _ uuid.UUID, c *rctypes.Condition) error {
+				r.On("GetActiveCondition", mock.Anything, serverID).
+					Return(nil, nil).
+					Once()
+				r.On("Create", mock.Anything, serverID, mock.IsType(&rctypes.Condition{})).
+					Run(func(args mock.Arguments) {
+						c := args.Get(2).(*rctypes.Condition)
 						assert.Equal(t, rctypes.ConditionStructVersion, c.Version, "condition version mismatch")
 						assert.Equal(t, rctypes.FirmwareInstall, c.Kind, "condition kind mismatch")
 						assert.Equal(t, json.RawMessage(parametersJSON), c.Parameters, "condition parameters mismatch")
 						assert.Equal(t, rctypes.Pending, c.State, "condition state mismatch")
-						return nil
 					}).
-					Times(1)
-
-				// condition deletion due to publish failure
-				r.EXPECT().
-					Update(gomock.Any(), gomock.Eq(serverID), gomock.Any()).
-					Times(1).DoAndReturn(func(_ context.Context, _ uuid.UUID, c *rctypes.Condition) error {
-					require.Equal(t, rctypes.Failed, c.State)
-					return nil
-				})
+					Return(nil).
+					Once()
+				r.On("Update", mock.Anything, serverID, mock.IsType(&rctypes.Condition{})).
+					Run(func(args mock.Arguments) {
+						c := args.Get(2).(*rctypes.Condition)
+						assert.Equal(t, rctypes.Failed, c.State)
+					}).
+					Return(nil).
+					Once()
 			},
-
-			func(m *fleetdb.MockFleetDB) {
-				// facility code lookup
-				m.EXPECT().
-					GetServer(
-						gomock.Any(),
-						gomock.Eq(serverID),
-					).
-					Return(
-						&model.Server{ID: serverID, FacilityCode: facilityCode},
-						nil,
-					).
-					Times(1)
+			mockFleetDBClient: func(m *fleetdb.MockFleetDB) {
+				m.On("GetServer", mock.Anything, serverID).
+					Return(&model.Server{ID: serverID, FacilityCode: facilityCode}, nil).
+					Once()
 			},
-
-			func(r *mockevents.MockStream) {
-				r.EXPECT().
-					Publish(
-						gomock.Any(),
-						gomock.Eq(fmt.Sprintf("%s.servers.%s", facilityCode, rctypes.FirmwareInstall)),
-						gomock.Any(),
-					).
+			mockStream: func(r *eventsm.MockStream) {
+				r.On("Publish", mock.Anything, fmt.Sprintf("%s.servers.%s", facilityCode, rctypes.FirmwareInstall), mock.Anything).
 					Return(errors.New("gremlins in the pipes")).
-					Times(1)
+					Once()
 			},
-			func(t *testing.T) *http.Request {
+			request: func(t *testing.T) *http.Request {
 				payload, err := json.Marshal(&v1types.ConditionCreate{Parameters: []byte(`{"some param": "1"}`)})
 				if err != nil {
 					t.Error()
 				}
-
 				url := fmt.Sprintf("/api/v1/servers/%s/condition/%s", serverID.String(), rctypes.FirmwareInstall)
 				request, err := http.NewRequestWithContext(context.TODO(), http.MethodPost, url, bytes.NewReader(payload))
 				if err != nil {
 					t.Fatal(err)
 				}
-
 				return request
 			},
-			func(t *testing.T, r *httptest.ResponseRecorder) {
+			assertResponse: func(t *testing.T, r *httptest.ResponseRecorder) {
 				assert.Equal(t, http.StatusInternalServerError, r.Code)
 				var resp v1types.ServerResponse
 				err = json.Unmarshal(r.Body.Bytes(), &resp)
@@ -1207,7 +952,6 @@ func TestServerConditionCreate(t *testing.T) {
 		})
 	}
 }
-
 func TestConditionStatus(t *testing.T) {
 	serverID := uuid.New()
 	condID := uuid.New()
@@ -1224,10 +968,7 @@ func TestConditionStatus(t *testing.T) {
 	}
 
 	// mock repository
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	repository := storeTest.NewMockRepository(ctrl)
+	repository := new(store.MockRepository)
 
 	server, err := mockserver(t, logrus.New(), nil, repository, nil)
 	if err != nil {
@@ -1236,14 +977,14 @@ func TestConditionStatus(t *testing.T) {
 
 	testcases := []struct {
 		name           string
-		mockStore      func(r *storeTest.MockRepository)
+		mockStore      func(r *store.MockRepository)
 		request        func(t *testing.T) *http.Request
 		assertResponse func(t *testing.T, r *httptest.ResponseRecorder)
 	}{
 		{
-			"invalid server ID error",
-			nil,
-			func(t *testing.T) *http.Request {
+			name:      "invalid server ID error",
+			mockStore: nil,
+			request: func(t *testing.T) *http.Request {
 				url := fmt.Sprintf("/api/v1/servers/%s/status", "123")
 				request, err := http.NewRequestWithContext(context.TODO(), http.MethodGet, url, http.NoBody)
 				if err != nil {
@@ -1252,21 +993,19 @@ func TestConditionStatus(t *testing.T) {
 
 				return request
 			},
-			func(t *testing.T, r *httptest.ResponseRecorder) {
+			assertResponse: func(t *testing.T, r *httptest.ResponseRecorder) {
 				assert.Equal(t, http.StatusBadRequest, r.Code)
 				assert.Contains(t, string(asBytes(t, r.Body)), "invalid UUID")
 			},
 		},
 		{
-			"server condition record returned",
-			// mock repository
-			func(r *storeTest.MockRepository) {
-				r.EXPECT().
-					Get(gomock.Any(), gomock.Eq(serverID)).
-					Times(1).
-					Return(conditionRecord, nil)
+			name: "server condition record returned",
+			mockStore: func(r *store.MockRepository) {
+				r.On("Get", mock.Anything, serverID).
+					Return(conditionRecord, nil).
+					Once()
 			},
-			func(t *testing.T) *http.Request {
+			request: func(t *testing.T) *http.Request {
 				url := fmt.Sprintf("/api/v1/servers/%s/status", serverID.String())
 
 				request, err := http.NewRequestWithContext(context.TODO(), http.MethodGet, url, http.NoBody)
@@ -1276,7 +1015,7 @@ func TestConditionStatus(t *testing.T) {
 
 				return request
 			},
-			func(t *testing.T, r *httptest.ResponseRecorder) {
+			assertResponse: func(t *testing.T, r *httptest.ResponseRecorder) {
 				assert.Equal(t, http.StatusOK, r.Code)
 
 				want := asJSONBytes(
@@ -1296,15 +1035,13 @@ func TestConditionStatus(t *testing.T) {
 			},
 		},
 		{
-			"no server condition",
-			// mock repository
-			func(r *storeTest.MockRepository) {
-				r.EXPECT().
-					Get(gomock.Any(), gomock.Eq(serverID)).
-					Times(1).
-					Return(nil, store.ErrConditionNotFound)
+			name: "no server condition",
+			mockStore: func(r *store.MockRepository) {
+				r.On("Get", mock.Anything, serverID).
+					Return(nil, store.ErrConditionNotFound).
+					Once()
 			},
-			func(t *testing.T) *http.Request {
+			request: func(t *testing.T) *http.Request {
 				url := fmt.Sprintf("/api/v1/servers/%s/status", serverID.String())
 
 				request, err := http.NewRequestWithContext(context.TODO(), http.MethodGet, url, http.NoBody)
@@ -1314,7 +1051,7 @@ func TestConditionStatus(t *testing.T) {
 
 				return request
 			},
-			func(t *testing.T, r *httptest.ResponseRecorder) {
+			assertResponse: func(t *testing.T, r *httptest.ResponseRecorder) {
 				assert.Equal(t, http.StatusNotFound, r.Code)
 
 				want := asJSONBytes(
@@ -1328,15 +1065,13 @@ func TestConditionStatus(t *testing.T) {
 			},
 		},
 		{
-			"lookup error",
-			// mock repository
-			func(r *storeTest.MockRepository) {
-				r.EXPECT().
-					Get(gomock.Any(), gomock.Eq(serverID)).
-					Times(1).
-					Return(nil, errors.New("bogus error"))
+			name: "lookup error",
+			mockStore: func(r *store.MockRepository) {
+				r.On("Get", mock.Anything, serverID).
+					Return(nil, errors.New("bogus error")).
+					Once()
 			},
-			func(t *testing.T) *http.Request {
+			request: func(t *testing.T) *http.Request {
 				url := fmt.Sprintf("/api/v1/servers/%s/status", serverID.String())
 
 				request, err := http.NewRequestWithContext(context.TODO(), http.MethodGet, url, http.NoBody)
@@ -1346,7 +1081,7 @@ func TestConditionStatus(t *testing.T) {
 
 				return request
 			},
-			func(t *testing.T, r *httptest.ResponseRecorder) {
+			assertResponse: func(t *testing.T, r *httptest.ResponseRecorder) {
 				assert.Equal(t, http.StatusServiceUnavailable, r.Code)
 
 				want := asJSONBytes(
