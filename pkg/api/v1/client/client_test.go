@@ -1,6 +1,7 @@
 package client
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -15,15 +16,15 @@ import (
 	"github.com/metal-toolbox/conditionorc/internal/model"
 	"github.com/metal-toolbox/conditionorc/internal/server"
 	"github.com/metal-toolbox/conditionorc/internal/store"
-	storeTest "github.com/metal-toolbox/conditionorc/internal/store/test"
 	"github.com/sirupsen/logrus"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	"github.com/metal-toolbox/conditionorc/pkg/api/v1/types"
 	v1types "github.com/metal-toolbox/conditionorc/pkg/api/v1/types"
 	rctypes "github.com/metal-toolbox/rivets/condition"
 
-	events "go.hollow.sh/toolbox/events/mock"
+	eventsm "github.com/metal-toolbox/rivets/events"
 )
 
 type integrationTester struct {
@@ -31,9 +32,9 @@ type integrationTester struct {
 	assertAuthToken bool
 	handler         http.Handler
 	client          *Client
-	repository      *storeTest.MockRepository
+	repository      *store.MockRepository
 	fleetDB         *fleetdb.MockFleetDB
-	stream          *events.MockStream
+	stream          *eventsm.MockStream
 }
 
 // Do implements the HTTPRequestDoer interface to swap the response writer
@@ -61,9 +62,9 @@ func newTester(t *testing.T) (*integrationTester, finalizer) {
 
 	ctrl := gomock.NewController(t)
 
-	repository := storeTest.NewMockRepository(ctrl)
-	fleetDBClient := fleetdb.NewMockFleetDB(ctrl)
-	stream := events.NewMockStream(ctrl)
+	repository := store.NewMockRepository(t)
+	fleetDBClient := fleetdb.NewMockFleetDB(t)
+	stream := eventsm.NewMockStream(t)
 
 	l := logrus.New()
 	l.Level = logrus.Level(logrus.ErrorLevel)
@@ -105,41 +106,37 @@ func newTester(t *testing.T) (*integrationTester, finalizer) {
 
 	return tester, ctrl.Finish
 }
-
 func TestConditionStatus(t *testing.T) {
 	serverID := uuid.New()
 
 	testcases := []struct {
 		name                string
-		mockStore           func(r *storeTest.MockRepository)
+		mockStore           func(r *store.MockRepository)
 		expectResponse      func() *v1types.ServerResponse
 		expectErrorContains string
 	}{
 		{
-			"valid response",
-			// mock repository
-			func(r *storeTest.MockRepository) {
-				r.EXPECT().
-					Get(
-						gomock.Any(),
-						gomock.Eq(serverID),
-					).
-					Return(
-						&store.ConditionRecord{
-							State: rctypes.Pending,
-							Conditions: []*rctypes.Condition{
-								&rctypes.Condition{
-									Kind:   rctypes.FirmwareInstall,
-									State:  rctypes.Pending,
-									Status: []byte(`{"hello":"world"}`),
-								},
+			name: "valid response",
+			mockStore: func(r *store.MockRepository) {
+				r.On(
+					"Get",
+					mock.Anything,
+					serverID,
+				).Return(
+					&store.ConditionRecord{
+						State: rctypes.Pending,
+						Conditions: []*rctypes.Condition{
+							&rctypes.Condition{
+								Kind:   rctypes.FirmwareInstall,
+								State:  rctypes.Pending,
+								Status: []byte(`{"hello":"world"}`),
 							},
 						},
-						nil).
-					Times(1)
+					},
+					nil,
+				).Once()
 			},
-			func() *v1types.ServerResponse {
-
+			expectResponse: func() *v1types.ServerResponse {
 				return &v1types.ServerResponse{
 					StatusCode: 200,
 					Records: &v1types.ConditionsResponse{
@@ -155,30 +152,27 @@ func TestConditionStatus(t *testing.T) {
 					},
 				}
 			},
-			"",
+			expectErrorContains: "",
 		},
 		{
-			"404 response",
-			// mock repository
-			func(r *storeTest.MockRepository) {
-				// lookup existing condition
-				r.EXPECT().
-					Get(
-						gomock.Any(),
-						gomock.Eq(serverID),
-					).
-					Return(
-						nil,
-						store.ErrConditionNotFound).
-					Times(1)
+			name: "404 response",
+			mockStore: func(r *store.MockRepository) {
+				r.On(
+					"Get",
+					mock.Anything,
+					serverID,
+				).Return(
+					nil,
+					store.ErrConditionNotFound,
+				).Once()
 			},
-			func() *v1types.ServerResponse {
+			expectResponse: func() *v1types.ServerResponse {
 				return &v1types.ServerResponse{
 					Message:    "condition not found for server",
 					StatusCode: 404,
 				}
 			},
-			"",
+			expectErrorContains: "",
 		},
 	}
 
@@ -212,82 +206,77 @@ func TestConditionStatus(t *testing.T) {
 		})
 	}
 }
-
 func TestConditionCreate(t *testing.T) {
 	serverID := uuid.New()
 
 	testcases := []struct {
 		name                string
 		payload             v1types.ConditionCreate
-		mockStore           func(r *storeTest.MockRepository)
+		mockStore           func(r *store.MockRepository)
 		expectResponse      func() *v1types.ServerResponse
 		expectErrorContains string
+		expectPublish       bool
 	}{
 		{
-			"valid payload sent",
-			v1types.ConditionCreate{Parameters: []byte(`{"hello":"world"}`)},
-			// mock repository
-			func(r *storeTest.MockRepository) {
-				r.EXPECT().
-					GetActiveCondition(
-						gomock.Any(),
-						gomock.Eq(serverID),
-					).
-					Return(
-						nil,
-						nil,
-					).
-					Times(1)
+			name:    "valid payload sent",
+			payload: v1types.ConditionCreate{Parameters: []byte(`{"hello":"world"}`)},
+			mockStore: func(r *store.MockRepository) {
+				r.On(
+					"GetActiveCondition",
+					mock.Anything,
+					serverID,
+				).Return(
+					nil,
+					nil,
+				).Once()
 
-				// expect valid payload
-				r.EXPECT().
-					Create(
-						gomock.Any(),
-						gomock.Eq(serverID),
-						gomock.Any(),
-					).
-					DoAndReturn(func(_ context.Context, _ uuid.UUID, c *rctypes.Condition) error {
+				r.On(
+					"Create",
+					mock.Anything,
+					serverID,
+					mock.Anything,
+				).Return(
+					func(_ context.Context, _ uuid.UUID, c *rctypes.Condition) error {
 						require.Equal(t, rctypes.ConditionStructVersion, c.Version, "condition version mismatch")
 						require.Equal(t, rctypes.FirmwareInstall, c.Kind, "condition kind mismatch")
 						require.Equal(t, json.RawMessage(`{"hello":"world"}`), c.Parameters, "condition parameters mismatch")
 						require.Equal(t, rctypes.Pending, c.State, "condition state mismatch")
 						return nil
-					}).
-					Times(1)
+					},
+				).Once()
 			},
-			func() *v1types.ServerResponse {
+			expectResponse: func() *v1types.ServerResponse {
 				return &v1types.ServerResponse{
 					StatusCode: 200,
 					Message:    "condition set",
 				}
 			},
-			"",
+			expectErrorContains: "",
+			expectPublish:       true,
 		},
 		{
-			"400 response",
-			v1types.ConditionCreate{Parameters: []byte(`{"hello":"world"}`)},
-			// mock repository
-			func(r *storeTest.MockRepository) {
-				// condition exists
-				r.EXPECT().
-					GetActiveCondition(
-						gomock.Any(),
-						gomock.Eq(serverID),
-					).
-					Return(
-						&rctypes.Condition{
-							State: rctypes.Pending,
-						},
-						nil).
-					Times(1)
+			name:    "400 response",
+			payload: v1types.ConditionCreate{Parameters: []byte(`{"hello":"world"}`)},
+			mockStore: func(r *store.MockRepository) {
+				r.On(
+					"GetActiveCondition",
+					mock.Anything,
+					serverID,
+				).Return(
+					&rctypes.Condition{
+						State: rctypes.Pending,
+					},
+					nil,
+				).Once()
 			},
-			func() *v1types.ServerResponse {
+			expectResponse: func() *v1types.ServerResponse {
 				return &v1types.ServerResponse{
 					Message:    "server has an active condition",
 					StatusCode: 400,
 				}
 			},
-			"",
+			expectErrorContains: "",
+			expectPublish:       false,
 		},
 	}
 
@@ -300,11 +289,11 @@ func TestConditionCreate(t *testing.T) {
 				tc.mockStore(tester.repository)
 			}
 
-			tester.fleetDB.EXPECT().GetServer(gomock.Any(), gomock.Any()).AnyTimes().
-				Return(&model.Server{FacilityCode: "facility"}, nil)
+			tester.fleetDB.On("GetServer", mock.Anything, mock.Anything).Return(&model.Server{FacilityCode: "facility"}, nil).Once()
 
-			tester.stream.EXPECT().Publish(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes().
-				Return(nil)
+			if tc.expectPublish {
+				tester.stream.On("Publish", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
+			}
 
 			got, err := tester.client.ServerConditionCreate(context.TODO(), serverID, rctypes.FirmwareInstall, tc.payload)
 			if err != nil {
@@ -324,68 +313,52 @@ func TestConditionCreate(t *testing.T) {
 		})
 	}
 }
-
 func TestFirmwareInstall(t *testing.T) {
 	serverID := uuid.New()
 
 	testcases := []struct {
 		name                string
 		payload             *rctypes.FirmwareInstallTaskParameters
-		mockStore           func(r *storeTest.MockRepository)
+		mockStore           func(r *store.MockRepository)
 		expectResponse      func() *v1types.ServerResponse
 		expectErrorContains string
+		expectPublish       bool
 	}{
 		{
-			"success case",
-			&rctypes.FirmwareInstallTaskParameters{
+			name: "success case",
+			payload: &rctypes.FirmwareInstallTaskParameters{
 				AssetID: serverID,
 			},
-			// mock repository
-			func(r *storeTest.MockRepository) {
-				// CreateMultiple returns an error if there is an active condition
-				r.EXPECT().
-					CreateMultiple(
-						gomock.Any(),
-						gomock.Eq(serverID),
-						gomock.Any(),
-						gomock.Any(),
-					).Times(1).Return(nil)
+			mockStore: func(r *store.MockRepository) {
+				r.On("CreateMultiple", mock.Anything, serverID, mock.Anything, mock.Anything).
+					Return(nil).Once()
 			},
-			func() *v1types.ServerResponse {
+			expectResponse: func() *v1types.ServerResponse {
 				return &v1types.ServerResponse{
 					StatusCode: 200,
 					Message:    "firmware install scheduled",
 				}
 			},
-			"",
+			expectErrorContains: "",
+			expectPublish:       true,
 		},
 		{
-			"400 response",
-			&rctypes.FirmwareInstallTaskParameters{
+			name: "400 response",
+			payload: &rctypes.FirmwareInstallTaskParameters{
 				AssetID: serverID,
 			},
-			// mock repository
-			func(r *storeTest.MockRepository) {
-				// condition exists
-				r.EXPECT().
-					CreateMultiple(
-						gomock.Any(),
-						gomock.Eq(serverID),
-						gomock.Any(),
-						gomock.Any(),
-					).
-					Return(
-						fmt.Errorf("%w:%s", store.ErrActiveCondition, "pound sand"),
-					).
-					Times(1)
+			mockStore: func(r *store.MockRepository) {
+				r.On("CreateMultiple", mock.Anything, serverID, mock.Anything, mock.Anything).
+					Return(fmt.Errorf("%w:%s", store.ErrActiveCondition, "pound sand")).Once()
 			},
-			func() *v1types.ServerResponse {
+			expectResponse: func() *v1types.ServerResponse {
 				return &v1types.ServerResponse{
 					Message:    "server has an active condition",
 					StatusCode: 409,
 				}
 			},
-			"",
+			expectErrorContains: "",
+			expectPublish:       false,
 		},
 	}
 
@@ -398,11 +371,10 @@ func TestFirmwareInstall(t *testing.T) {
 				tc.mockStore(tester.repository)
 			}
 
-			tester.fleetDB.EXPECT().GetServer(gomock.Any(), gomock.Any()).AnyTimes().
-				Return(&model.Server{FacilityCode: "facility"}, nil)
-
-			tester.stream.EXPECT().Publish(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes().
-				Return(nil)
+			tester.fleetDB.On("GetServer", mock.Anything, mock.Anything).Return(&model.Server{FacilityCode: "facility"}, nil).Times(1)
+			if tc.expectPublish {
+				tester.stream.On("Publish", mock.Anything, mock.Anything, mock.Anything).Return(nil).Times(1)
+			}
 
 			got, err := tester.client.ServerFirmwareInstall(context.TODO(), tc.payload)
 			if err != nil {
@@ -422,7 +394,6 @@ func TestFirmwareInstall(t *testing.T) {
 		})
 	}
 }
-
 func TestServerEnroll(t *testing.T) {
 	serverID := uuid.New()
 	validParams := types.AddServerParams{
@@ -451,118 +422,91 @@ func TestServerEnroll(t *testing.T) {
 		name                  string
 		payload               v1types.ConditionCreate
 		mockFleetDBClient     func(f *fleetdb.MockFleetDB)
-		mockStore             func(r *storeTest.MockRepository)
+		mockStore             func(r *store.MockRepository)
 		expectedRollbackCount int
 		expectResponse        func() *v1types.ServerResponse
 		expectError           string
+		expectPublish         bool
 	}{
 		{
-			"valid payload sent",
-			v1types.ConditionCreate{Parameters: validParams.MustJSON()},
-			func(r *fleetdb.MockFleetDB) {
+			name:    "valid payload sent",
+			payload: v1types.ConditionCreate{Parameters: validParams.MustJSON()},
+			mockFleetDBClient: func(r *fleetdb.MockFleetDB) {
 				// lookup for an existing condition
-				r.EXPECT().
-					AddServer(
-						gomock.Any(),
-						gomock.Eq(serverID),
-						gomock.Eq("mock-facility-code"),
-						gomock.Eq("mock-ip"), gomock.Eq("mock-user"),
-						gomock.Eq("mock-pwd"),
-					).
+				r.On("AddServer",
+					mock.Anything,
+					serverID,
+					"mock-facility-code",
+					"mock-ip",
+					"mock-user",
+					"mock-pwd",
+				).
 					Return(nil, nil).
-					Times(1)
+					Once()
 			},
-			func(r *storeTest.MockRepository) {
+			mockStore: func(r *store.MockRepository) {
 				// expect valid payload
-				r.EXPECT().
-					Create(
-						gomock.Any(),
-						gomock.Eq(serverID),
-						gomock.Any(),
-					).
-					DoAndReturn(func(_ context.Context, _ uuid.UUID, c *rctypes.Condition) error {
-						require.Equal(t, rctypes.ConditionStructVersion, c.Version, "condition version mismatch")
-						require.Equal(t, rctypes.Inventory, c.Kind, "condition kind mismatch")
-						require.Equal(t, json.RawMessage(expectedInventoryParams(serverID.String())), c.Parameters, "condition parameters mismatch")
-						require.Equal(t, rctypes.Pending, c.State, "condition state mismatch")
-						return nil
-					}).
-					Times(1)
+				r.On("Create",
+					mock.Anything,
+					serverID,
+					mock.Anything,
+				).Return(func(_ context.Context, _ uuid.UUID, c *rctypes.Condition) error {
+					require.Equal(t, rctypes.ConditionStructVersion, c.Version, "condition version mismatch")
+					require.Equal(t, rctypes.Inventory, c.Kind, "condition kind mismatch")
+					require.Equal(t, json.RawMessage(expectedInventoryParams(serverID.String())), c.Parameters, "condition parameters mismatch")
+					require.Equal(t, rctypes.Pending, c.State, "condition state mismatch")
+					return nil
+				}).
+					Once()
 			},
-			0,
-			func() *v1types.ServerResponse {
+			expectedRollbackCount: 0,
+			expectResponse: func() *v1types.ServerResponse {
 				return &v1types.ServerResponse{
 					StatusCode: 200,
 					Message:    "condition set",
 				}
 			},
-			"",
+			expectError:   "",
+			expectPublish: true,
 		},
 		{
-			"invalid payload - failed to send out",
-			v1types.ConditionCreate{Parameters: []byte("not json")},
-			func(r *fleetdb.MockFleetDB) {
-				// lookup for an existing condition
-				r.EXPECT().
-					AddServer(
-						gomock.Any(),
-						gomock.Any(),
-						gomock.Any(),
-						gomock.Any(),
-						gomock.Any(),
-						gomock.Any(),
-					).
-					Times(0)
-			},
-			func(r *storeTest.MockRepository) {
-				// expect valid payload
-				r.EXPECT().
-					Create(
-						gomock.Any(),
-						gomock.Any(),
-						gomock.Any(),
-					).
-					Times(0)
-			},
-			0,
-			func() *v1types.ServerResponse {
+			name:                  "invalid payload - failed to send out",
+			payload:               v1types.ConditionCreate{Parameters: []byte("not json")},
+			mockFleetDBClient:     func(r *fleetdb.MockFleetDB) {},
+			mockStore:             func(r *store.MockRepository) {},
+			expectedRollbackCount: 0,
+			expectResponse: func() *v1types.ServerResponse {
 				return nil
 			},
-			"conditionorc client error - error in POST JSON payload",
+			expectError:   "conditionorc client error - error in POST JSON payload",
+			expectPublish: false,
 		},
 		{
-			"no bmc user",
-			v1types.ConditionCreate{Parameters: invalidParamsNoBMCUser.MustJSON()},
-			func(r *fleetdb.MockFleetDB) {
+			name:    "no bmc user",
+			payload: v1types.ConditionCreate{Parameters: invalidParamsNoBMCUser.MustJSON()},
+			mockFleetDBClient: func(r *fleetdb.MockFleetDB) {
 				// lookup for an existing condition
-				r.EXPECT().
-					AddServer(
-						gomock.Any(),
-						gomock.Eq(serverID),
-						gomock.Eq("mock-facility-code"),
-						gomock.Eq("mock-ip"), gomock.Eq(""),
-						gomock.Eq("mock-pwd"),
-					).
+				r.On("AddServer",
+					mock.Anything,
+					serverID,
+					"mock-facility-code",
+					"mock-ip",
+					"",
+					"mock-pwd",
+				).
 					Return(rollback, fleetdb.ErrBMCCredentials).
-					Times(1)
+					Once()
 			},
-			func(r *storeTest.MockRepository) {
-				// expect valid payload
-				r.EXPECT().
-					Create(
-						gomock.Any(),
-						gomock.Any(),
-						gomock.Any(),
-					).Times(0)
-			},
-			1,
-			func() *v1types.ServerResponse {
+			mockStore:             func(r *store.MockRepository) {},
+			expectedRollbackCount: 1,
+			expectResponse: func() *v1types.ServerResponse {
 				return &v1types.ServerResponse{
 					StatusCode: 500,
 					Message:    "add server: invalid bmc credentials. missing user or passwordserver rollback err: <nil>",
 				}
 			},
-			"",
+			expectError:   "",
+			expectPublish: false,
 		},
 	}
 
@@ -579,8 +523,10 @@ func TestServerEnroll(t *testing.T) {
 				tc.mockFleetDBClient(tester.fleetDB)
 			}
 
-			tester.stream.EXPECT().Publish(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes().
-				Return(nil)
+			if tc.expectPublish {
+				tester.stream.On("Publish", mock.Anything, mock.Anything, mock.Anything).Return(nil).Times(1)
+			}
+
 			defer func() {
 				require.Equal(t, tc.expectedRollbackCount, rollbackCounter, "rollback called incorrectly")
 				rollbackCounter = 0
@@ -628,36 +574,33 @@ func TestServerEnrollEmptyUUID(t *testing.T) {
 		return nil
 	}
 
-	tester.fleetDB.EXPECT().
-		AddServer(gomock.Any(),
-			gomock.Any(),
-			gomock.Eq("mock-facility-code"),
-			gomock.Eq("mock-ip"),
-			gomock.Eq("mock-user"),
-			gomock.Eq("mock-pwd"),
-		).
-		DoAndReturn(func(ctx context.Context, serverID uuid.UUID, _, _, _, _ string) (func() error, error) {
-			generatedServerID = serverID
-			return rollback, nil
-		}).
-		Times(1)
+	tester.fleetDB.On("AddServer",
+		mock.Anything,
+		mock.Anything,
+		"mock-facility-code",
+		"mock-ip",
+		"mock-user",
+		"mock-pwd").
+		Return(rollback, nil).
+		Once()
 
-	tester.repository.EXPECT().
-		Create(
-			gomock.Any(),
-			gomock.Any(),
-			gomock.Any(),
-		).
-		DoAndReturn(func(_ context.Context, _ uuid.UUID, c *rctypes.Condition) error {
-			require.Equal(t, rctypes.ConditionStructVersion, c.Version, "condition version mismatch")
-			require.Equal(t, rctypes.Inventory, c.Kind, "condition kind mismatch")
-			require.Equal(t, json.RawMessage(expectedInventoryParams(generatedServerID.String())), c.Parameters, "condition parameters mismatch")
-			require.Equal(t, rctypes.Pending, c.State, "condition state mismatch")
-			return nil
-		}).
-		Times(1)
+	tester.repository.On("Create",
+		mock.Anything,
+		mock.Anything,
+		mock.MatchedBy(func(c *rctypes.Condition) bool {
+			generatedServerID = c.Target
+			return c.Version == rctypes.ConditionStructVersion &&
+				c.Kind == rctypes.Inventory &&
+				bytes.Equal(c.Parameters, []byte(expectedInventoryParams(generatedServerID.String()))) &&
+				c.State == rctypes.Pending
+		})).
+		Return(nil).
+		Once()
 
-	tester.stream.EXPECT().Publish(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes().
+	tester.stream.On("Publish",
+		mock.Anything,
+		mock.Anything,
+		mock.Anything).
 		Return(nil)
 
 	got, err := tester.client.ServerEnroll(context.TODO(), "", v1types.ConditionCreate{Parameters: validParams.MustJSON()})
@@ -673,29 +616,23 @@ func TestServerDelete(t *testing.T) {
 	testcases := []struct {
 		name              string
 		mockFleetDBClient func(f *fleetdb.MockFleetDB)
-		mockStore         func(r *storeTest.MockRepository)
+		mockStore         func(r *store.MockRepository)
 		expectResponse    func() *v1types.ServerResponse
 	}{
 		{
 			"delete server success",
 			func(r *fleetdb.MockFleetDB) {
-				r.EXPECT().
-					DeleteServer(
-						gomock.Any(),
-						gomock.Eq(serverID),
-					).
-					Return(nil).
-					Times(1)
+				r.On("DeleteServer",
+					mock.Anything,
+					serverID,
+				).Return(nil).Once()
 			},
-			func(r *storeTest.MockRepository) {
+			func(r *store.MockRepository) {
 				// expect valid payload
-				r.EXPECT().
-					GetActiveCondition(
-						gomock.Any(),
-						gomock.Eq(serverID),
-					).
-					Return(nil, nil).
-					Times(1)
+				r.On("GetActiveCondition",
+					mock.Anything,
+					serverID,
+				).Return(nil, nil).Once()
 			},
 			func() *v1types.ServerResponse {
 				return &v1types.ServerResponse{
@@ -706,23 +643,13 @@ func TestServerDelete(t *testing.T) {
 		},
 		{
 			"active condition",
-			func(r *fleetdb.MockFleetDB) {
-				r.EXPECT().
-					DeleteServer(
-						gomock.Any(),
-						gomock.Any(),
-					).
-					Times(0)
-			},
-			func(r *storeTest.MockRepository) {
+			func(r *fleetdb.MockFleetDB) {},
+			func(r *store.MockRepository) {
 				// expect valid payload
-				r.EXPECT().
-					GetActiveCondition(
-						gomock.Any(),
-						gomock.Eq(serverID),
-					).
-					Return(&rctypes.Condition{}, nil).
-					Times(1)
+				r.On("GetActiveCondition",
+					mock.Anything,
+					serverID,
+				).Return(&rctypes.Condition{}, nil).Once()
 			},
 			func() *v1types.ServerResponse {
 				return &v1types.ServerResponse{
@@ -733,23 +660,13 @@ func TestServerDelete(t *testing.T) {
 		},
 		{
 			"check active condition error",
-			func(r *fleetdb.MockFleetDB) {
-				r.EXPECT().
-					DeleteServer(
-						gomock.Any(),
-						gomock.Any(),
-					).
-					Times(0)
-			},
-			func(r *storeTest.MockRepository) {
+			func(r *fleetdb.MockFleetDB) {},
+			func(r *store.MockRepository) {
 				// expect valid payload
-				r.EXPECT().
-					GetActiveCondition(
-						gomock.Any(),
-						gomock.Eq(serverID),
-					).
-					Return(nil, fmt.Errorf("fake check condition error")).
-					Times(1)
+				r.On("GetActiveCondition",
+					mock.Anything,
+					serverID,
+				).Return(nil, fmt.Errorf("fake check condition error")).Once()
 			},
 			func() *v1types.ServerResponse {
 				return &v1types.ServerResponse{
@@ -761,23 +678,17 @@ func TestServerDelete(t *testing.T) {
 		{
 			"fleetdb delete error",
 			func(r *fleetdb.MockFleetDB) {
-				r.EXPECT().
-					DeleteServer(
-						gomock.Any(),
-						gomock.Any(),
-					).
-					Return(fmt.Errorf("fake delete error")).
-					Times(1)
+				r.On("DeleteServer",
+					mock.Anything,
+					mock.Anything,
+				).Return(fmt.Errorf("fake delete error")).Once()
 			},
-			func(r *storeTest.MockRepository) {
+			func(r *store.MockRepository) {
 				// expect valid payload
-				r.EXPECT().
-					GetActiveCondition(
-						gomock.Any(),
-						gomock.Eq(serverID),
-					).
-					Return(nil, nil).
-					Times(1)
+				r.On("GetActiveCondition",
+					mock.Anything,
+					serverID,
+				).Return(nil, nil).Once()
 			},
 			func() *v1types.ServerResponse {
 				return &v1types.ServerResponse{
@@ -845,22 +756,6 @@ func TestServerDeleteInvalidUUID(t *testing.T) {
 
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
-			tester.fleetDB.EXPECT().
-				DeleteServer(
-					gomock.Any(),
-					gomock.Any(),
-				).
-				Return(nil).
-				Times(0)
-
-			tester.repository.EXPECT().
-				GetActiveCondition(
-					gomock.Any(),
-					gomock.Any(),
-				).
-				Return(nil, nil).
-				Times(0)
-
 			got, err := tester.client.ServerDelete(context.TODO(), tc.serverID)
 			if err != nil {
 				t.Error(err)
