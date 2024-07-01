@@ -12,9 +12,9 @@ import (
 	"github.com/metal-toolbox/conditionorc/internal/fleetdb"
 	"github.com/metal-toolbox/conditionorc/internal/store"
 	"github.com/metal-toolbox/conditionorc/pkg/api/v1/routes"
+	"github.com/metal-toolbox/rivets/events"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
-	"go.hollow.sh/toolbox/events"
 	"go.hollow.sh/toolbox/ginjwt"
 
 	rctypes "github.com/metal-toolbox/rivets/condition"

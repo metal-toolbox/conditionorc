@@ -9,7 +9,7 @@ import (
 	"github.com/metal-toolbox/conditionorc/internal/app"
 	"github.com/metal-toolbox/conditionorc/internal/model"
 	rctypes "github.com/metal-toolbox/rivets/condition"
-	"go.hollow.sh/toolbox/events"
+	"github.com/metal-toolbox/rivets/events"
 
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
