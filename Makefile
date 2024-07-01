@@ -25,11 +25,11 @@ lint-fix:
 test: lint
 	go test -timeout 1m -v -covermode=atomic ./...
 
-## generate mock store - invoke when changes are made to the store interface
-gen-store-mock:
-	go install github.com/golang/mock/mockgen@v1.6.0
-	mockgen -package=test -source=internal/store/interface.go > internal/store/test/mock.go
-	mockgen -package=fleetdb -source=internal/fleetdb/interface.go > internal/fleetdb/mock.go
+## Generate mocks
+gen-mock:
+	go install github.com/vektra/mockery/v2@v2.42.1
+	mockery
+	go mod tidy
 
 ## build osx bin
 build-osx:
