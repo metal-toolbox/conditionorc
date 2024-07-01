@@ -8,7 +8,7 @@ import (
 	rctypes "github.com/metal-toolbox/rivets/condition"
 	"github.com/pkg/errors"
 
-	"go.hollow.sh/toolbox/events/registry"
+	"github.com/metal-toolbox/rivets/events/registry"
 )
 
 var (
