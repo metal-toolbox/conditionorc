@@ -45,7 +45,7 @@ func mockserver(t *testing.T, logger *logrus.Logger, fleetDBClient fleetdb.Fleet
 	}
 
 	if stream != nil {
-		options = append(options, WithStreamBroker(stream))
+		options = append(options, WithStreamBroker(stream, "foo"))
 	}
 
 	v1Router, err := NewRoutes(options...)
