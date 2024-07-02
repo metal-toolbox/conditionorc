@@ -11,7 +11,6 @@ import (
 	"testing"
 
 	"github.com/gin-gonic/gin"
-	"github.com/golang/mock/gomock"
 	"github.com/google/uuid"
 	"github.com/metal-toolbox/conditionorc/internal/fleetdb"
 	"github.com/metal-toolbox/conditionorc/internal/model"
@@ -86,9 +85,6 @@ func asJSONBytes(t *testing.T, s *v1types.ServerResponse) []byte {
 }
 
 func setupTestServer(t *testing.T) (*store.MockRepository, *fleetdb.MockFleetDB, *eventsm.MockStream, *gin.Engine, error) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
 	repository := store.NewMockRepository(t)
 	fleetDBClient := fleetdb.NewMockFleetDB(t)
 	stream := eventsm.NewMockStream(t)

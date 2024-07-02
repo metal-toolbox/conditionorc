@@ -18,7 +18,6 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/golang/mock/gomock"
 	"github.com/google/uuid"
 	"github.com/metal-toolbox/conditionorc/internal/server"
 	"github.com/metal-toolbox/conditionorc/internal/store"
@@ -33,10 +32,8 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-func newAuthTester(t *testing.T, authToken string) (*integrationTester, finalizer) {
+func newAuthTester(t *testing.T, authToken string) *integrationTester {
 	t.Helper()
-
-	ctrl := gomock.NewController(t)
 
 	repository := store.NewMockRepository(t)
 
@@ -90,7 +87,7 @@ func newAuthTester(t *testing.T, authToken string) (*integrationTester, finalize
 
 	tester.client = client
 
-	return tester, ctrl.Finish
+	return tester
 }
 
 func testAuthToken(t *testing.T) string {
@@ -197,8 +194,7 @@ func TestIntegration_AuthToken(t *testing.T) {
 
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
-			tester, finish := newAuthTester(t, tc.token)
-			defer finish()
+			tester := newAuthTester(t, tc.token)
 
 			if tc.mockStore != nil {
 				tc.mockStore(tester.repository)
