@@ -2,16 +2,20 @@ package cmd
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
+	"net/http"
 
 	"github.com/equinix-labs/otel-init-go/otelinit"
 
 	"github.com/metal-toolbox/conditionorc/internal/app"
+	"github.com/metal-toolbox/conditionorc/internal/fleetdb"
 	"github.com/metal-toolbox/conditionorc/internal/metrics"
 	"github.com/metal-toolbox/conditionorc/internal/model"
 	"github.com/metal-toolbox/conditionorc/internal/orchestrator"
 	"github.com/metal-toolbox/conditionorc/internal/orchestrator/notify"
+	"github.com/metal-toolbox/conditionorc/internal/server"
 	"github.com/metal-toolbox/conditionorc/internal/store"
 	"github.com/metal-toolbox/conditionorc/internal/version"
 	"github.com/metal-toolbox/rivets/events"
@@ -62,8 +66,38 @@ var cmdOrchestrator = &cobra.Command{
 			app.Logger.Fatal(err)
 		}
 
+		fleetDBClient, err := fleetdb.NewFleetDBClient(ctx, app.Config, app.Config.ConditionDefinitions, app.Logger)
+		if err != nil {
+			app.Logger.Fatal(err)
+		}
+
+		// init Orchestrator API server
+		optionsOrcAPI := []server.Option{
+			server.WithLogger(app.Logger),
+			server.WithListenAddress(app.Config.ListenAddress),
+			server.WithStore(repository),
+			server.WithFleetDBClient(fleetDBClient),
+			server.WithStreamBroker(streamBroker, app.Config.NatsOptions.PublisherSubjectPrefix),
+			server.WithConditionDefinitions(app.Config.ConditionDefinitions),
+			server.WithAsOrchestrator(facility),
+		}
+
+		if app.OidcEnabled() {
+			optionsOrcAPI = append(optionsOrcAPI, server.WithAuthMiddlewareConfig(app.Config.APIServerJWTAuth))
+		}
+
+		app.Logger.Info(version.Current().String())
+
+		srv := server.New(optionsOrcAPI...)
+		go func() {
+			if err := srv.ListenAndServe(); err != nil && errors.Is(err, http.ErrServerClosed) {
+				app.Logger.Fatal(err)
+			}
+		}()
+
 		notifier := notify.New(app.Logger, app.Config.Notifications)
 
+		// init Orchestrator service
 		options := []orchestrator.Option{
 			orchestrator.WithLogger(app.Logger),
 			orchestrator.WithListenAddress(app.Config.ListenAddress),
@@ -85,6 +119,13 @@ var cmdOrchestrator = &cobra.Command{
 
 		orc := orchestrator.New(options...)
 		orc.Run(ctx)
+
+		// shutdown server when orchestrator Run method returns
+		ctx, cancel := context.WithTimeout(cmd.Context(), shutdownTimeout)
+		defer cancel()
+		if err := srv.Shutdown(ctx); err != nil {
+			app.Logger.Fatal("server shutdown error:", err)
+		}
 	},
 }
 
