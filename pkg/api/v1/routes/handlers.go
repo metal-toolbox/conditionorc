@@ -388,7 +388,7 @@ func (r *Routes) conditionCreate(otelCtx context.Context, newCondition *rctypes.
 	}
 
 	// publish the condition and in case of publish failure - revert.
-	err = r.publishCondition(otelCtx, serverID, facilityCode, newCondition)
+	err = r.publishCondition(otelCtx, serverID, facilityCode, newCondition, false)
 	if err != nil {
 		r.logger.WithError(err).Warn("condition create failed to publish")
 
@@ -453,7 +453,7 @@ func RegisterSpanEvent(span trace.Span, serverID, conditionID, conditionKind, ev
 	))
 }
 
-func (r *Routes) publishCondition(ctx context.Context, serverID uuid.UUID, facilityCode string, publishCondition *rctypes.Condition) error {
+func (r *Routes) publishCondition(ctx context.Context, serverID uuid.UUID, facilityCode string, publishCondition *rctypes.Condition, rollupSubject bool) error {
 	errPublish := errors.New("error publishing condition")
 
 	otelCtx, span := otel.Tracer(pkgName).Start(
@@ -485,6 +485,7 @@ func (r *Routes) publishCondition(ctx context.Context, serverID uuid.UUID, facil
 		otelCtx,
 		subjectSuffix,
 		byt,
+		rollupSubject,
 	); err != nil {
 		return errors.Wrap(errPublish, err.Error())
 	}
