@@ -21,6 +21,8 @@ import (
 
 	"github.com/metal-toolbox/conditionorc/internal/version"
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
+	"go.hollow.sh/toolbox/ginjwt"
 )
 
 var (
@@ -48,4 +50,7 @@ func init() {
 	// Read in env vars with appName as prefix
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "conditionorc.yaml", "default is ./conditionorc.yaml")
 	rootCmd.PersistentFlags().StringVar(&logLevel, "log-level", "info", "set logging level - debug, trace")
+
+	rootCmd.PersistentFlags().Bool("oidc", true, "Use OIDC Auth for API endpoints")
+	ginjwt.BindFlagFromViperInst(viper.GetViper(), "oidc.enabled", rootCmd.PersistentFlags().Lookup("oidc"))
 }

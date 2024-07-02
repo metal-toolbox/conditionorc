@@ -101,6 +101,20 @@ func (a *App) LoadConfiguration() error {
 	return nil
 }
 
+func (a *App) OidcEnabled() bool {
+	if a.v.GetBool("oidc.enabled") {
+		if len(a.Config.APIServerJWTAuth) == 0 {
+			a.Logger.Fatal("OIDC enabled without configuration")
+		}
+		a.Logger.Info("OIDC enabled")
+
+		return true
+	}
+
+	a.Logger.Info("OIDC disabled")
+	return false
+}
+
 func (a *App) envVarOverrides() error {
 	if a.v.GetString("log.level") != "" {
 		a.Config.LogLevel = a.v.GetString("log.level")
