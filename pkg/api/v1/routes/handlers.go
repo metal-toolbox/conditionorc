@@ -313,27 +313,8 @@ func (r *Routes) firmwareInstall(c *gin.Context) (int, *v1types.ServerResponse) 
 		}
 	}
 
-	createTime := time.Now()
-
-	fwCondition := &rctypes.Condition{
-		Kind:                  rctypes.FirmwareInstall,
-		Version:               rctypes.ConditionStructVersion,
-		Parameters:            fw.MustJSON(),
-		State:                 rctypes.Pending,
-		FailOnCheckpointError: true,
-		CreatedAt:             createTime,
-	}
-
-	invCondition := &rctypes.Condition{
-		Kind:                  rctypes.Inventory,
-		Version:               rctypes.ConditionStructVersion,
-		Parameters:            rctypes.MustDefaultInventoryJSON(serverID),
-		State:                 rctypes.Pending,
-		FailOnCheckpointError: true,
-		CreatedAt:             createTime,
-	}
-
-	if err = r.repository.CreateMultiple(otelCtx, serverID, facilityCode, fwCondition, invCondition); err != nil {
+	serverConditions := r.firmwareInstallComposite(serverID, fw)
+	if err = r.repository.CreateMultiple(otelCtx, serverID, serverConditions.Conditions...); err != nil {
 		if errors.Is(err, store.ErrActiveCondition) {
 			return http.StatusConflict, &v1types.ServerResponse{
 				Message: err.Error(),
@@ -345,12 +326,13 @@ func (r *Routes) firmwareInstall(c *gin.Context) (int, *v1types.ServerResponse) 
 		}
 	}
 
-	if err = r.publishCondition(otelCtx, serverID, facilityCode, fwCondition); err != nil {
-		r.logger.WithError(err).Warn("publishing firmware-install condition")
-		// mark firmwareInstall as failed
-		fwCondition.State = rctypes.Failed
-		fwCondition.Status = failedPublishStatus
-		if markErr := r.repository.Update(otelCtx, serverID, fwCondition); markErr != nil {
+	if err = r.publishCondition(otelCtx, serverID, facilityCode, serverConditions.Conditions[0], false); err != nil {
+		r.logger.WithField("kind", serverConditions.Conditions[0].Kind).WithError(err).Warn("error publishing condition")
+		// mark first condition as failed
+		serverConditions.Conditions[0].State = rctypes.Failed
+		serverConditions.Conditions[0].Status = failedPublishStatus
+
+		if markErr := r.repository.Update(otelCtx, serverID, serverConditions.Conditions[0]); markErr != nil {
 			// an operator is going to have to sort this out
 			r.logger.WithError(err).Warn("marking unpublished condition failed")
 		}
@@ -366,11 +348,62 @@ func (r *Routes) firmwareInstall(c *gin.Context) (int, *v1types.ServerResponse) 
 	return http.StatusOK, &v1types.ServerResponse{
 		Message: "firmware install scheduled",
 		Records: &v1types.ConditionsResponse{
-			ServerID: serverID,
-			State:    rctypes.Pending,
-			Conditions: []*rctypes.Condition{
-				fwCondition,
-				invCondition,
+			ServerID:   serverID,
+			State:      rctypes.Pending,
+			Conditions: serverConditions.Conditions,
+		},
+	}
+}
+
+func (r *Routes) firmwareInstallComposite(serverID uuid.UUID, fwtp rctypes.FirmwareInstallTaskParameters) *rctypes.ServerConditions {
+	createTime := time.Now()
+	return &rctypes.ServerConditions{
+		ServerID: serverID,
+		Conditions: []*rctypes.Condition{
+			{
+				Kind:    rctypes.BrokerAcquireServer,
+				Version: rctypes.ConditionStructVersion,
+				Parameters: rctypes.NewBrokerTaskParameters(
+					serverID,
+					rctypes.AcquireServer,
+					rctypes.PurposeFirmwareInstall,
+					"Marked for firmware install",
+				).MustMarshal(),
+				State:     rctypes.Pending,
+				CreatedAt: createTime,
+			},
+			{
+				Kind:       rctypes.FirmwareInstallInband,
+				Version:    rctypes.ConditionStructVersion,
+				Parameters: fwtp.MustJSON(),
+				State:      rctypes.Pending,
+				CreatedAt:  createTime,
+			},
+			{
+				Kind:       rctypes.FirmwareInstall,
+				Version:    rctypes.ConditionStructVersion,
+				Parameters: fwtp.MustJSON(),
+				State:      rctypes.Pending,
+				CreatedAt:  createTime,
+			},
+			{
+				Kind:       rctypes.Inventory,
+				Version:    rctypes.ConditionStructVersion,
+				Parameters: rctypes.MustDefaultInventoryJSON(serverID),
+				State:      rctypes.Pending,
+				CreatedAt:  createTime,
+			},
+			{
+				Kind:    rctypes.BrokerReleaseServer,
+				Version: rctypes.ConditionStructVersion,
+				Parameters: rctypes.NewBrokerTaskParameters(
+					serverID,
+					rctypes.ReleaseServer,
+					"",
+					"Firmware install process completed",
+				).MustMarshal(),
+				State:     rctypes.Pending,
+				CreatedAt: createTime,
 			},
 		},
 	}
