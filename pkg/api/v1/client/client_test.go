@@ -10,7 +10,6 @@ import (
 	"testing"
 
 	"github.com/gin-gonic/gin"
-	"github.com/golang/mock/gomock"
 	"github.com/google/uuid"
 	"github.com/metal-toolbox/conditionorc/internal/fleetdb"
 	"github.com/metal-toolbox/conditionorc/internal/model"
@@ -57,10 +56,8 @@ func (i *integrationTester) Do(req *http.Request) (*http.Response, error) {
 
 type finalizer func()
 
-func newTester(t *testing.T) (*integrationTester, finalizer) {
+func newTester(t *testing.T) *integrationTester {
 	t.Helper()
-
-	ctrl := gomock.NewController(t)
 
 	repository := store.NewMockRepository(t)
 	fleetDBClient := fleetdb.NewMockFleetDB(t)
@@ -103,9 +100,9 @@ func newTester(t *testing.T) (*integrationTester, finalizer) {
 	}
 
 	tester.client = client
-
-	return tester, ctrl.Finish
+	return tester
 }
+
 func TestConditionStatus(t *testing.T) {
 	serverID := uuid.New()
 
@@ -178,8 +175,7 @@ func TestConditionStatus(t *testing.T) {
 
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
-			tester, finish := newTester(t)
-			defer finish()
+			tester := newTester(t)
 
 			if tc.mockStore != nil {
 				tc.mockStore(tester.repository)
@@ -282,8 +278,7 @@ func TestConditionCreate(t *testing.T) {
 
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
-			tester, finish := newTester(t)
-			defer finish()
+			tester := newTester(t)
 
 			if tc.mockStore != nil {
 				tc.mockStore(tester.repository)
@@ -364,8 +359,7 @@ func TestFirmwareInstall(t *testing.T) {
 
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
-			tester, finish := newTester(t)
-			defer finish()
+			tester := newTester(t)
 
 			if tc.mockStore != nil {
 				tc.mockStore(tester.repository)
@@ -512,8 +506,7 @@ func TestServerEnroll(t *testing.T) {
 
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
-			tester, finish := newTester(t)
-			defer finish()
+			tester := newTester(t)
 
 			if tc.mockStore != nil {
 				tc.mockStore(tester.repository)
@@ -554,8 +547,7 @@ func TestServerEnroll(t *testing.T) {
 }
 
 func TestServerEnrollEmptyUUID(t *testing.T) {
-	tester, finish := newTester(t)
-	defer finish()
+	tester := newTester(t)
 
 	var generatedServerID uuid.UUID
 	validParams := types.AddServerParams{
@@ -701,8 +693,7 @@ func TestServerDelete(t *testing.T) {
 
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
-			tester, finish := newTester(t)
-			defer finish()
+			tester := newTester(t)
 
 			if tc.mockStore != nil {
 				tc.mockStore(tester.repository)
@@ -723,8 +714,8 @@ func TestServerDelete(t *testing.T) {
 }
 
 func TestServerDeleteInvalidUUID(t *testing.T) {
-	tester, finish := newTester(t)
-	defer finish()
+	tester := newTester(t)
+
 	fakeInvalidServerID := "fakeInvalidID"
 
 	testcases := []struct {
