@@ -33,6 +33,8 @@ type Routes struct {
 	fleetDBClient        fleetdb.FleetDB
 	repository           store.Repository
 	streamBroker         events.Stream
+	facilityCode         string
+	streamSubjectPrefix  string
 	conditionDefinitions rctypes.Definitions
 	logger               *logrus.Logger
 }
@@ -55,9 +57,16 @@ func WithFleetDBClient(client fleetdb.FleetDB) Option {
 }
 
 // WithStreamBroker sets the event stream broker.
-func WithStreamBroker(broker events.Stream) Option {
+func WithStreamBroker(broker events.Stream, streamSubjectPrefix string) Option {
 	return func(r *Routes) {
 		r.streamBroker = broker
+		r.streamSubjectPrefix = streamSubjectPrefix
+	}
+}
+
+func WithFacilityCode(fc string) Option {
+	return func(r *Routes) {
+		r.facilityCode = fc
 	}
 }
 
@@ -127,6 +136,7 @@ func (r *Routes) composeAuthHandler(scopes []string) gin.HandlerFunc {
 	return r.authMW.AuthRequired(scopes)
 }
 
+// Routes returns routes for the Conditions API service.
 func (r *Routes) Routes(g *gin.RouterGroup) {
 	servers := g.Group("/servers/:uuid")
 
@@ -155,6 +165,16 @@ func (r *Routes) Routes(g *gin.RouterGroup) {
 			r.composeAuthHandler(createScopes("condition")),
 			wrapAPICall(r.serverConditionCreate))
 	}
+}
+
+// RoutesOrchestrator returns routes for the Orchestrator API service.
+func (r *Routes) RoutesOrchestrator(g *gin.RouterGroup) {
+	controller := g.Group("/servers/:uuid")
+	controller.GET(
+		"/condition-queue/:conditionKind",
+		r.composeAuthHandler(readScopes("conditionQueuePop")),
+		wrapAPICall(nil),
+	)
 }
 
 func createScopes(items ...string) []string {
