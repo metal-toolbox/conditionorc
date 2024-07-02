@@ -70,7 +70,7 @@ func newTester(t *testing.T) *integrationTester {
 		server.WithListenAddress("localhost:9999"),
 		server.WithStore(repository),
 		server.WithFleetDBClient(fleetDBClient),
-		server.WithStreamBroker(stream),
+		server.WithStreamBroker(stream, "foo"),
 		server.WithConditionDefinitions(
 			[]*rctypes.Definition{
 				{Kind: rctypes.FirmwareInstall},
