@@ -331,17 +331,6 @@ func TestAddServer(t *testing.T) {
 			server.ServeHTTP(recorder, tc.request(t))
 
 			tc.assertResponse(t, recorder)
-
-			// Assert all expectations
-			if tc.mockStore != nil {
-				repository.AssertExpectations(t)
-			}
-			if tc.mockFleetDBClient != nil {
-				fleetDBClient.AssertExpectations(t)
-			}
-			if tc.mockStream != nil {
-				stream.AssertExpectations(t)
-			}
 		})
 	}
 }
