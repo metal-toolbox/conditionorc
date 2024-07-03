@@ -14,7 +14,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/slack-go/slack"
 
-	v1types "github.com/metal-toolbox/conditionorc/pkg/api/v1/types"
+	v1types "github.com/metal-toolbox/conditionorc/pkg/api/v1/conditions/types"
 	rctypes "github.com/metal-toolbox/rivets/condition"
 )
 

@@ -11,7 +11,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/metal-toolbox/conditionorc/internal/fleetdb"
 	"github.com/metal-toolbox/conditionorc/internal/store"
-	"github.com/metal-toolbox/conditionorc/pkg/api/v1/routes"
+	"github.com/metal-toolbox/conditionorc/pkg/api/v1/conditions/routes"
 	"github.com/metal-toolbox/rivets/events"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"

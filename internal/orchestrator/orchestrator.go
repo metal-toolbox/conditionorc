@@ -11,7 +11,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 
-	v1EventHandlers "github.com/metal-toolbox/conditionorc/pkg/api/v1/events"
+	v1EventHandlers "github.com/metal-toolbox/conditionorc/pkg/api/v1/conditions/events"
 	rctypes "github.com/metal-toolbox/rivets/condition"
 )
 
