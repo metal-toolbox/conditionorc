@@ -9,7 +9,7 @@
 // /usr/local/bin/go test -timeout 10s -run ^TestIntegration_ConditionsGet$ \
 //   -tags testtools github.com/metal-toolbox/conditionorc/pkg/api/v1/client -v
 
-package client
+package conditions
 
 import (
 	"context"
@@ -27,7 +27,7 @@ import (
 	"gopkg.in/square/go-jose.v2"
 	"gopkg.in/square/go-jose.v2/jwt"
 
-	v1types "github.com/metal-toolbox/conditionorc/pkg/api/v1/types"
+	v1types "github.com/metal-toolbox/conditionorc/pkg/api/v1/conditions/types"
 	rctypes "github.com/metal-toolbox/rivets/condition"
 	"github.com/sirupsen/logrus"
 )
