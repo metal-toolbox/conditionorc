@@ -11,7 +11,7 @@ import (
 	"github.com/slack-go/slack"
 	"github.com/stretchr/testify/require"
 
-	v1types "github.com/metal-toolbox/conditionorc/pkg/api/v1/types"
+	v1types "github.com/metal-toolbox/conditionorc/pkg/api/v1/conditions/types"
 	rctypes "github.com/metal-toolbox/rivets/condition"
 )
 
