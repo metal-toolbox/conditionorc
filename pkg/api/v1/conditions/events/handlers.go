@@ -11,7 +11,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"go.opentelemetry.io/otel"
 
-	v1types "github.com/metal-toolbox/conditionorc/pkg/api/v1/types"
+	v1types "github.com/metal-toolbox/conditionorc/pkg/api/v1/conditions/types"
 )
 
 const (

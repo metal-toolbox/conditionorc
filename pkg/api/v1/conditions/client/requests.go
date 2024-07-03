@@ -1,4 +1,4 @@
-package client
+package conditions
 
 import (
 	"bytes"
@@ -10,8 +10,8 @@ import (
 	"net/url"
 
 	"github.com/metal-toolbox/conditionorc/internal/version"
-	"github.com/metal-toolbox/conditionorc/pkg/api/v1/routes"
-	v1types "github.com/metal-toolbox/conditionorc/pkg/api/v1/types"
+	"github.com/metal-toolbox/conditionorc/pkg/api/v1/conditions/routes"
+	v1types "github.com/metal-toolbox/conditionorc/pkg/api/v1/conditions/types"
 )
 
 func (c *Client) get(ctx context.Context, path string) (*v1types.ServerResponse, error) {

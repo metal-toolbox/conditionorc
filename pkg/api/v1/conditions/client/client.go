@@ -1,4 +1,4 @@
-package client
+package conditions
 
 import (
 	"context"
@@ -7,7 +7,7 @@ import (
 
 	"github.com/google/uuid"
 
-	v1types "github.com/metal-toolbox/conditionorc/pkg/api/v1/types"
+	v1types "github.com/metal-toolbox/conditionorc/pkg/api/v1/conditions/types"
 	rctypes "github.com/metal-toolbox/rivets/condition"
 )
 
