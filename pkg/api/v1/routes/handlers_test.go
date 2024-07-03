@@ -151,9 +151,13 @@ func TestAddServer(t *testing.T) {
 					Once()
 			},
 			mockStream: func(r *eventsm.MockStream) {
-				r.On("Publish", mock.Anything, fmt.Sprintf("%s.servers.%s", mockFacilityCode, rctypes.Inventory), mock.Anything).
-					Return(nil).
-					Once()
+				r.On(
+					"Publish",
+					mock.Anything,
+					fmt.Sprintf("%s.servers.%s", mockFacilityCode, rctypes.Inventory),
+					mock.Anything,
+					false,
+				).Return(nil).Once()
 			},
 			request: func(t *testing.T) *http.Request {
 				payload, err := json.Marshal(&v1types.ConditionCreate{Parameters: validParams.MustJSON()})
@@ -291,9 +295,13 @@ func TestAddServer(t *testing.T) {
 					Once()
 			},
 			mockStream: func(r *eventsm.MockStream) {
-				r.On("Publish", mock.Anything, fmt.Sprintf("%s.servers.%s", mockFacilityCode, rctypes.Inventory), mock.Anything).
-					Return(nil).
-					Once()
+				r.On(
+					"Publish",
+					mock.Anything,
+					fmt.Sprintf("%s.servers.%s", mockFacilityCode, rctypes.Inventory),
+					mock.Anything,
+					false,
+				).Return(nil).Once()
 			},
 			request: func(t *testing.T) *http.Request {
 				payload, err := json.Marshal(&v1types.ConditionCreate{Parameters: validParams.MustJSON()})
@@ -608,7 +616,7 @@ func TestAddServerRollback(t *testing.T) {
 			}
 
 			if tc.mockStreamErr.calledTime > 0 {
-				stream.On("Publish", mock.Anything, mock.Anything, mock.Anything).
+				stream.On("Publish", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 					Return(tc.mockStreamErr.err).
 					Times(tc.mockStreamErr.calledTime)
 			}
@@ -756,9 +764,13 @@ func TestServerConditionCreate(t *testing.T) {
 					Once()
 			},
 			mockStream: func(r *eventsm.MockStream) {
-				r.On("Publish", mock.Anything, fmt.Sprintf("%s.servers.%s", facilityCode, rctypes.FirmwareInstall), mock.Anything).
-					Return(nil).
-					Once()
+				r.On(
+					"Publish",
+					mock.Anything,
+					fmt.Sprintf("%s.servers.%s", facilityCode, rctypes.FirmwareInstall),
+					mock.Anything,
+					false,
+				).Return(nil).Once()
 			},
 			request: func(t *testing.T) *http.Request {
 				payload, err := json.Marshal(&v1types.ConditionCreate{Parameters: []byte(`{"some param": "1"}`)})
@@ -805,9 +817,13 @@ func TestServerConditionCreate(t *testing.T) {
 					Once()
 			},
 			mockStream: func(r *eventsm.MockStream) {
-				r.On("Publish", mock.Anything, fmt.Sprintf("%s.servers.%s", facilityCode, rctypes.FirmwareInstall), mock.Anything).
-					Return(nil).
-					Once()
+				r.On(
+					"Publish",
+					mock.Anything,
+					fmt.Sprintf("%s.servers.%s", facilityCode, rctypes.FirmwareInstall),
+					mock.Anything,
+					false,
+				).Return(nil).Once()
 			},
 			request: func(t *testing.T) *http.Request {
 				fault := rctypes.Fault{Panic: true, DelayDuration: "10s", FailAt: "foobar"}
@@ -892,7 +908,13 @@ func TestServerConditionCreate(t *testing.T) {
 					Once()
 			},
 			mockStream: func(r *eventsm.MockStream) {
-				r.On("Publish", mock.Anything, fmt.Sprintf("%s.servers.%s", facilityCode, rctypes.FirmwareInstall), mock.Anything).
+				r.On(
+					"Publish",
+					mock.Anything,
+					fmt.Sprintf("%s.servers.%s", facilityCode, rctypes.FirmwareInstall),
+					mock.Anything,
+					false,
+				).
 					Return(errors.New("gremlins in the pipes")).
 					Once()
 			},
