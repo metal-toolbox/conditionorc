@@ -14,6 +14,7 @@ import (
 	"github.com/metal-toolbox/conditionorc/internal/fleetdb"
 	"github.com/metal-toolbox/conditionorc/internal/model"
 	"github.com/metal-toolbox/conditionorc/internal/server"
+
 	"github.com/metal-toolbox/conditionorc/internal/store"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/mock"
@@ -287,7 +288,13 @@ func TestConditionCreate(t *testing.T) {
 			tester.fleetDB.On("GetServer", mock.Anything, mock.Anything).Return(&model.Server{FacilityCode: "facility"}, nil).Once()
 
 			if tc.expectPublish {
-				tester.stream.On("Publish", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
+				tester.stream.On(
+					"Publish",
+					mock.Anything,
+					mock.Anything,
+					mock.Anything,
+					false,
+				).Return(nil).Once()
 			}
 
 			got, err := tester.client.ServerConditionCreate(context.TODO(), serverID, rctypes.FirmwareInstall, tc.payload)
@@ -325,7 +332,16 @@ func TestFirmwareInstall(t *testing.T) {
 				AssetID: serverID,
 			},
 			mockStore: func(r *store.MockRepository) {
-				r.On("CreateMultiple", mock.Anything, serverID, mock.Anything, mock.Anything).
+				r.On(
+					"CreateMultiple",
+					mock.Anything,
+					serverID,
+					mock.Anything, // I haven't figured a way pass in a variable list of conditions to this r.On mock method
+					mock.Anything,
+					mock.Anything,
+					mock.Anything,
+					mock.Anything,
+				).
 					Return(nil).Once()
 			},
 			expectResponse: func() *v1types.ServerResponse {
@@ -343,7 +359,16 @@ func TestFirmwareInstall(t *testing.T) {
 				AssetID: serverID,
 			},
 			mockStore: func(r *store.MockRepository) {
-				r.On("CreateMultiple", mock.Anything, serverID, mock.Anything, mock.Anything).
+				r.On(
+					"CreateMultiple",
+					mock.Anything,
+					serverID,
+					mock.Anything, // I haven't figured a way pass in a variable list of conditions to this r.On mock method
+					mock.Anything,
+					mock.Anything,
+					mock.Anything,
+					mock.Anything,
+				).
 					Return(fmt.Errorf("%w:%s", store.ErrActiveCondition, "pound sand")).Once()
 			},
 			expectResponse: func() *v1types.ServerResponse {
@@ -367,7 +392,13 @@ func TestFirmwareInstall(t *testing.T) {
 
 			tester.fleetDB.On("GetServer", mock.Anything, mock.Anything).Return(&model.Server{FacilityCode: "facility"}, nil).Times(1)
 			if tc.expectPublish {
-				tester.stream.On("Publish", mock.Anything, mock.Anything, mock.Anything).Return(nil).Times(1)
+				tester.stream.On(
+					"Publish",
+					mock.Anything,
+					mock.Anything,
+					mock.Anything,
+					false,
+				).Return(nil).Times(1)
 			}
 
 			got, err := tester.client.ServerFirmwareInstall(context.TODO(), tc.payload)
@@ -517,7 +548,13 @@ func TestServerEnroll(t *testing.T) {
 			}
 
 			if tc.expectPublish {
-				tester.stream.On("Publish", mock.Anything, mock.Anything, mock.Anything).Return(nil).Times(1)
+				tester.stream.On(
+					"Publish",
+					mock.Anything,
+					mock.Anything,
+					mock.Anything,
+					false,
+				).Return(nil).Times(1)
 			}
 
 			defer func() {
@@ -592,8 +629,9 @@ func TestServerEnrollEmptyUUID(t *testing.T) {
 	tester.stream.On("Publish",
 		mock.Anything,
 		mock.Anything,
-		mock.Anything).
-		Return(nil)
+		mock.Anything,
+		false,
+	).Return(nil)
 
 	got, err := tester.client.ServerEnroll(context.TODO(), "", v1types.ConditionCreate{Parameters: validParams.MustJSON()})
 	if err != nil {

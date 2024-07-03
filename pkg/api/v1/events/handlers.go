@@ -38,7 +38,7 @@ func NewHandler(repository store.Repository, stream events.Stream, logger *logru
 	return &Handler{repository: repository, stream: stream, logger: logger}
 }
 
-// UpdateCondition sanity checks the incoming condition update, merges it and applies the result to serverservice
+// UpdateCondition sanity checks the incoming condition update, merges it and applies the result to the condition record.
 func (h *Handler) UpdateCondition(ctx context.Context, updEvt *v1types.ConditionUpdateEvent) error {
 	_, span := otel.Tracer(pkgName).Start(ctx, "events.UpdateCondition")
 	defer span.End()
