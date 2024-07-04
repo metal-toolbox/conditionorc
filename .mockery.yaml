@@ -16,3 +16,10 @@ packages:
       inpackage: True
     interfaces:
       FleetDB:
+  github.com/metal-toolbox/conditionorc/pkg/api/v1/orchestrator/routes:
+    config:
+      dir: pkg/api/v1/orchestrator/routes
+      fileName: "mock_{{.InterfaceName | firstLower}}.go"
+      inpackage: True
+    interfaces:
+      statusValueKV:
