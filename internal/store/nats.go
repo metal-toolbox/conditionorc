@@ -319,11 +319,17 @@ func (n *natsStore) Update(ctx context.Context, serverID uuid.UUID, updated *rct
 		}
 	}
 
-	// XXX: is there a better way to OR 3 mostly independent conditions
-	switch {
-	case cr.State == rctypes.Pending, updated.State == rctypes.Failed, lastCondition:
+	// The condition record State is only updated if,
+	// - Its the last condition in the record
+	// - The updated payload condition.State indicates its failed
+	if lastCondition || (cr.State == rctypes.Pending && updated.State == rctypes.Failed) {
+		le.WithFields(logrus.Fields{
+			"current state":      cr.State,
+			"updated cond state": updated.State,
+			"last cond":          lastCondition,
+		}).Debug("CR state updated")
+
 		cr.State = updated.State
-	default:
 	}
 
 	_, err = n.bucket.Put(serverID.String(), cr.MustJSON())

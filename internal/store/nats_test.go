@@ -142,6 +142,24 @@ func TestCreateReadUpdate(t *testing.T) {
 	cr, err = store.Get(context.TODO(), serverID)
 	require.NoError(t, err)
 	require.Equal(t, rctypes.Succeeded, cr.State)
+
+	// failed state when ConditionRecord is Pending
+	serverID = uuid.New()
+	condition = &rctypes.Condition{
+		ID:    uuid.New(),
+		Kind:  kind,
+		State: rctypes.Pending,
+	}
+	err = store.Create(context.TODO(), serverID, condition)
+	require.NoError(t, err)
+
+	condition.State = rctypes.Failed
+	err = store.Update(context.TODO(), serverID, condition)
+	require.NoError(t, err)
+
+	cr, err = store.Get(context.TODO(), serverID)
+	require.NoError(t, err)
+	require.Equal(t, rctypes.Failed, cr.State)
 }
 
 // Given a conditionRecord with multiple conditions, walk through some common
@@ -162,7 +180,7 @@ func TestMultipleConditionUpdate(t *testing.T) {
 		require.NoError(t, err, "created multiple with nil work")
 
 		work := []*rctypes.Condition{
-			&rctypes.Condition{
+			{
 				Kind:  rctypes.Kind("first"),
 				State: rctypes.Pending,
 			},
@@ -266,5 +284,36 @@ func TestMultipleConditionUpdate(t *testing.T) {
 		cr, err := store.Get(context.TODO(), serverID)
 		require.NoError(t, err)
 		require.Equal(t, rctypes.Failed, cr.State)
+	})
+
+	t.Run("non-last condition update", func(t *testing.T) {
+		serverID := uuid.New()
+		first := &rctypes.Condition{
+			Kind:  rctypes.Kind("first"),
+			State: rctypes.Pending,
+		}
+		second := &rctypes.Condition{
+			Kind:  rctypes.Kind("second"),
+			State: rctypes.Pending,
+		}
+		work := []*rctypes.Condition{
+			first,
+			second,
+		}
+
+		err := store.CreateMultiple(context.TODO(), serverID, work...)
+		require.NoError(t, err, "CreateMultiple")
+
+		first.State = rctypes.Succeeded
+		err = store.Update(context.TODO(), serverID, first)
+		require.NoError(t, err, "first update - succeeded")
+
+		cr, err := store.Get(context.TODO(), serverID)
+		require.NoError(t, err)
+		require.Equal(t, rctypes.Pending, cr.State)
+
+		active, err := store.GetActiveCondition(context.TODO(), serverID)
+		require.NoError(t, err, "GetActiveCondition")
+		require.Equal(t, active, second)
 	})
 }
