@@ -39,6 +39,7 @@ type Routes struct {
 	logger               *logrus.Logger
 	statusValueKV        statusValueKV
 	livenessKV           livenessKV
+	taskKV               taskKV
 }
 
 // Option type sets a parameter on the Routes type.
@@ -107,6 +108,13 @@ func WithLivenessKV(l livenessKV) Option {
 	}
 }
 
+// WithTaskKV sets the condition task queryor, publisher.
+func WithTaskKV(t taskKV) Option {
+	return func(r *Routes) {
+		r.taskKV = t
+	}
+}
+
 // apiHandler is a function that performs real work for the Orchestrator API
 type apiHandler func(c *gin.Context) (int, *v1types.ServerResponse)
 
@@ -146,6 +154,15 @@ func NewRoutes(options ...Option) (*Routes, error) {
 		routes.livenessKV = lkv
 	}
 
+	if routes.taskKV == nil {
+		tkv, err := initTaskKVImpl(routes.facilityCode, routes.logger, routes.streamBroker)
+		if err != nil {
+			return nil, errors.Wrap(err, "task KV init error")
+		}
+
+		routes.taskKV = tkv
+	}
+
 	if routes.repository == nil {
 		return nil, errors.Wrap(ErrStore, "no store repository defined")
 	}
@@ -179,6 +196,18 @@ func (r *Routes) Routes(g *gin.RouterGroup) {
 		"/controller-checkin/:conditionID",
 		r.composeAuthHandler(createScopes("checkin")),
 		wrapAPICall(r.livenessCheckin),
+	)
+
+	controller.GET(
+		"/condition-task/:conditionKind",
+		r.composeAuthHandler(createScopes("taskQuery")),
+		wrapAPICall(r.taskQuery),
+	)
+
+	controller.POST(
+		"/condition-task/:conditionKind/:conditionID",
+		r.composeAuthHandler(createScopes("taskPublish")),
+		wrapAPICall(r.taskPublish),
 	)
 }
 

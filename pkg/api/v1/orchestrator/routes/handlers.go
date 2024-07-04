@@ -12,6 +12,7 @@ import (
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 
+	"github.com/metal-toolbox/conditionorc/internal/store"
 	v1types "github.com/metal-toolbox/conditionorc/pkg/api/v1/orchestrator/types"
 	rctypes "github.com/metal-toolbox/rivets/condition"
 )
@@ -218,5 +219,195 @@ func (r *Routes) livenessCheckin(c *gin.Context) (int, *v1types.ServerResponse) 
 
 	return http.StatusOK, &v1types.ServerResponse{
 		Message: "check-in successful",
+	}
+}
+
+// @Summary taskQuery
+// @Tag Conditions
+// @Description Queries a *rivets.Task object from KV for a condition
+// @ID taskQuery
+// @Param uuid path string true "Server ID"
+// @Param conditionKind path string true "Condition Kind"
+// @Accept json
+// @Produce json
+// @Success 200 {object} v1types.ServerResponse
+// Failure 400 {object} v1types.ServerResponse
+// Failure 404 {object} v1types.ServerResponse
+// Failure 500 {object} v1types.ServerResponse
+// Failure 503 {object} v1types.ServerResponse
+// @Router /servers/{uuid}/condition-task/{conditionKind} [get]
+func (r *Routes) taskQuery(c *gin.Context) (int, *v1types.ServerResponse) {
+	ctx, span := otel.Tracer(pkgName).Start(c.Request.Context(), "Routes.taskQuery")
+	span.SetAttributes(
+		attribute.KeyValue{Key: "serverId", Value: attribute.StringValue(c.Param("uuid"))},
+		attribute.KeyValue{Key: "conditionKind", Value: attribute.StringValue(c.Param("conditionKind"))},
+	)
+	defer span.End()
+
+	serverID, err := uuid.Parse(c.Param("uuid"))
+	if err != nil {
+		return http.StatusBadRequest, &v1types.ServerResponse{
+			Message: "invalid server id: " + err.Error(),
+		}
+	}
+
+	conditionKind := rctypes.Kind(c.Param("conditionKind"))
+	if !r.conditionKindValid(conditionKind) {
+		r.logger.WithFields(logrus.Fields{
+			"kind": conditionKind,
+		}).Info("unsupported condition kind")
+
+		return http.StatusBadRequest, &v1types.ServerResponse{
+			Message: "unsupported condition kind: " + string(conditionKind),
+		}
+	}
+
+	// the controller pop'ed the condition from the queue which created the Task entry
+	// we expect an active condition to allow this query
+	activeCond, err := r.repository.GetActiveCondition(ctx, serverID)
+	if err != nil {
+		if errors.Is(err, store.ErrConditionNotFound) {
+			return http.StatusBadRequest, &v1types.ServerResponse{
+				Message: "no active condition found for server",
+			}
+		}
+
+		r.logger.WithField("condition.kind", conditionKind).WithError(err).Info("active condition query error")
+
+		return http.StatusInternalServerError, &v1types.ServerResponse{
+			Message: "condition lookup error: " + err.Error(),
+		}
+	}
+
+	if activeCond.Kind != conditionKind {
+		return http.StatusServiceUnavailable, &v1types.ServerResponse{
+			Message: fmt.Sprintf("current active condition: %s, retry in a while", activeCond.Kind),
+		}
+	}
+
+	task, err := r.taskKV.get(c.Request.Context(), conditionKind, activeCond.ID, serverID)
+	if err != nil {
+		r.logger.WithField("condition.id", activeCond.ID).WithError(err).Info("task KV query error")
+
+		return http.StatusInternalServerError, &v1types.ServerResponse{
+			Message: err.Error(),
+		}
+	}
+
+	// A stale task was not cleaned up and now we have an odd situation
+	if activeCond.ID != task.ID {
+		return http.StatusBadRequest, &v1types.ServerResponse{
+			Message: fmt.Sprintf("TaskID: %s does not match active ConditionID: %s", task.ID, activeCond.ID),
+		}
+	}
+
+	return http.StatusOK, &v1types.ServerResponse{
+		Message: "Task identified",
+		Task:    task,
+	}
+}
+
+// @Summary taskPublish
+// @Tag Conditions
+// @Description Publishes a *rivets.Task object to the KV for a condition
+// @ID taskPublish
+// @Param uuid path string true "Server ID"
+// @Param conditionKind path string true "Condition Kind"
+// @Param conditionID path string true "Condition ID"
+// @Accept json
+// @Produce json
+// @Success 200 {object} v1types.ServerResponse
+// Failure 400 {object} v1types.ServerResponse
+// Failure 404 {object} v1types.ServerResponse
+// Failure 503 {object} v1types.ServerResponse
+// @Router /servers/{uuid}/condition-task/{conditionKind}/{conditionID} [post]
+func (r *Routes) taskPublish(c *gin.Context) (int, *v1types.ServerResponse) {
+	ctx, span := otel.Tracer(pkgName).Start(c.Request.Context(), "Routes.taskPublish")
+	span.SetAttributes(
+		attribute.KeyValue{Key: "serverId", Value: attribute.StringValue(c.Param("uuid"))},
+		attribute.KeyValue{Key: "conditionKind", Value: attribute.StringValue(c.Param("conditionKind"))},
+		attribute.KeyValue{Key: "conditionID", Value: attribute.StringValue(c.Param("conditionID"))},
+		attribute.KeyValue{Key: "timestampUpdate", Value: attribute.StringValue(c.Request.URL.Query().Get("ts_update"))},
+	)
+	defer span.End()
+
+	var task rctypes.Task[any, any]
+	var onlyTimestampUpdate bool
+
+	if c.Request.URL.Query().Get("ts_update") == "true" {
+		onlyTimestampUpdate = true
+	} else {
+		if err := c.ShouldBindJSON(&task); err != nil {
+			r.logger.WithError(err).Warn("unmarshal Task payload")
+
+			return http.StatusBadRequest, &v1types.ServerResponse{
+				Message: "invalid Task payload: " + err.Error(),
+			}
+		}
+	}
+
+	serverID, err := uuid.Parse(c.Param("uuid"))
+	if err != nil {
+		return http.StatusBadRequest, &v1types.ServerResponse{
+			Message: "invalid server id: " + err.Error(),
+		}
+	}
+
+	conditionKind := rctypes.Kind(c.Param("conditionKind"))
+	if !r.conditionKindValid(conditionKind) {
+		r.logger.WithFields(logrus.Fields{
+			"kind": conditionKind,
+		}).Info("unsupported condition kind")
+
+		return http.StatusBadRequest, &v1types.ServerResponse{
+			Message: "unsupported condition kind: " + string(conditionKind),
+		}
+	}
+
+	conditionID, err := uuid.Parse(c.Param("conditionID"))
+	if err != nil {
+		return http.StatusBadRequest, &v1types.ServerResponse{
+			Message: "invalid conditionID: " + err.Error(),
+		}
+	}
+
+	// the controller retrieved the condition from the queue which created the Task entry
+	// we expect an active condition to allow this publish
+	activeCond, err := r.repository.GetActiveCondition(ctx, serverID)
+	if err != nil {
+		return http.StatusInternalServerError, &v1types.ServerResponse{
+			Message: "condition lookup: " + err.Error(),
+		}
+	}
+
+	if activeCond == nil {
+		return http.StatusBadRequest, &v1types.ServerResponse{
+			Message: "no active condition found for server",
+		}
+	}
+
+	if !onlyTimestampUpdate && activeCond.ID != task.ID {
+		return http.StatusBadRequest, &v1types.ServerResponse{
+			Message: fmt.Sprintf("TaskID: %s does not match active ConditionID: %s", task.ID, activeCond.ID),
+		}
+	}
+
+	// publish Task
+	if err := r.taskKV.publish(
+		ctx,
+		serverID.String(),
+		conditionID.String(),
+		conditionKind,
+		&task,
+		false,
+		onlyTimestampUpdate,
+	); err != nil {
+		return http.StatusInternalServerError, &v1types.ServerResponse{
+			Message: "Task publish error: " + err.Error(),
+		}
+	}
+
+	return http.StatusOK, &v1types.ServerResponse{
+		Message: "condition Task published",
 	}
 }
