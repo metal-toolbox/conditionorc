@@ -11,10 +11,12 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/metal-toolbox/conditionorc/internal/fleetdb"
 	"github.com/metal-toolbox/conditionorc/internal/store"
-	"github.com/metal-toolbox/conditionorc/pkg/api/v1/conditions/routes"
+	condRoutes "github.com/metal-toolbox/conditionorc/pkg/api/v1/conditions/routes"
+	orcRoutes "github.com/metal-toolbox/conditionorc/pkg/api/v1/orchestrator/routes"
 	"github.com/metal-toolbox/rivets/events"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
+	"go.hollow.sh/toolbox/ginauth"
 	"go.hollow.sh/toolbox/ginjwt"
 
 	rctypes "github.com/metal-toolbox/rivets/condition"
@@ -29,10 +31,17 @@ var (
 	ErrRoutes = errors.New("error in routes")
 )
 
+type kind string
+
+const (
+	ConditionsAPI   kind = "conditionsAPI"
+	OrchestratorAPI kind = "orchestratorAPI"
+)
+
 // Server type holds attributes of the condition orc server
 type Server struct {
-	orchestrator         bool // run in orchestrator API mode
 	authMWConfigs        []ginjwt.AuthConfig
+	kind                 kind // server kind
 	logger               *logrus.Logger
 	streamBroker         events.Stream
 	streamSubjectPrefix  string
@@ -96,16 +105,20 @@ func WithAuthMiddlewareConfig(authMWConfigs []ginjwt.AuthConfig) Option {
 	}
 }
 
-// WithAsOrchestrator registers just the Orchestrator routes, excluding any Condition API routes.
-func WithAsOrchestrator(facilityCode string) Option {
+// By default the Condition API routes are registered,
+//
+// With this option the server will register the Orchestrator API routes.
+func WithOrchestratorAPI(facilityCode string) Option {
 	return func(s *Server) {
-		s.orchestrator = true
+		s.kind = OrchestratorAPI
 		s.facilityCode = facilityCode
 	}
 }
 
 func New(opts ...Option) *http.Server {
-	s := &Server{}
+	s := &Server{
+		kind: ConditionsAPI,
+	}
 
 	for _, opt := range opts {
 		opt(s)
@@ -116,40 +129,22 @@ func New(opts ...Option) *http.Server {
 
 	g.GET("/healthz/readiness", s.ping)
 
-	options := []routes.Option{
-		routes.WithLogger(s.logger),
-		routes.WithStore(s.repository),
-		routes.WithFleetDBClient(s.fleetDBClient),
-		routes.WithStreamBroker(s.streamBroker, s.streamSubjectPrefix),
-		routes.WithConditionDefinitions(s.conditionDefinitions),
-	}
-
-	// orchestrator mode requires a facility code
-	if s.orchestrator {
-		options = append(options, routes.WithFacilityCode(s.facilityCode))
-	}
-
-	// add auth middleware
+	var authMW *ginauth.MultiTokenMiddleware
 	if s.authMWConfigs != nil {
-		authMW, err := ginjwt.NewMultiTokenMiddlewareFromConfigs(s.authMWConfigs...)
+		var err error
+		authMW, err = ginjwt.NewMultiTokenMiddlewareFromConfigs(s.authMWConfigs...)
 		if err != nil {
 			s.logger.Fatal("failed to initialize auth middleware: ", err)
 		}
-
-		options = append(options, routes.WithAuthMiddleware(authMW))
 	}
 
-	v1Router, err := routes.NewRoutes(options...)
-	if err != nil {
-		s.logger.Fatal(errors.Wrap(err, ErrRoutes.Error()))
-	}
-
-	if s.orchestrator {
-		v1Router.RoutesOrchestrator(g.Group(routes.PathPrefix))
-		s.logger.Info("Orchestrator API server routes registered.")
-	} else {
-		v1Router.Routes(g.Group(routes.PathPrefix))
-		s.logger.Info("Condition API server routes registered.")
+	switch s.kind {
+	case ConditionsAPI:
+		s.ConditionsAPIRoutes(g, authMW)
+	case OrchestratorAPI:
+		s.OrchestratorAPIRoutes(g, authMW)
+	default:
+		s.logger.Fatal("unexpected server kind: ", s.kind)
 	}
 
 	g.NoRoute(func(c *gin.Context) {
@@ -166,6 +161,51 @@ func New(opts ...Option) *http.Server {
 		ReadTimeout:  readTimeout,
 		WriteTimeout: writeTimeout,
 	}
+}
+
+func (s *Server) ConditionsAPIRoutes(g *gin.Engine, authMW *ginauth.MultiTokenMiddleware) {
+	options := []condRoutes.Option{
+		condRoutes.WithLogger(s.logger),
+		condRoutes.WithStore(s.repository),
+		condRoutes.WithFleetDBClient(s.fleetDBClient),
+		condRoutes.WithStreamBroker(s.streamBroker, s.streamSubjectPrefix),
+		condRoutes.WithConditionDefinitions(s.conditionDefinitions),
+	}
+
+	if authMW != nil {
+		options = append(options, condRoutes.WithAuthMiddleware(authMW))
+	}
+
+	v1CondRouter, err := condRoutes.NewRoutes(options...)
+	if err != nil {
+		s.logger.Fatal(errors.Wrap(err, ErrRoutes.Error()))
+	}
+
+	v1CondRouter.Routes(g.Group(condRoutes.PathPrefix))
+	s.logger.Info("Condition API server routes registered.")
+}
+
+func (s *Server) OrchestratorAPIRoutes(g *gin.Engine, authMW *ginauth.MultiTokenMiddleware) {
+	options := []orcRoutes.Option{
+		orcRoutes.WithLogger(s.logger),
+		orcRoutes.WithStore(s.repository),
+		orcRoutes.WithFleetDBClient(s.fleetDBClient),
+		orcRoutes.WithStreamBroker(s.streamBroker, s.streamSubjectPrefix),
+		orcRoutes.WithConditionDefinitions(s.conditionDefinitions),
+		orcRoutes.WithFacilityCode(s.facilityCode),
+	}
+
+	if authMW != nil {
+		options = append(options, orcRoutes.WithAuthMiddleware(authMW))
+	}
+
+	v1OrcRouter, err := orcRoutes.NewRoutes(options...)
+	if err != nil {
+		s.logger.Fatal(errors.Wrap(err, ErrRoutes.Error()))
+	}
+
+	v1OrcRouter.Routes(g.Group(orcRoutes.PathPrefix))
+	s.logger.Info("Orchestrator API server routes registered.")
 }
 
 // this is a placeholder for a more comprehensive readiness check
