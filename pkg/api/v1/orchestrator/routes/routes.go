@@ -38,6 +38,7 @@ type Routes struct {
 	conditionDefinitions rctypes.Definitions
 	logger               *logrus.Logger
 	statusValueKV        statusValueKV
+	livenessKV           livenessKV
 }
 
 // Option type sets a parameter on the Routes type.
@@ -92,9 +93,17 @@ func WithConditionDefinitions(defs rctypes.Definitions) Option {
 	}
 }
 
+// WithStatusKVPublisher sets the conditions status KV publisher.
 func WithStatusKVPublisher(p statusValueKV) Option {
 	return func(r *Routes) {
 		r.statusValueKV = p
+	}
+}
+
+// WithLivenessKV sets the controller liveness publisher.
+func WithLivenessKV(l livenessKV) Option {
+	return func(r *Routes) {
+		r.livenessKV = l
 	}
 }
 
@@ -128,6 +137,15 @@ func NewRoutes(options ...Option) (*Routes, error) {
 		routes.statusValueKV = initStatusValueKV()
 	}
 
+	if routes.livenessKV == nil {
+		lkv, err := initLivenessKV(routes.logger, routes.streamBroker)
+		if err != nil {
+			return nil, errors.Wrap(err, "liveness KV init error")
+		}
+
+		routes.livenessKV = lkv
+	}
+
 	if routes.repository == nil {
 		return nil, errors.Wrap(ErrStore, "no store repository defined")
 	}
@@ -155,6 +173,12 @@ func (r *Routes) Routes(g *gin.RouterGroup) {
 		"/condition-status/:conditionKind/:conditionID",
 		r.composeAuthHandler(createScopes("statusUpdate")),
 		wrapAPICall(r.conditionStatusUpdate),
+	)
+
+	controller.GET(
+		"/controller-checkin/:conditionID",
+		r.composeAuthHandler(createScopes("checkin")),
+		wrapAPICall(r.livenessCheckin),
 	)
 }
 
