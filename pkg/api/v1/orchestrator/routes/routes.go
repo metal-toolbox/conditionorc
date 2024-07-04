@@ -40,6 +40,7 @@ type Routes struct {
 	statusValueKV        statusValueKV
 	livenessKV           livenessKV
 	taskKV               taskKV
+	conditionJetstream   conditionJetstream
 }
 
 // Option type sets a parameter on the Routes type.
@@ -115,6 +116,13 @@ func WithTaskKV(t taskKV) Option {
 	}
 }
 
+// WithConditionJetstream sets the condition jetstream from which conditions are retrieved  for controllers.
+func WithConditionJetstream(j conditionJetstream) Option {
+	return func(r *Routes) {
+		r.conditionJetstream = j
+	}
+}
+
 // apiHandler is a function that performs real work for the Orchestrator API
 type apiHandler func(c *gin.Context) (int, *v1types.ServerResponse)
 
@@ -163,6 +171,17 @@ func NewRoutes(options ...Option) (*Routes, error) {
 		routes.taskKV = tkv
 	}
 
+	if routes.conditionJetstream == nil {
+		js := initConditionJetstream(
+			routes.streamSubjectPrefix,
+			routes.facilityCode,
+			routes.logger,
+			routes.streamBroker,
+		)
+
+		routes.conditionJetstream = js
+	}
+
 	if routes.repository == nil {
 		return nil, errors.Wrap(ErrStore, "no store repository defined")
 	}
@@ -209,6 +228,13 @@ func (r *Routes) Routes(g *gin.RouterGroup) {
 		r.composeAuthHandler(createScopes("taskPublish")),
 		wrapAPICall(r.taskPublish),
 	)
+
+	controller.GET(
+		"/condition-queue/:conditionKind",
+		r.composeAuthHandler(readScopes("conditionQueuePop")),
+		wrapAPICall(r.conditionQueuePop),
+	)
+
 }
 
 func createScopes(items ...string) []string {

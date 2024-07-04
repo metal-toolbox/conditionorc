@@ -11,6 +11,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 
 	"github.com/metal-toolbox/conditionorc/internal/store"
 	v1types "github.com/metal-toolbox/conditionorc/pkg/api/v1/orchestrator/types"
@@ -410,4 +411,151 @@ func (r *Routes) taskPublish(c *gin.Context) (int, *v1types.ServerResponse) {
 	return http.StatusOK, &v1types.ServerResponse{
 		Message: "condition Task published",
 	}
+}
+
+// @Summary ConditionQueuePop
+// @Tag Conditions
+// @Description Pops a conditions from the NATS Jestream and registers the serverID as a controller.
+// @ID conditionQueue
+// @Param uuid path string true "Server ID"
+// @Param conditionKind path string true "Condition Kind"
+// @Accept json
+// @Produce json
+// @Success 200 {object} v1types.ServerResponse
+// Failure 400 {object} v1types.ServerResponse
+// Failure 404 {object} v1types.ServerResponse
+// Failure 500 {object} v1types.ServerResponse
+// @Router /servers/{uuid}/condition-queue/{conditionKind} [get]
+func (r *Routes) conditionQueuePop(c *gin.Context) (int, *v1types.ServerResponse) {
+	ctx, span := otel.Tracer(pkgName).Start(c.Request.Context(), "Routes.conditionQueuePop")
+	span.SetAttributes(
+		attribute.KeyValue{Key: "serverId", Value: attribute.StringValue(c.Param("uuid"))},
+		attribute.KeyValue{Key: "conditionKind", Value: attribute.StringValue(c.Param("conditionKind"))},
+	)
+	defer span.End()
+
+	serverID, err := uuid.Parse(c.Param("uuid"))
+	if err != nil {
+		return http.StatusBadRequest, &v1types.ServerResponse{
+			Message: "invalid server id: " + err.Error(),
+		}
+	}
+
+	conditionKind := rctypes.Kind(c.Param("conditionKind"))
+	if !r.conditionKindValid(conditionKind) {
+		r.logger.WithFields(logrus.Fields{
+			"kind": conditionKind,
+		}).Info("unsupported condition kind")
+
+		return http.StatusBadRequest, &v1types.ServerResponse{
+			Message: "unsupported condition kind: " + string(conditionKind),
+		}
+	}
+
+	conditionRecord, err := r.repository.Get(ctx, serverID)
+	if err != nil {
+		if errors.Is(err, store.ErrConditionNotFound) {
+			return http.StatusNotFound, &v1types.ServerResponse{
+				Message: "condition not found for server",
+			}
+		}
+
+		r.logger.WithError(err).Info("condition record query error")
+
+		return http.StatusInternalServerError, &v1types.ServerResponse{
+			Message: "condition lookup: " + err.Error(),
+		}
+	}
+
+	var activeConditionExists bool
+	for _, cond := range conditionRecord.Conditions {
+		if cond.Kind == conditionKind && !rctypes.StateIsComplete(cond.State) {
+			activeConditionExists = true
+		}
+	}
+
+	if !activeConditionExists {
+		return http.StatusNotFound, &v1types.ServerResponse{
+			Message: "no active condition found for server",
+		}
+	}
+
+	// TODO: if a task exists for this condition in an active state, don't proceed
+
+	// pop condition from the Jetstream queue
+	cond, err := r.conditionJetstream.pop(ctx, conditionKind, serverID)
+	if err != nil {
+		if errors.Is(err, errNoConditionInQueue) {
+			return http.StatusNotFound, &v1types.ServerResponse{
+				Message: "no condition in queue",
+			}
+		}
+
+		r.logger.WithError(err).Info("condition queue fetch error")
+
+		return http.StatusInternalServerError, &v1types.ServerResponse{
+			Message: "Condition Queue fetch error error: " + err.Error(),
+		}
+	}
+
+	// register this worker
+	controllerID, err := r.livenessKV.register(serverID.String())
+	if err != nil {
+		r.logger.WithField("condition.id", cond.ID).WithError(err).Info("controller registration error")
+
+		return http.StatusInternalServerError, &v1types.ServerResponse{
+			Message: "Controller registration error: " + err.Error(),
+		}
+	}
+
+	st := rctypes.NewTaskStatusRecord("controller fetched condition using client IP: " + c.RemoteIP())
+	sv := &rctypes.StatusValue{
+		WorkerID: controllerID.String(),
+		Target:   serverID.String(),
+		TraceID:  trace.SpanFromContext(ctx).SpanContext().TraceID().String(),
+		SpanID:   trace.SpanFromContext(ctx).SpanContext().SpanID().String(),
+		State:    string(rctypes.Pending),
+		Status:   st.MustMarshal(),
+	}
+
+	// create condition status value entry
+	if err := r.statusValueKV.publish(
+		r.facilityCode,
+		cond.ID,
+		controllerID,
+		cond.Kind,
+		sv,
+		true,
+		false,
+	); err != nil {
+		r.logger.WithField("condition.id", cond.ID).WithError(err).Info("status KV publish error")
+
+		return http.StatusInternalServerError, &v1types.ServerResponse{
+			Message: "Condition first status publish error: " + err.Error(),
+		}
+	}
+
+	// setup task to be published
+	task := rctypes.NewTaskFromCondition(cond)
+	task.WorkerID = controllerID.String()
+	task.TraceID = trace.SpanFromContext(ctx).SpanContext().TraceID().String()
+	task.SpanID = trace.SpanFromContext(ctx).SpanContext().SpanID().String()
+
+	if err := r.taskKV.publish(
+		ctx,
+		serverID.String(),
+		cond.ID.String(),
+		conditionKind,
+		task,
+		true,
+		false,
+	); err != nil {
+		r.logger.WithField("condition.id", cond.ID).WithError(err).Info("task KV publish error")
+
+		return http.StatusInternalServerError, &v1types.ServerResponse{
+			Message: "Condition Task publish error: " + err.Error(),
+		}
+	}
+
+	return http.StatusOK, &v1types.ServerResponse{Condition: cond}
 }
