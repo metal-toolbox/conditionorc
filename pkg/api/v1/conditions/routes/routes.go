@@ -22,12 +22,12 @@ const (
 	PathPrefix = "/api/v1"
 )
 
-var pkgName = "pkg/api/v1/routes"
+var pkgName = "pkg/api/v1/conditions/routes"
 
 var ginNoOp = func(_ *gin.Context) {
 }
 
-// Routes type sets up the conditionorc API  router routes.
+// Routes type sets up the Conditions API router routes.
 type Routes struct {
 	authMW               *ginauth.MultiTokenMiddleware
 	fleetDBClient        fleetdb.FleetDB
@@ -165,16 +165,6 @@ func (r *Routes) Routes(g *gin.RouterGroup) {
 			r.composeAuthHandler(createScopes("condition")),
 			wrapAPICall(r.serverConditionCreate))
 	}
-}
-
-// RoutesOrchestrator returns routes for the Orchestrator API service.
-func (r *Routes) RoutesOrchestrator(g *gin.RouterGroup) {
-	controller := g.Group("/servers/:uuid")
-	controller.GET(
-		"/condition-queue/:conditionKind",
-		r.composeAuthHandler(readScopes("conditionQueuePop")),
-		wrapAPICall(nil),
-	)
 }
 
 func createScopes(items ...string) []string {
