@@ -34,6 +34,7 @@ type tester struct {
 	mockFleetDB       *fleetdb.MockFleetDB
 	mockStream        *eventsm.MockStream
 	mockStatusValueKV *MockstatusValueKV
+	mockLivenessKV    *MocklivenessKV
 }
 
 func mockserver(t *testing.T, mtester *tester) (*gin.Engine, error) {
@@ -48,6 +49,7 @@ func mockserver(t *testing.T, mtester *tester) (*gin.Engine, error) {
 		WithStore(mtester.mockStore),
 		WithFleetDBClient(mtester.mockFleetDB),
 		WithStatusKVPublisher(mtester.mockStatusValueKV),
+		WithLivenessKV(mtester.mockLivenessKV),
 		WithConditionDefinitions(
 			[]*rctypes.Definition{
 				{Kind: rctypes.FirmwareInstall},
@@ -102,6 +104,7 @@ func setupTestServer(t *testing.T) (*tester, *gin.Engine, error) {
 		mockFleetDB:       fleetdb.NewMockFleetDB(t),
 		mockStream:        eventsm.NewMockStream(t),
 		mockStatusValueKV: NewMockstatusValueKV(t),
+		mockLivenessKV:    NewMocklivenessKV(t),
 	}
 
 	server, err := mockserver(t, mtester)
@@ -257,6 +260,158 @@ func TestConditionStatusUpdate(t *testing.T) {
 			}
 			if tc.mockKVPublisher != nil {
 				tc.mockKVPublisher(mtester.mockStatusValueKV)
+			}
+
+			recorder := httptest.NewRecorder()
+
+			server.ServeHTTP(recorder, tc.request(t))
+			tc.assertResponse(t, recorder)
+		})
+	}
+}
+
+func TestLivenessCheckin(t *testing.T) {
+	serverID := uuid.New()
+	conditionID := uuid.New()
+	controllerID := registry.GetID("test-controller")
+
+	mtester, server, err := setupTestServer(t)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	surl := fmt.Sprintf("/api/v1/servers/%s/controller-checkin/%s", serverID, conditionID)
+
+	testcases := []struct {
+		name           string
+		mockStore      func(r *store.MockRepository)
+		mockLivenessKV func(l *MocklivenessKV)
+		request        func(t *testing.T) *http.Request
+		assertResponse func(t *testing.T, r *httptest.ResponseRecorder)
+	}{
+		{
+			name: "invalid server id",
+			request: func(t *testing.T) *http.Request {
+				request, err := http.NewRequestWithContext(context.TODO(), http.MethodGet, fmt.Sprintf("/api/v1/servers/%s/controller-checkin/%s", "invalid_serverid", conditionID), http.NoBody)
+				if err != nil {
+					t.Fatal(err)
+				}
+				return request
+			},
+			assertResponse: func(t *testing.T, r *httptest.ResponseRecorder) {
+				assert.Equal(t, http.StatusBadRequest, r.Code)
+				assert.Contains(t, string(asBytes(t, r.Body)), "invalid server id")
+			},
+		},
+		{
+			name: "missing controller_id",
+			request: func(t *testing.T) *http.Request {
+				request, err := http.NewRequestWithContext(context.TODO(), http.MethodGet, surl, http.NoBody)
+				if err != nil {
+					t.Fatal(err)
+				}
+				return request
+			},
+			assertResponse: func(t *testing.T, r *httptest.ResponseRecorder) {
+				assert.Equal(t, http.StatusBadRequest, r.Code)
+				assert.Contains(t, string(asBytes(t, r.Body)), "invalid controller ID, none specified")
+			},
+		},
+		{
+			name: "invalid controller_id",
+
+			request: func(t *testing.T) *http.Request {
+				endpoint := surl + "?controller_id=invalid"
+				request, err := http.NewRequestWithContext(context.TODO(), http.MethodGet, endpoint, http.NoBody)
+				if err != nil {
+					t.Fatal(err)
+				}
+				return request
+			},
+			assertResponse: func(t *testing.T, r *httptest.ResponseRecorder) {
+				assert.Equal(t, http.StatusBadRequest, r.Code)
+				assert.Contains(t, string(asBytes(t, r.Body)), "invalid controller ID")
+			},
+		},
+		{
+			name: "successful checkin",
+			mockStore: func(r *store.MockRepository) {
+				r.On("GetActiveCondition", mock.Anything, serverID).
+					Return(&rctypes.Condition{ID: conditionID}, nil).
+					Once()
+			},
+			mockLivenessKV: func(l *MocklivenessKV) {
+				l.On("checkin", controllerID).
+					Return(nil).
+					Once()
+			},
+			request: func(t *testing.T) *http.Request {
+				endpoint := fmt.Sprintf("%s?controller_id=%s", surl, controllerID.String())
+				request, err := http.NewRequestWithContext(context.TODO(), http.MethodGet, endpoint, http.NoBody)
+				if err != nil {
+					t.Fatal(err)
+				}
+				return request
+			},
+			assertResponse: func(t *testing.T, r *httptest.ResponseRecorder) {
+				assert.Equal(t, http.StatusOK, r.Code)
+				assert.Contains(t, string(asBytes(t, r.Body)), "check-in successful")
+			},
+		},
+		{
+			name: "no active condition",
+			mockStore: func(r *store.MockRepository) {
+				r.On("GetActiveCondition", mock.Anything, serverID).
+					Return(nil, nil).
+					Once()
+			},
+			request: func(t *testing.T) *http.Request {
+				endpoint := fmt.Sprintf("%s?controller_id=%s", surl, controllerID.String())
+				request, err := http.NewRequestWithContext(context.TODO(), http.MethodGet, endpoint, http.NoBody)
+				if err != nil {
+					t.Fatal(err)
+				}
+				return request
+			},
+			assertResponse: func(t *testing.T, r *httptest.ResponseRecorder) {
+				assert.Equal(t, http.StatusNotFound, r.Code)
+				assert.Contains(t, string(asBytes(t, r.Body)), "no active condition found for server")
+			},
+		},
+		{
+			name: "liveness checkin error",
+			mockStore: func(r *store.MockRepository) {
+				r.On("GetActiveCondition", mock.Anything, serverID).
+					Return(&rctypes.Condition{ID: conditionID}, nil).
+					Once()
+			},
+			mockLivenessKV: func(l *MocklivenessKV) {
+				l.On("checkin", controllerID).
+					Return(fmt.Errorf("checkin error")).
+					Once()
+			},
+			request: func(t *testing.T) *http.Request {
+				endpoint := fmt.Sprintf("%s?controller_id=%s", surl, controllerID.String())
+				request, err := http.NewRequestWithContext(context.TODO(), http.MethodGet, endpoint, http.NoBody)
+				if err != nil {
+					t.Fatal(err)
+				}
+				return request
+			},
+			assertResponse: func(t *testing.T, r *httptest.ResponseRecorder) {
+				assert.Equal(t, http.StatusInternalServerError, r.Code)
+				assert.Contains(t, string(asBytes(t, r.Body)), "check-in failed")
+			},
+		},
+	}
+
+	for _, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+			if tc.mockStore != nil {
+				tc.mockStore(mtester.mockStore)
+			}
+			if tc.mockLivenessKV != nil {
+				tc.mockLivenessKV(mtester.mockLivenessKV)
 			}
 
 			recorder := httptest.NewRecorder()
