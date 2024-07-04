@@ -79,7 +79,7 @@ var cmdOrchestrator = &cobra.Command{
 			server.WithFleetDBClient(fleetDBClient),
 			server.WithStreamBroker(streamBroker, app.Config.NatsOptions.PublisherSubjectPrefix),
 			server.WithConditionDefinitions(app.Config.ConditionDefinitions),
-			server.WithAsOrchestrator(facility),
+			server.WithOrchestratorAPI(facility),
 		}
 
 		if app.OidcEnabled() {
