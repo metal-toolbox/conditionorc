@@ -80,7 +80,7 @@ func (t *taskKVImpl) get(ctx context.Context, conditionKind rctypes.Kind, condit
 				"conditionID":  conditionID,
 				"controllerID": serverID,
 				"key":          key,
-			}).Info("Task key not found") // TODO: change to debug
+			}).Debug("Task key not found")
 
 			return nil, errors.Wrap(errNoTask, err.Error())
 		}
