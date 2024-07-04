@@ -15,7 +15,7 @@ import (
 )
 
 const (
-	pkgName = "pkg/api/v1/events"
+	pkgName = "pkg/api/v1/conditions/events"
 )
 
 var (
