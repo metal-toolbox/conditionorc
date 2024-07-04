@@ -35,6 +35,7 @@ type tester struct {
 	mockStream        *eventsm.MockStream
 	mockStatusValueKV *MockstatusValueKV
 	mockLivenessKV    *MocklivenessKV
+	mocktaskKV        *MocktaskKV
 }
 
 func mockserver(t *testing.T, mtester *tester) (*gin.Engine, error) {
@@ -50,6 +51,7 @@ func mockserver(t *testing.T, mtester *tester) (*gin.Engine, error) {
 		WithFleetDBClient(mtester.mockFleetDB),
 		WithStatusKVPublisher(mtester.mockStatusValueKV),
 		WithLivenessKV(mtester.mockLivenessKV),
+		WithTaskKV(mtester.mocktaskKV),
 		WithConditionDefinitions(
 			[]*rctypes.Definition{
 				{Kind: rctypes.FirmwareInstall},
@@ -105,6 +107,7 @@ func setupTestServer(t *testing.T) (*tester, *gin.Engine, error) {
 		mockStream:        eventsm.NewMockStream(t),
 		mockStatusValueKV: NewMockstatusValueKV(t),
 		mockLivenessKV:    NewMocklivenessKV(t),
+		mocktaskKV:        NewMocktaskKV(t),
 	}
 
 	server, err := mockserver(t, mtester)
@@ -412,6 +415,365 @@ func TestLivenessCheckin(t *testing.T) {
 			}
 			if tc.mockLivenessKV != nil {
 				tc.mockLivenessKV(mtester.mockLivenessKV)
+			}
+
+			recorder := httptest.NewRecorder()
+
+			server.ServeHTTP(recorder, tc.request(t))
+			tc.assertResponse(t, recorder)
+		})
+	}
+}
+
+func TestTaskQuery(t *testing.T) {
+	serverID := uuid.New()
+	conditionID := uuid.New()
+	conditionKind := rctypes.FirmwareInstall
+
+	mtester, server, err := setupTestServer(t)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	surl := fmt.Sprintf("/api/v1/servers/%s/condition-task/%s", serverID, conditionKind)
+
+	testcases := []struct {
+		name           string
+		mockStore      func(r *store.MockRepository)
+		mockTaskKV     func(tk *MocktaskKV)
+		request        func(t *testing.T) *http.Request
+		assertResponse func(t *testing.T, r *httptest.ResponseRecorder)
+	}{
+		{
+			name: "invalid server id",
+			request: func(t *testing.T) *http.Request {
+				request, err := http.NewRequestWithContext(context.TODO(), http.MethodPut, fmt.Sprintf("/api/v1/servers/%s/condition-status/%s/%s", "invalid_serverid", rctypes.FirmwareInstall, conditionID), http.NoBody)
+				if err != nil {
+					t.Fatal(err)
+				}
+				return request
+			},
+			assertResponse: func(t *testing.T, r *httptest.ResponseRecorder) {
+				assert.Equal(t, http.StatusBadRequest, r.Code)
+				assert.Contains(t, string(asBytes(t, r.Body)), "invalid server id")
+			},
+		},
+		{
+			name: "invalid condition kind",
+			request: func(t *testing.T) *http.Request {
+				url := fmt.Sprintf("/api/v1/servers/%s/condition-task/invalidkind", serverID)
+				request, err := http.NewRequestWithContext(context.TODO(), http.MethodGet, url, http.NoBody)
+				if err != nil {
+					t.Fatal(err)
+				}
+				return request
+			},
+			assertResponse: func(t *testing.T, r *httptest.ResponseRecorder) {
+				assert.Equal(t, http.StatusBadRequest, r.Code)
+				assert.Contains(t, string(asBytes(t, r.Body)), "unsupported condition kind")
+			},
+		},
+		{
+			name: "no active condition",
+			mockStore: func(r *store.MockRepository) {
+				r.On("GetActiveCondition", mock.Anything, serverID).
+					Return(nil, store.ErrConditionNotFound).
+					Once()
+			},
+			request: func(t *testing.T) *http.Request {
+				request, err := http.NewRequestWithContext(context.TODO(), http.MethodGet, surl, http.NoBody)
+				if err != nil {
+					t.Fatal(err)
+				}
+				return request
+			},
+			assertResponse: func(t *testing.T, r *httptest.ResponseRecorder) {
+				assert.Equal(t, http.StatusBadRequest, r.Code)
+				assert.Contains(t, string(asBytes(t, r.Body)), "no active condition found for server")
+			},
+		},
+		{
+			name: "active condition kind mismatch",
+			mockStore: func(r *store.MockRepository) {
+				r.On("GetActiveCondition", mock.Anything, serverID).
+					Return(&rctypes.Condition{ID: conditionID, Kind: rctypes.Inventory, State: rctypes.Pending}, nil).
+					Once()
+			},
+			request: func(t *testing.T) *http.Request {
+				request, err := http.NewRequestWithContext(context.TODO(), http.MethodGet, surl, http.NoBody)
+				if err != nil {
+					t.Fatal(err)
+				}
+				return request
+			},
+			assertResponse: func(t *testing.T, r *httptest.ResponseRecorder) {
+				assert.Equal(t, http.StatusServiceUnavailable, r.Code)
+				assert.Contains(t, string(asBytes(t, r.Body)), "current active condition")
+			},
+		},
+		{
+			name: "task KV query error",
+			mockStore: func(r *store.MockRepository) {
+				r.On("GetActiveCondition", mock.Anything, serverID).
+					Return(&rctypes.Condition{ID: conditionID, Kind: conditionKind}, nil).
+					Once()
+			},
+			mockTaskKV: func(tk *MocktaskKV) {
+				tk.On("get", mock.Anything, conditionKind, conditionID, serverID).
+					Return(nil, fmt.Errorf("task KV query error")).
+					Once()
+			},
+			request: func(t *testing.T) *http.Request {
+				request, err := http.NewRequestWithContext(context.TODO(), http.MethodGet, surl, http.NoBody)
+				if err != nil {
+					t.Fatal(err)
+				}
+				return request
+			},
+			assertResponse: func(t *testing.T, r *httptest.ResponseRecorder) {
+				assert.Equal(t, http.StatusInternalServerError, r.Code)
+				assert.Contains(t, string(asBytes(t, r.Body)), "task KV query error")
+			},
+		},
+		{
+			name: "task ID mismatch",
+			mockStore: func(r *store.MockRepository) {
+				r.On("GetActiveCondition", mock.Anything, serverID).
+					Return(&rctypes.Condition{ID: conditionID, Kind: conditionKind}, nil).
+					Once()
+			},
+			mockTaskKV: func(tk *MocktaskKV) {
+				tk.On("get", mock.Anything, conditionKind, conditionID, serverID).
+					Return(&rctypes.Task[any, any]{ID: uuid.New(), Kind: conditionKind}, nil).
+					Once()
+			},
+			request: func(t *testing.T) *http.Request {
+				request, err := http.NewRequestWithContext(context.TODO(), http.MethodGet, surl, http.NoBody)
+				if err != nil {
+					t.Fatal(err)
+				}
+				return request
+			},
+			assertResponse: func(t *testing.T, r *httptest.ResponseRecorder) {
+				assert.Equal(t, http.StatusBadRequest, r.Code)
+				assert.Contains(t, string(asBytes(t, r.Body)), "does not match active ConditionID")
+			},
+		},
+		{
+			name: "successful task query",
+			mockStore: func(r *store.MockRepository) {
+				r.On("GetActiveCondition", mock.Anything, serverID).
+					Return(&rctypes.Condition{ID: conditionID, Kind: conditionKind}, nil).
+					Once()
+			},
+			mockTaskKV: func(tk *MocktaskKV) {
+				tk.On("get", mock.Anything, conditionKind, conditionID, serverID).
+					Return(&rctypes.Task[any, any]{ID: conditionID, Kind: conditionKind}, nil).
+					Once()
+			},
+			request: func(t *testing.T) *http.Request {
+				request, err := http.NewRequestWithContext(context.TODO(), http.MethodGet, surl, http.NoBody)
+				if err != nil {
+					t.Fatal(err)
+				}
+				return request
+			},
+			assertResponse: func(t *testing.T, r *httptest.ResponseRecorder) {
+				assert.Equal(t, http.StatusOK, r.Code)
+				var response v1types.ServerResponse
+				err := json.Unmarshal(asBytes(t, r.Body), &response)
+				assert.NoError(t, err)
+				assert.Equal(t, "Task identified", response.Message)
+				assert.NotNil(t, response.Task)
+				assert.Equal(t, conditionID, response.Task.ID)
+			},
+		},
+	}
+
+	for _, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+			if tc.mockStore != nil {
+				tc.mockStore(mtester.mockStore)
+			}
+			if tc.mockTaskKV != nil {
+				tc.mockTaskKV(mtester.mocktaskKV)
+			}
+
+			recorder := httptest.NewRecorder()
+
+			server.ServeHTTP(recorder, tc.request(t))
+			tc.assertResponse(t, recorder)
+		})
+	}
+}
+
+func TestTaskPublish(t *testing.T) {
+	serverID := uuid.New()
+	conditionID := uuid.New()
+	conditionKind := rctypes.FirmwareInstall
+
+	mtester, server, err := setupTestServer(t)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	surl := fmt.Sprintf("/api/v1/servers/%s/condition-task/%s/%s", serverID, conditionKind, conditionID)
+
+	testcases := []struct {
+		name           string
+		mockStore      func(r *store.MockRepository)
+		mockTaskKV     func(tk *MocktaskKV)
+		request        func(t *testing.T) *http.Request
+		assertResponse func(t *testing.T, r *httptest.ResponseRecorder)
+	}{
+		{
+			name: "invalid condition kind",
+			request: func(t *testing.T) *http.Request {
+				url := fmt.Sprintf("/api/v1/servers/%s/condition-task/invalidkind/%s", serverID, conditionID)
+				request, err := http.NewRequestWithContext(context.TODO(), http.MethodPost, url, bytes.NewBufferString("{}"))
+				if err != nil {
+					t.Fatal(err)
+				}
+				request.Header.Set("Content-Type", "application/json")
+				return request
+			},
+			assertResponse: func(t *testing.T, r *httptest.ResponseRecorder) {
+				assert.Equal(t, http.StatusBadRequest, r.Code)
+				assert.Contains(t, string(asBytes(t, r.Body)), "unsupported condition kind")
+			},
+		},
+		{
+			name: "no active condition",
+			mockStore: func(r *store.MockRepository) {
+				r.On("GetActiveCondition", mock.Anything, serverID).
+					Return(nil, nil).
+					Once()
+			},
+			request: func(t *testing.T) *http.Request {
+				task := rctypes.Task[any, any]{ID: conditionID, Kind: conditionKind}
+				payload, _ := json.Marshal(task)
+				request, err := http.NewRequestWithContext(context.TODO(), http.MethodPost, surl, bytes.NewBuffer(payload))
+				if err != nil {
+					t.Fatal(err)
+				}
+				request.Header.Set("Content-Type", "application/json")
+				return request
+			},
+			assertResponse: func(t *testing.T, r *httptest.ResponseRecorder) {
+				assert.Equal(t, http.StatusBadRequest, r.Code)
+				assert.Contains(t, string(asBytes(t, r.Body)), "no active condition found for server")
+			},
+		},
+		{
+			name: "task ID mismatch",
+			mockStore: func(r *store.MockRepository) {
+				r.On("GetActiveCondition", mock.Anything, serverID).
+					Return(&rctypes.Condition{ID: uuid.New(), Kind: conditionKind}, nil).
+					Once()
+			},
+			request: func(t *testing.T) *http.Request {
+				task := rctypes.Task[any, any]{ID: conditionID, Kind: conditionKind}
+				payload, _ := json.Marshal(task)
+				request, err := http.NewRequestWithContext(context.TODO(), http.MethodPost, surl, bytes.NewBuffer(payload))
+				if err != nil {
+					t.Fatal(err)
+				}
+				request.Header.Set("Content-Type", "application/json")
+				return request
+			},
+			assertResponse: func(t *testing.T, r *httptest.ResponseRecorder) {
+				assert.Equal(t, http.StatusBadRequest, r.Code)
+				assert.Contains(t, string(asBytes(t, r.Body)), "does not match active ConditionID")
+			},
+		},
+		{
+			name: "successful task publish",
+			mockStore: func(r *store.MockRepository) {
+				r.On("GetActiveCondition", mock.Anything, serverID).
+					Return(&rctypes.Condition{ID: conditionID, Kind: conditionKind}, nil).
+					Once()
+			},
+			mockTaskKV: func(tk *MocktaskKV) {
+				tk.On("publish", mock.Anything, serverID.String(), conditionID.String(), conditionKind, mock.IsType(&rctypes.Task[any, any]{}), false, false).
+					Return(nil).
+					Once()
+			},
+			request: func(t *testing.T) *http.Request {
+				task := rctypes.Task[any, any]{ID: conditionID, Kind: conditionKind}
+				payload, _ := json.Marshal(task)
+				request, err := http.NewRequestWithContext(context.TODO(), http.MethodPost, surl, bytes.NewBuffer(payload))
+				if err != nil {
+					t.Fatal(err)
+				}
+				request.Header.Set("Content-Type", "application/json")
+				return request
+			},
+			assertResponse: func(t *testing.T, r *httptest.ResponseRecorder) {
+				assert.Equal(t, http.StatusOK, r.Code)
+				assert.Contains(t, string(asBytes(t, r.Body)), "condition Task published")
+			},
+		},
+		{
+			name: "timestamp update only",
+			mockStore: func(r *store.MockRepository) {
+				r.On("GetActiveCondition", mock.Anything, serverID).
+					Return(&rctypes.Condition{ID: conditionID, Kind: conditionKind}, nil).
+					Once()
+			},
+			mockTaskKV: func(tk *MocktaskKV) {
+				tk.On("publish", mock.Anything, serverID.String(), conditionID.String(), conditionKind, mock.IsType(&rctypes.Task[any, any]{ID: conditionID}), false, true).
+					Return(nil).
+					Once()
+			},
+			request: func(t *testing.T) *http.Request {
+				url := fmt.Sprintf("%s?ts_update=true", surl)
+				request, err := http.NewRequestWithContext(context.TODO(), http.MethodPost, url, http.NoBody)
+				if err != nil {
+					t.Fatal(err)
+				}
+				return request
+			},
+			assertResponse: func(t *testing.T, r *httptest.ResponseRecorder) {
+				assert.Equal(t, http.StatusOK, r.Code)
+				assert.Contains(t, string(asBytes(t, r.Body)), "condition Task published")
+			},
+		},
+		{
+			name: "task KV publish error",
+			mockStore: func(r *store.MockRepository) {
+				r.On("GetActiveCondition", mock.Anything, serverID).
+					Return(&rctypes.Condition{ID: conditionID, Kind: conditionKind}, nil).
+					Once()
+			},
+			mockTaskKV: func(tk *MocktaskKV) {
+				tk.On("publish", mock.Anything, serverID.String(), conditionID.String(), conditionKind, mock.IsType(&rctypes.Task[any, any]{}), false, false).
+					Return(fmt.Errorf("task KV publish error")).
+					Once()
+			},
+			request: func(t *testing.T) *http.Request {
+				task := rctypes.Task[any, any]{ID: conditionID, Kind: conditionKind}
+				payload, _ := json.Marshal(task)
+				request, err := http.NewRequestWithContext(context.TODO(), http.MethodPost, surl, bytes.NewBuffer(payload))
+				if err != nil {
+					t.Fatal(err)
+				}
+				request.Header.Set("Content-Type", "application/json")
+				return request
+			},
+			assertResponse: func(t *testing.T, r *httptest.ResponseRecorder) {
+				assert.Equal(t, http.StatusInternalServerError, r.Code)
+				assert.Contains(t, string(asBytes(t, r.Body)), "Task publish error")
+			},
+		},
+	}
+
+	for _, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+			if tc.mockStore != nil {
+				tc.mockStore(mtester.mockStore)
+			}
+			if tc.mockTaskKV != nil {
+				tc.mockTaskKV(mtester.mocktaskKV)
 			}
 
 			recorder := httptest.NewRecorder()
