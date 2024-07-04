@@ -22,6 +22,8 @@ const (
 	PathPrefix = "/api/v1"
 )
 
+var pkgName = "pkg/api/v1/orchestrator/routes"
+
 var ginNoOp = func(_ *gin.Context) {
 }
 
@@ -35,6 +37,7 @@ type Routes struct {
 	streamSubjectPrefix  string
 	conditionDefinitions rctypes.Definitions
 	logger               *logrus.Logger
+	statusValueKV        statusValueKV
 }
 
 // Option type sets a parameter on the Routes type.
@@ -89,6 +92,12 @@ func WithConditionDefinitions(defs rctypes.Definitions) Option {
 	}
 }
 
+func WithStatusKVPublisher(p statusValueKV) Option {
+	return func(r *Routes) {
+		r.statusValueKV = p
+	}
+}
+
 // apiHandler is a function that performs real work for the Orchestrator API
 type apiHandler func(c *gin.Context) (int, *v1types.ServerResponse)
 
@@ -115,6 +124,10 @@ func NewRoutes(options ...Option) (*Routes, error) {
 
 	supported := []string{}
 
+	if routes.statusValueKV == nil {
+		routes.statusValueKV = initStatusValueKV()
+	}
+
 	if routes.repository == nil {
 		return nil, errors.Wrap(ErrStore, "no store repository defined")
 	}
@@ -137,11 +150,21 @@ func (r *Routes) composeAuthHandler(scopes []string) gin.HandlerFunc {
 // Routes returns routes for the Orchestrator API service.
 func (r *Routes) Routes(g *gin.RouterGroup) {
 	controller := g.Group("/servers/:uuid")
-	controller.GET(
-		"/condition-queue/:conditionKind",
-		r.composeAuthHandler(readScopes("conditionQueuePop")),
-		wrapAPICall(nil),
+
+	controller.PUT(
+		"/condition-status/:conditionKind/:conditionID",
+		r.composeAuthHandler(createScopes("statusUpdate")),
+		wrapAPICall(r.conditionStatusUpdate),
 	)
+}
+
+func createScopes(items ...string) []string {
+	s := []string{"write", "create"}
+	for _, i := range items {
+		s = append(s, fmt.Sprintf("create:%s", i))
+	}
+
+	return s
 }
 
 func readScopes(items ...string) []string {
