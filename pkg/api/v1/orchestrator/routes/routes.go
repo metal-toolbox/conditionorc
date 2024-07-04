@@ -234,7 +234,6 @@ func (r *Routes) Routes(g *gin.RouterGroup) {
 		r.composeAuthHandler(readScopes("conditionQueuePop")),
 		wrapAPICall(r.conditionQueuePop),
 	)
-
 }
 
 func createScopes(items ...string) []string {
