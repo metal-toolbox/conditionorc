@@ -143,3 +143,80 @@ func (r *Routes) conditionStatusUpdate(c *gin.Context) (int, *v1types.ServerResp
 		Message: "condition status update published",
 	}
 }
+
+// @Summary livenessCheckin
+// @Tag Controllers
+// @Description Check-in endpoint for controllers.
+// @ID conditionQueue
+// @Param uuid path string true "Server ID"
+// @Param conditionKind path string true "Condition Kind"
+// @Param conditionID path string true "Condition ID"
+// @Accept json
+// @Produce json
+// @Success 200 {object} v1types.ServerResponse
+// Failure 400 {object} v1types.ServerResponse
+// Failure 500 {object} v1types.ServerResponse
+// @Router /servers/:uuid/controller-checkin/:conditionID [get]
+func (r *Routes) livenessCheckin(c *gin.Context) (int, *v1types.ServerResponse) {
+	ctx, span := otel.Tracer(pkgName).Start(c.Request.Context(), "Routes.livenessCheckin")
+	span.SetAttributes(
+		attribute.KeyValue{Key: "serverId", Value: attribute.StringValue(c.Param("uuid"))},
+		attribute.KeyValue{Key: "conditionID", Value: attribute.StringValue(c.Param("conditionID"))},
+		attribute.KeyValue{Key: "controllerID", Value: attribute.StringValue(c.Request.URL.Query().Get("controller_id"))},
+	)
+	defer span.End()
+
+	serverID, err := uuid.Parse(c.Param("uuid"))
+	if err != nil {
+		return http.StatusBadRequest, &v1types.ServerResponse{
+			Message: "invalid server id: " + err.Error(),
+		}
+	}
+
+	paramControllerID := c.Request.URL.Query().Get("controller_id")
+	if paramControllerID == "" {
+		return http.StatusBadRequest, &v1types.ServerResponse{
+			Message: "invalid controller ID, none specified",
+		}
+	}
+
+	controllerID, err := registry.ControllerIDFromString(paramControllerID)
+	if err != nil {
+		return http.StatusBadRequest, &v1types.ServerResponse{
+			Message: "invalid controller ID: " + err.Error(),
+		}
+	}
+
+	_, err = uuid.Parse(c.Param("conditionID"))
+	if err != nil {
+		return http.StatusBadRequest, &v1types.ServerResponse{
+			Message: "invalid conditionID: " + err.Error(),
+		}
+	}
+
+	// the controller pop'ed the condition from the queue
+	// which set the condition state to be active, so we expect an active condition
+	// to check in this controller
+	activeCond, err := r.repository.GetActiveCondition(ctx, serverID)
+	if err != nil {
+		return http.StatusInternalServerError, &v1types.ServerResponse{
+			Message: "condition lookup: " + err.Error(),
+		}
+	}
+
+	if activeCond == nil {
+		return http.StatusNotFound, &v1types.ServerResponse{
+			Message: "no active condition found for server",
+		}
+	}
+
+	if err := r.livenessKV.checkin(controllerID); err != nil {
+		return http.StatusInternalServerError, &v1types.ServerResponse{
+			Message: "check-in failed: " + err.Error(),
+		}
+	}
+
+	return http.StatusOK, &v1types.ServerResponse{
+		Message: "check-in successful",
+	}
+}
