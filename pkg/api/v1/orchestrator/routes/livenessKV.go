@@ -93,6 +93,7 @@ func (l *liveness) checkin(id registry.ControllerID) error {
 		}
 	}
 
+	le.Trace("Token refreshed successfully")
 	return nil
 }
 
