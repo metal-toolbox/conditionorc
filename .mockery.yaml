@@ -25,3 +25,4 @@ packages:
       statusValueKV:
       livenessKV:
       taskKV:
+      conditionJetstream:
