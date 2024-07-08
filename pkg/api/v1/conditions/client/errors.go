@@ -20,5 +20,5 @@ type RequestError struct {
 
 // Error returns the RequestError in string format
 func (e RequestError) Error() string {
-	return fmt.Sprintf("conditionorc client request error, statusCode: %d, message: %s", e.StatusCode, e.Message)
+	return fmt.Sprintf("Conditions API client request error, statusCode: %d, message: %s", e.StatusCode, e.Message)
 }

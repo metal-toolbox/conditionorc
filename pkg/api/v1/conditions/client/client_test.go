@@ -55,8 +55,6 @@ func (i *integrationTester) Do(req *http.Request) (*http.Response, error) {
 	return w.Result(), nil
 }
 
-type finalizer func()
-
 func newTester(t *testing.T) *integrationTester {
 	t.Helper()
 
