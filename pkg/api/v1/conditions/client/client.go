@@ -18,9 +18,9 @@ type HTTPRequestDoer interface {
 	Do(req *http.Request) (*http.Response, error)
 }
 
-// Client can perform queries against the conditionorc API service.
+// Client can perform queries against the Conditions API service.
 type Client struct {
-	// The server address with the schema - https://foo.com
+	// The Conditions API server address with the schema - https://foo.com
 	serverAddress string
 
 	// Authentication token
