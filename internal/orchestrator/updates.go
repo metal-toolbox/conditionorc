@@ -3,7 +3,6 @@ package orchestrator
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"strings"
 	"sync"
 	"time"
@@ -519,7 +518,10 @@ func (o *Orchestrator) eventUpdate(ctx context.Context, evt *v1types.ConditionUp
 func (o *Orchestrator) queueFollowingCondition(ctx context.Context, evt *v1types.ConditionUpdateEvent) error {
 	active, err := o.repository.GetActiveCondition(ctx, evt.ConditionUpdate.ServerID)
 	if err != nil && errors.Is(err, store.ErrConditionNotFound) {
-		// nothing more to do
+		o.logger.WithError(err).WithFields(logrus.Fields{
+			"condition.id": evt.ConditionUpdate.ConditionID,
+			"server.id":    evt.ConditionUpdate.ServerID,
+		}).Debug("no further conditions to be queued")
 		return nil
 	}
 
@@ -540,13 +542,21 @@ func (o *Orchestrator) queueFollowingCondition(ctx context.Context, evt *v1types
 	// lose the race to publish the next one, but it's possible I suppose.
 	if active != nil && active.State == rctypes.Pending {
 		byt := active.MustBytes()
-		subject := fmt.Sprintf("%s.servers.%s", o.facility, active.Kind)
-		err := o.streamBroker.Publish(ctx, subject, byt)
+
+		// TODO - for discussion:
+		//
+		// Move this rollup flag check into Condition defs,
+		// optionally move all conditions to be published with the serverID suffix
+		// and rollup is enabled by default.
+		rollup := (active.Kind == rctypes.FirmwareInstallInband)
+
+		err := o.streamBroker.Publish(ctx, active.StreamPublishSubject(o.facility), byt, rollup)
 		if err != nil {
 			o.logger.WithError(err).WithFields(logrus.Fields{
 				"condition.id":   active.ID,
 				"server.id":      evt.ConditionUpdate.ServerID,
 				"condition.kind": active.Kind,
+				"stream.subject": active.StreamPublishSubject(o.facility),
 			}).Warn("publishing next active condition")
 
 			metrics.DependencyError("nats", "publish-condition")
@@ -562,6 +572,7 @@ func (o *Orchestrator) queueFollowingCondition(ctx context.Context, evt *v1types
 			"condition.id":   active.ID,
 			"server.id":      evt.ConditionUpdate.ServerID,
 			"condition.kind": active.Kind,
+			"stream.subject": active.StreamPublishSubject(o.facility),
 		}).Debug("published next condition in chain")
 	}
 
