@@ -357,28 +357,10 @@ func (r *Routes) firmwareInstall(c *gin.Context) (int, *v1types.ServerResponse) 
 
 func (r *Routes) firmwareInstallComposite(serverID uuid.UUID, fwtp rctypes.FirmwareInstallTaskParameters) *rctypes.ServerConditions {
 	createTime := time.Now()
+
 	return &rctypes.ServerConditions{
 		ServerID: serverID,
 		Conditions: []*rctypes.Condition{
-			{
-				Kind:    rctypes.BrokerAcquireServer,
-				Version: rctypes.ConditionStructVersion,
-				Parameters: rctypes.NewBrokerTaskParameters(
-					serverID,
-					rctypes.AcquireServer,
-					rctypes.PurposeFirmwareInstall,
-					"Marked for firmware install",
-				).MustMarshal(),
-				State:     rctypes.Pending,
-				CreatedAt: createTime,
-			},
-			{
-				Kind:       rctypes.FirmwareInstallInband,
-				Version:    rctypes.ConditionStructVersion,
-				Parameters: fwtp.MustJSON(),
-				State:      rctypes.Pending,
-				CreatedAt:  createTime,
-			},
 			{
 				Kind:       rctypes.FirmwareInstall,
 				Version:    rctypes.ConditionStructVersion,
@@ -392,18 +374,6 @@ func (r *Routes) firmwareInstallComposite(serverID uuid.UUID, fwtp rctypes.Firmw
 				Parameters: rctypes.MustDefaultInventoryJSON(serverID),
 				State:      rctypes.Pending,
 				CreatedAt:  createTime,
-			},
-			{
-				Kind:    rctypes.BrokerReleaseServer,
-				Version: rctypes.ConditionStructVersion,
-				Parameters: rctypes.NewBrokerTaskParameters(
-					serverID,
-					rctypes.ReleaseServer,
-					"",
-					"Firmware install process completed",
-				).MustMarshal(),
-				State:     rctypes.Pending,
-				CreatedAt: createTime,
 			},
 		},
 	}

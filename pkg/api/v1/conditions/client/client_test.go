@@ -124,7 +124,7 @@ func TestConditionStatus(t *testing.T) {
 					&store.ConditionRecord{
 						State: rctypes.Pending,
 						Conditions: []*rctypes.Condition{
-							&rctypes.Condition{
+							{
 								Kind:   rctypes.FirmwareInstall,
 								State:  rctypes.Pending,
 								Status: []byte(`{"hello":"world"}`),
