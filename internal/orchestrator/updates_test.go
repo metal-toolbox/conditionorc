@@ -404,8 +404,22 @@ func TestActiveConditionsToReconcile_Updates(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// set condition CreatedAt to across the stale threshold
+	// set condition CreatedAt to across the stale threshold - condition in queue, not exceeded queue age threshold
 	cr.Conditions[0].CreatedAt = time.Now().Add(-1 * rctypes.StaleThreshold)
+
+	o.repository.Update(ctx, sid, cr.Conditions[0])
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// expect updates and no creates
+	creates, updates = o.activeConditionsToReconcile(ctx)
+	assert.Len(t, creates, 0, "creates")
+	assert.Len(t, updates, 0, "updates")
+
+	// set condition CreatedAt to across the stale threshold - condition in queue, exceeded queue age threshold
+	cr.Conditions[0].CreatedAt = time.Now().Add(-1 * msgMaxAgeThreshold)
+	cr.Conditions[0].UpdatedAt = time.Time{}
 
 	o.repository.Update(ctx, sid, cr.Conditions[0])
 	if err != nil {
@@ -541,7 +555,37 @@ func TestFilterToReconcile(t *testing.T) {
 			},
 		},
 		{
-			name: "pending in active-conditions within stale threshold and not listed in status KV",
+			name: "CR in Pending state and Condition is still in queue",
+			records: []*store.ConditionRecord{
+				{
+					ID:    cid1,
+					State: rctypes.Pending,
+					Conditions: []*rctypes.Condition{
+						{
+							ID:        cid1,
+							Kind:      rctypes.FirmwareInstall,
+							State:     rctypes.Pending,
+							Target:    sid1,
+							CreatedAt: createdTS.Add(-rctypes.StaleThreshold - 2*time.Minute),
+							UpdatedAt: time.Time{},
+						},
+						{
+							ID:        cid1,
+							Kind:      rctypes.Inventory,
+							State:     rctypes.Pending,
+							Target:    sid1,
+							CreatedAt: createdTS.Add(-rctypes.StaleThreshold + 1),
+							UpdatedAt: time.Time{},
+						},
+					},
+				},
+			},
+			updateEvents: map[string]*v1types.ConditionUpdateEvent{},
+			wantCreates:  nil,
+			wantUpdates:  nil,
+		},
+		{
+			name: "CR in Pending state within stale threshold and not listed in status KV",
 			records: []*store.ConditionRecord{
 				{
 					ID:    cid1,
