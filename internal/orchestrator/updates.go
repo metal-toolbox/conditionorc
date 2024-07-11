@@ -36,6 +36,9 @@ var (
 	failedByReconciler = []byte(`{ "msg": "controller failed to process this condition in time" }`)
 	reconcilerCadence  = 1 * time.Minute
 	errRetryThis       = errors.New("retry this operation")
+	// Ideally set this to the JS MaxAge value.
+	// The Discard Policy should be set to Old.
+	msgMaxAgeThreshold = 24 * time.Hour
 )
 
 func (o *Orchestrator) startUpdateMonitor(ctx context.Context) {
@@ -347,6 +350,12 @@ func filterToReconcile(records []*store.ConditionRecord, updateEvts map[string]*
 	updates := []*v1types.ConditionUpdateEvent{}
 
 	stale := func(createdAt, updatedAt time.Time) bool {
+		//	// condition in queue
+		if updatedAt.IsZero() {
+			return time.Since(createdAt) >= msgMaxAgeThreshold
+		}
+
+		// condition active with stale updatedAt
 		return time.Since(createdAt) >= rctypes.StaleThreshold &&
 			time.Since(updatedAt) >= rcontroller.StatusStaleThreshold
 	}
