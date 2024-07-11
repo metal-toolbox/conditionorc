@@ -325,7 +325,7 @@ func TestFirmwareInstall(t *testing.T) {
 				AssetID: serverID,
 			},
 			mockStore: func(r *store.MockRepository) {
-				r.On("CreateMultiple", mock.Anything, serverID, mock.Anything, mock.Anything).
+				r.On("CreateMultiple", mock.Anything, serverID, mock.Anything, mock.Anything, mock.Anything).
 					Return(nil).Once()
 			},
 			expectResponse: func() *v1types.ServerResponse {
@@ -343,7 +343,7 @@ func TestFirmwareInstall(t *testing.T) {
 				AssetID: serverID,
 			},
 			mockStore: func(r *store.MockRepository) {
-				r.On("CreateMultiple", mock.Anything, serverID, mock.Anything, mock.Anything).
+				r.On("CreateMultiple", mock.Anything, serverID, mock.Anything, mock.Anything, mock.Anything).
 					Return(fmt.Errorf("%w:%s", store.ErrActiveCondition, "pound sand")).Once()
 			},
 			expectResponse: func() *v1types.ServerResponse {

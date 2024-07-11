@@ -323,7 +323,7 @@ func TestActiveConditionsToReconcile_Creates(t *testing.T) {
 
 			ctx := context.Background()
 			for _, cond := range tc.conditions {
-				err := o.repository.CreateMultiple(ctx, cond.Target, cond)
+				err := o.repository.CreateMultiple(ctx, cond.Target, o.facility, cond)
 				require.NoError(t, err)
 			}
 
@@ -340,9 +340,11 @@ func TestActiveConditionsToReconcile_Creates(t *testing.T) {
 }
 
 func TestActiveConditionsToReconcile_Updates(t *testing.T) {
+
 	o := Orchestrator{
 		logger:       logger,
 		streamBroker: evJS,
+		facility:     "fac13",
 	}
 
 	cfg := &app.Configuration{StoreKind: model.NATS}
@@ -376,7 +378,7 @@ func TestActiveConditionsToReconcile_Updates(t *testing.T) {
 	// active-conditions handle
 	acKV := newCleanActiveConditionsKV(t)
 
-	if err := o.repository.CreateMultiple(ctx, sid, fwcond, invcond); err != nil {
+	if err := o.repository.CreateMultiple(ctx, sid, o.facility, fwcond, invcond); err != nil {
 		t.Fatal(err)
 	}
 
@@ -514,18 +516,17 @@ func TestFilterToReconcile(t *testing.T) {
 			wantUpdates: nil,
 		},
 		{
-			name: "pending in active-conditions exceeded stale threshold and not listed in status KV",
+			name: "CR in Pending state with stale Condition.updatedAt and not listed in status KV",
 			records: []*store.ConditionRecord{
 				{
 					ID:    cid1,
 					State: rctypes.Pending,
 					Conditions: []*rctypes.Condition{
 						{
-							ID:     cid1,
-							Kind:   rctypes.FirmwareInstall,
-							State:  rctypes.Pending,
-							Target: sid1,
-							// exceed thresholds
+							ID:        cid1,
+							Kind:      rctypes.FirmwareInstall,
+							State:     rctypes.Pending,
+							Target:    sid1,
 							CreatedAt: createdTS.Add(-rctypes.StaleThreshold - 2*time.Minute),
 							UpdatedAt: updatedTS.Add(-rcontroller.StatusStaleThreshold - 2*time.Minute),
 						},
