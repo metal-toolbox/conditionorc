@@ -11,6 +11,7 @@ import (
 	gomock "github.com/golang/mock/gomock"
 	uuid "github.com/google/uuid"
 	model "github.com/metal-toolbox/conditionorc/internal/model"
+	condition "github.com/metal-toolbox/rivets/condition"
 )
 
 // MockFleetDB is a mock of FleetDB interface.
@@ -78,4 +79,18 @@ func (m *MockFleetDB) GetServer(ctx context.Context, serverID uuid.UUID) (*model
 func (mr *MockFleetDBMockRecorder) GetServer(ctx, serverID interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetServer", reflect.TypeOf((*MockFleetDB)(nil).GetServer), ctx, serverID)
+}
+
+// WriteConditionHistory mocks base method.
+func (m *MockFleetDB) WriteConditionHistory(ctx context.Context, cond *condition.Condition) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "WriteConditionHistory", ctx, cond)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// WriteConditionHistory indicates an expected call of WriteConditionHistory.
+func (mr *MockFleetDBMockRecorder) WriteConditionHistory(ctx, cond interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "WriteConditionHistory", reflect.TypeOf((*MockFleetDB)(nil).WriteConditionHistory), ctx, cond)
 }

@@ -25,10 +25,9 @@ const (
 )
 
 type fleetDBImpl struct {
-	config               *app.FleetDBAPIOptions
-	conditionDefinitions rctypes.Definitions
-	client               *fleetdbapi.Client
-	logger               *logrus.Logger
+	config *app.FleetDBAPIOptions
+	client *fleetdbapi.Client
+	logger *logrus.Logger
 }
 
 type serverCreateStatus struct {
@@ -45,8 +44,8 @@ var (
 	ErrServerNotFound = errors.New("server not found")
 )
 
-func serverServiceError(operation string) {
-	metrics.DependencyError("serverservice", operation)
+func fleetDBError(operation string) {
+	metrics.DependencyError("fleetDB", operation)
 }
 
 // AddServer creates a server record in FleetDB
@@ -95,6 +94,7 @@ func (s *fleetDBImpl) AddServer(ctx context.Context, serverID uuid.UUID, facilit
 	server := fleetdbapi.Server{UUID: serverID, Name: serverID.String(), FacilityCode: facilityCode}
 	_, _, err = s.client.Create(otelCtx, server)
 	if err != nil {
+		fleetDBError("create-server")
 		return cleanup, err
 	}
 	createStatus.serverCreated = true
@@ -102,6 +102,7 @@ func (s *fleetDBImpl) AddServer(ctx context.Context, serverID uuid.UUID, facilit
 	// Add server BMC credential
 	_, err = s.client.SetCredential(otelCtx, serverID, secretSlug, bmcUser, bmcPass)
 	if err != nil {
+		fleetDBError("set-credentials")
 		return cleanup, err
 	}
 	createStatus.credentialCreated = true
@@ -111,6 +112,7 @@ func (s *fleetDBImpl) AddServer(ctx context.Context, serverID uuid.UUID, facilit
 	bmcIPAttr := fleetdbapi.Attributes{Namespace: rfleetdbapi.ServerAttributeNSBmcAddress, Data: []byte(addrAttr)}
 	_, err = s.client.CreateAttributes(otelCtx, serverID, bmcIPAttr)
 	if err != nil {
+		fleetDBError("create-bmc-ip-attributes")
 		return cleanup, err
 	}
 	createStatus.attributesCreated = true
@@ -135,7 +137,7 @@ func (s *fleetDBImpl) GetServer(ctx context.Context, serverID uuid.UUID) (*model
 			"method":   "GetServer",
 		}).Warn("error reaching fleetDB")
 
-		serverServiceError("get-server")
+		fleetDBError("get-server")
 
 		return nil, errors.Wrap(errServerLookup, err.Error())
 	}
@@ -149,5 +151,38 @@ func (s *fleetDBImpl) DeleteServer(ctx context.Context, serverID uuid.UUID) erro
 	defer span.End()
 
 	_, err := s.client.Delete(otelCtx, fleetdbapi.Server{UUID: serverID})
+	if err != nil {
+		fleetDBError("delete-server")
+	}
+	return err
+}
+
+// WriteConditionHistory adds an event-history record to FleetDB describing the outcome of this condition.
+// XXX: only call this when the condition is complete. FleetDB only tracks the final outcome.
+func (i *fleetDBImpl) WriteConditionHistory(ctx context.Context, cond *rctypes.Condition) error {
+	otelCtx, span := otel.Tracer(pkgName).Start(ctx, "FleetDB.UpdateEvent")
+	defer span.End()
+
+	payload := &fleetdbapi.Event{
+		EventID:     cond.ID,
+		Type:        string(cond.Kind),
+		Start:       cond.CreatedAt,
+		End:         cond.UpdatedAt,
+		Target:      cond.Target,
+		FinalState:  string(cond.State),
+		FinalStatus: cond.Status,
+		Parameters:  cond.Parameters,
+	}
+
+	_, err := i.client.UpdateEvent(otelCtx, payload)
+	if err != nil {
+		fleetDBError("update-event-history")
+		i.logger.WithFields(logrus.Fields{
+			"condition.id": cond.ID.String(),
+			"server.id":    cond.Target.String(),
+			"error":        err,
+			"method":       "UpdateEvent",
+		}).Warn("updating event history")
+	}
 	return err
 }

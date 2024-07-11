@@ -8,6 +8,7 @@ import (
 	"github.com/equinix-labs/otel-init-go/otelinit"
 
 	"github.com/metal-toolbox/conditionorc/internal/app"
+	"github.com/metal-toolbox/conditionorc/internal/fleetdb"
 	"github.com/metal-toolbox/conditionorc/internal/metrics"
 	"github.com/metal-toolbox/conditionorc/internal/model"
 	"github.com/metal-toolbox/conditionorc/internal/orchestrator"
@@ -62,6 +63,11 @@ var cmdOrchestrator = &cobra.Command{
 			app.Logger.Fatal(err)
 		}
 
+		fleetDBClient, err := fleetdb.NewFleetDBClient(ctx, app.Config, app.Logger)
+		if err != nil {
+			app.Logger.Fatal(err)
+		}
+
 		notifier := notify.New(app.Logger, app.Config.Notifications)
 
 		options := []orchestrator.Option{
@@ -72,6 +78,7 @@ var cmdOrchestrator = &cobra.Command{
 			orchestrator.WithNotifier(notifier),
 			orchestrator.WithFacility(facility),
 			orchestrator.WithConditionDefs(app.Config.ConditionDefinitions),
+			orchestrator.WithFleetDBClient(fleetDBClient),
 		}
 
 		if app.Config.NatsOptions.KVReplicationFactor > 0 {

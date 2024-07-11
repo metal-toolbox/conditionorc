@@ -28,20 +28,20 @@ type FleetDB interface {
 	GetServer(ctx context.Context, serverID uuid.UUID) (*model.Server, error)
 	// DeleteServer
 	DeleteServer(ctx context.Context, serverID uuid.UUID) error
+	// WriteConditionHistory adds a record to FleetDB describing the completed condition's outcome
+	WriteConditionHistory(ctx context.Context, cond *rctypes.Condition) error
 }
 
-func NewFleetDBClient(ctx context.Context, config *app.Configuration, conditionDefs rctypes.Definitions,
-	logger *logrus.Logger) (FleetDB, error) {
+func NewFleetDBClient(ctx context.Context, config *app.Configuration, logger *logrus.Logger) (FleetDB, error) {
 	ssOpts := &config.FleetDBAPIOptions
 	client, err := getFleetDBAPIClient(ctx, ssOpts, logger)
 	if err != nil {
 		return nil, err
 	}
 	return &fleetDBImpl{
-		config:               ssOpts,
-		conditionDefinitions: conditionDefs,
-		logger:               logger,
-		client:               client,
+		config: ssOpts,
+		logger: logger,
+		client: client,
 	}, nil
 }
 
