@@ -321,10 +321,14 @@ func conditionFromUpdateEvent(evt *v1types.ConditionUpdateEvent) *rctypes.Condit
 	}
 }
 
-func filterIncompleteRecords(records []*store.ConditionRecord) []*store.ConditionRecord {
+func (o *Orchestrator) filterIncompleteRecords(records []*store.ConditionRecord) []*store.ConditionRecord {
 	foundRecords := []*store.ConditionRecord{}
 
 	for _, cr := range records {
+		if cr.Facility != o.facility {
+			continue
+		}
+
 		if len(cr.Conditions) == 0 {
 			continue
 		}
@@ -394,7 +398,7 @@ func (o *Orchestrator) activeConditionsToReconcile(ctx context.Context) ([]*rcty
 	}
 
 	// filter condition Kinds and records to be reconciled
-	filteredRecords := filterIncompleteRecords(records)
+	filteredRecords := o.filterIncompleteRecords(records)
 
 	// map of serverIDs to condition updates from the status KV
 	updateEvts := map[string]*v1types.ConditionUpdateEvent{}

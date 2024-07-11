@@ -333,7 +333,7 @@ func (r *Routes) firmwareInstall(c *gin.Context) (int, *v1types.ServerResponse) 
 		CreatedAt:             createTime,
 	}
 
-	if err = r.repository.CreateMultiple(otelCtx, serverID, fwCondition, invCondition); err != nil {
+	if err = r.repository.CreateMultiple(otelCtx, serverID, facilityCode, fwCondition, invCondition); err != nil {
 		if errors.Is(err, store.ErrActiveCondition) {
 			return http.StatusConflict, &v1types.ServerResponse{
 				Message: err.Error(),
