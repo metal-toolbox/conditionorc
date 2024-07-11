@@ -73,14 +73,14 @@ func (_c *MockRepository_Create_Call) RunAndReturn(run func(context.Context, uui
 	return _c
 }
 
-// CreateMultiple provides a mock function with given fields: ctx, serverID, conditions
-func (_m *MockRepository) CreateMultiple(ctx context.Context, serverID uuid.UUID, conditions ...*condition.Condition) error {
+// CreateMultiple provides a mock function with given fields: ctx, serverID, facilityCode, conditions
+func (_m *MockRepository) CreateMultiple(ctx context.Context, serverID uuid.UUID, facilityCode string, conditions ...*condition.Condition) error {
 	_va := make([]interface{}, len(conditions))
 	for _i := range conditions {
 		_va[_i] = conditions[_i]
 	}
 	var _ca []interface{}
-	_ca = append(_ca, ctx, serverID)
+	_ca = append(_ca, ctx, serverID, facilityCode)
 	_ca = append(_ca, _va...)
 	ret := _m.Called(_ca...)
 
@@ -89,8 +89,8 @@ func (_m *MockRepository) CreateMultiple(ctx context.Context, serverID uuid.UUID
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, uuid.UUID, ...*condition.Condition) error); ok {
-		r0 = rf(ctx, serverID, conditions...)
+	if rf, ok := ret.Get(0).(func(context.Context, uuid.UUID, string, ...*condition.Condition) error); ok {
+		r0 = rf(ctx, serverID, facilityCode, conditions...)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -106,21 +106,22 @@ type MockRepository_CreateMultiple_Call struct {
 // CreateMultiple is a helper method to define mock.On call
 //   - ctx context.Context
 //   - serverID uuid.UUID
+//   - facilityCode string
 //   - conditions ...*condition.Condition
-func (_e *MockRepository_Expecter) CreateMultiple(ctx interface{}, serverID interface{}, conditions ...interface{}) *MockRepository_CreateMultiple_Call {
+func (_e *MockRepository_Expecter) CreateMultiple(ctx interface{}, serverID interface{}, facilityCode interface{}, conditions ...interface{}) *MockRepository_CreateMultiple_Call {
 	return &MockRepository_CreateMultiple_Call{Call: _e.mock.On("CreateMultiple",
-		append([]interface{}{ctx, serverID}, conditions...)...)}
+		append([]interface{}{ctx, serverID, facilityCode}, conditions...)...)}
 }
 
-func (_c *MockRepository_CreateMultiple_Call) Run(run func(ctx context.Context, serverID uuid.UUID, conditions ...*condition.Condition)) *MockRepository_CreateMultiple_Call {
+func (_c *MockRepository_CreateMultiple_Call) Run(run func(ctx context.Context, serverID uuid.UUID, facilityCode string, conditions ...*condition.Condition)) *MockRepository_CreateMultiple_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		variadicArgs := make([]*condition.Condition, len(args)-2)
-		for i, a := range args[2:] {
+		variadicArgs := make([]*condition.Condition, len(args)-3)
+		for i, a := range args[3:] {
 			if a != nil {
 				variadicArgs[i] = a.(*condition.Condition)
 			}
 		}
-		run(args[0].(context.Context), args[1].(uuid.UUID), variadicArgs...)
+		run(args[0].(context.Context), args[1].(uuid.UUID), args[2].(string), variadicArgs...)
 	})
 	return _c
 }
@@ -130,7 +131,7 @@ func (_c *MockRepository_CreateMultiple_Call) Return(_a0 error) *MockRepository_
 	return _c
 }
 
-func (_c *MockRepository_CreateMultiple_Call) RunAndReturn(run func(context.Context, uuid.UUID, ...*condition.Condition) error) *MockRepository_CreateMultiple_Call {
+func (_c *MockRepository_CreateMultiple_Call) RunAndReturn(run func(context.Context, uuid.UUID, string, ...*condition.Condition) error) *MockRepository_CreateMultiple_Call {
 	_c.Call.Return(run)
 	return _c
 }
