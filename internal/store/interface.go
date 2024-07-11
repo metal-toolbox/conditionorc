@@ -20,6 +20,7 @@ import (
 type ConditionRecord struct {
 	ID         uuid.UUID            `json:"id"`
 	State      rctypes.State        `json:"state"`
+	Facility   string               `json:"facility"`
 	Conditions []*rctypes.Condition `json:"conditions"`
 }
 
@@ -57,7 +58,7 @@ type Repository interface {
 	// Create a condition record that encapsulates a unit of work encompassing multiple conditions
 	// If you create a condition record with 0 conditions, you don't actually create anything, but
 	// no error is returned.
-	CreateMultiple(ctx context.Context, serverID uuid.UUID, conditions ...*rctypes.Condition) error
+	CreateMultiple(ctx context.Context, serverID uuid.UUID, facilityCode string, conditions ...*rctypes.Condition) error
 
 	// Update a condition on a server
 	// @serverID: required
