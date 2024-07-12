@@ -23,9 +23,11 @@ import (
 	"github.com/nats-io/nats.go"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/goleak"
 
+	v1EventHandlers "github.com/metal-toolbox/conditionorc/pkg/api/v1/events"
 	v1types "github.com/metal-toolbox/conditionorc/pkg/api/v1/types"
 	rctypes "github.com/metal-toolbox/rivets/condition"
 	rcontroller "github.com/metal-toolbox/rivets/events/controller"
@@ -823,4 +825,163 @@ func TestConditionListenersExit(t *testing.T) {
 	case <-sentinelChan:
 	}
 	require.True(t, testPassed)
+}
+
+func TestEventUpdate(t *testing.T) {
+	mockStream := events.NewMockStream(t)
+	o := Orchestrator{
+		logger:        logger,
+		streamBroker:  mockStream,
+		facility:      "fc13",
+		conditionDefs: defs,
+	}
+
+	cfg := &app.Configuration{StoreKind: model.NATS}
+	repository, err := store.NewStore(cfg, logger, evJS)
+	if err != nil {
+		t.Fatal(err)
+	}
+	o.repository = repository
+
+	mockEventHandler := v1EventHandlers.NewMockSetter(t)
+	o.eventHandler = mockEventHandler
+
+	serverID := uuid.New()
+	conditionID := uuid.New()
+
+	testcases := []struct {
+		name          string
+		event         *v1types.ConditionUpdateEvent
+		setupMocks    func()
+		expectedError error
+		cleanStatusKV bool
+	}{
+		{
+			name: "successful update - non-final state",
+			event: &v1types.ConditionUpdateEvent{
+				ConditionUpdate: v1types.ConditionUpdate{
+					ConditionID: conditionID,
+					ServerID:    serverID,
+					State:       rctypes.Active,
+					Status:      json.RawMessage(`{"msg":"in progress"}`),
+					UpdatedAt:   time.Now(),
+				},
+				Kind: rctypes.FirmwareInstall,
+			},
+			setupMocks: func() {
+				mockEventHandler.On("UpdateCondition", mock.Anything, mock.IsType(&v1types.ConditionUpdateEvent{})).Return(nil)
+				o.repository.CreateMultiple(
+					context.Background(),
+					serverID,
+					o.facility,
+					&rctypes.Condition{
+						ID:     conditionID,
+						Kind:   rctypes.FirmwareInstall,
+						Target: serverID,
+						State:  rctypes.Pending,
+					},
+					&rctypes.Condition{
+						ID:     conditionID,
+						Kind:   rctypes.Inventory,
+						Target: serverID,
+						State:  rctypes.Pending,
+					},
+				)
+			},
+			expectedError: nil,
+			cleanStatusKV: true,
+		},
+		{
+			name: "successful update - final state",
+			event: &v1types.ConditionUpdateEvent{
+				ConditionUpdate: v1types.ConditionUpdate{
+					ConditionID: conditionID,
+					ServerID:    serverID,
+					State:       rctypes.Succeeded,
+					Status:      json.RawMessage(`{"msg":"completed"}`),
+					UpdatedAt:   time.Now(),
+				},
+				Kind: rctypes.FirmwareInstall,
+			},
+			setupMocks: func() {
+				mockEventHandler.On("UpdateCondition", mock.Anything, mock.IsType(&v1types.ConditionUpdateEvent{})).Return(nil)
+				mockStream.On(
+					"Publish",
+					mock.Anything,
+					mock.Anything,
+					mock.Anything,
+				).Return(nil)
+				o.repository.CreateMultiple(
+					context.Background(),
+					serverID,
+					o.facility,
+					&rctypes.Condition{
+						ID:     conditionID,
+						Kind:   rctypes.FirmwareInstall,
+						Target: serverID,
+						State:  rctypes.Succeeded,
+					},
+					&rctypes.Condition{
+						ID:     conditionID,
+						Kind:   rctypes.Inventory,
+						Target: serverID,
+						State:  rctypes.Active,
+					},
+				)
+			},
+			expectedError: nil,
+			cleanStatusKV: true,
+		},
+		{
+			name: "update not applied - when CR is in final state",
+			event: &v1types.ConditionUpdateEvent{
+				ConditionUpdate: v1types.ConditionUpdate{
+					ConditionID: conditionID,
+					ServerID:    serverID,
+					State:       rctypes.Active,
+					Status:      json.RawMessage(`{"msg":"in progress"}`),
+					UpdatedAt:   time.Now(),
+				},
+				Kind: rctypes.FirmwareInstall,
+			},
+			setupMocks: func() {
+				require.NoError(t,
+					o.repository.Create(context.Background(), serverID, &rctypes.Condition{
+						ID:     conditionID,
+						Target: serverID,
+						Kind:   rctypes.FirmwareInstall,
+					}),
+				)
+
+				require.NoError(t,
+					o.repository.Update(context.Background(), serverID, &rctypes.Condition{
+						ID:     conditionID,
+						Target: serverID,
+						Kind:   rctypes.FirmwareInstall,
+						State:  rctypes.Succeeded,
+					}),
+				)
+			},
+			expectedError: nil,
+			cleanStatusKV: true,
+		},
+	}
+
+	for _, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+			if tc.cleanStatusKV {
+				_ = newCleanStatusKV(t, tc.event.Kind)
+			}
+
+			tc.setupMocks()
+
+			err := o.eventUpdate(context.Background(), tc.event)
+
+			if tc.expectedError != nil {
+				assert.EqualError(t, err, tc.expectedError.Error())
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
 }

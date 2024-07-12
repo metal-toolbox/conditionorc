@@ -492,8 +492,17 @@ func (o *Orchestrator) getEventsToReconcile(ctx context.Context) (evts []*v1type
 }
 
 func (o *Orchestrator) eventUpdate(ctx context.Context, evt *v1types.ConditionUpdateEvent) error {
-	if err := o.eventHandler.UpdateCondition(ctx, evt); err != nil {
-		return errors.Wrap(err, "updating condition")
+	// fetch current CR for server
+	cr, err := o.repository.Get(ctx, evt.ServerID)
+	if err != nil {
+		return err
+	}
+
+	// CR to be updated when current state is not final
+	if !rctypes.StateIsComplete(cr.State) {
+		if err := o.eventHandler.UpdateCondition(ctx, evt); err != nil {
+			return errors.Wrap(err, "updateCondition error")
+		}
 	}
 
 	// nothing else to do if the condition is not finalized
