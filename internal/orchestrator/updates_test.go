@@ -459,6 +459,63 @@ func TestEventNeedsReconciliation(t *testing.T) {
 	require.False(t, o.eventNeedsReconciliation(evt), "controller active")
 }
 
+func TestFilterIncompleteRecords(t *testing.T) {
+	t.Parallel()
+	winningID := uuid.MustParse("D1BCE35F-5604-4517-925A-57B5A601AC5C")
+	recs := []*store.ConditionRecord{
+		{
+			// no conditions -- skipped
+			ID:       uuid.MustParse("1E133C1F-680E-4FC4-85B8-8ADD1E9D480F"),
+			State:    rctypes.Pending,
+			Facility: "fc-13",
+		},
+		{
+			// wrong facility -- skipped
+			ID:       uuid.MustParse("F3AC3378-1FF8-47F4-BEDA-67D3DABA5E59"),
+			State:    rctypes.Active,
+			Facility: "fc-26",
+			// careful, this condition is incomplete
+			Conditions: []*rctypes.Condition{
+				{
+					ID:    uuid.MustParse("F3AC3378-1FF8-47F4-BEDA-67D3DABA5E59"),
+					Kind:  rctypes.Inventory,
+					State: rctypes.Active,
+				},
+			},
+		},
+		{
+			// finalized condition -- skipped
+			ID:       uuid.MustParse("C6DC6EE8-724C-486C-AF77-BFCFB611D593"),
+			State:    rctypes.Failed,
+			Facility: "fc-13",
+			Conditions: []*rctypes.Condition{
+				{
+					ID:    uuid.MustParse("C6DC6EE8-724C-486C-AF77-BFCFB611D593"),
+					Kind:  rctypes.Inventory,
+					State: rctypes.Failed,
+				},
+			},
+		},
+		{
+			// a winner
+			ID:       winningID,
+			State:    rctypes.Active,
+			Facility: "fc-13",
+			Conditions: []*rctypes.Condition{
+				{
+					ID:    winningID,
+					Kind:  rctypes.Inventory,
+					State: rctypes.Active,
+				},
+			},
+		},
+	}
+
+	got := filterIncompleteRecords(recs, "fc-13")
+	require.Len(t, got, 1)
+	require.Equal(t, winningID, got[0].ID)
+}
+
 func TestFilterToReconcile(t *testing.T) {
 	t.Parallel()
 
