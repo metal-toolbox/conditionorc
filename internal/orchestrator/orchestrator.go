@@ -30,7 +30,7 @@ type Orchestrator struct {
 	concurrency   int
 	repository    store.Repository
 	streamBroker  events.Stream
-	eventHandler  *v1EventHandlers.Handler
+	eventHandler  v1EventHandlers.Setter
 	replicaCount  int
 	notifier      notify.Sender
 	facility      string

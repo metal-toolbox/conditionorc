@@ -27,14 +27,18 @@ func eventsError(operation string) {
 	metrics.DependencyError("events", operation)
 }
 
-// Handler holds methods to handle events.
+type Setter interface {
+	UpdateCondition(ctx context.Context, updEvt *v1types.ConditionUpdateEvent) error
+}
+
+// Handler holds methods to handle events, implemnents the ConditionUpdater interface.
 type Handler struct {
 	logger     *logrus.Logger
 	repository store.Repository
 	stream     events.Stream
 }
 
-func NewHandler(repository store.Repository, stream events.Stream, logger *logrus.Logger) *Handler {
+func NewHandler(repository store.Repository, stream events.Stream, logger *logrus.Logger) Setter {
 	return &Handler{repository: repository, stream: stream, logger: logger}
 }
 
