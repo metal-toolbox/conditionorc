@@ -133,10 +133,10 @@ func TestAddServer(t *testing.T) {
 			// mock repository
 			mockStore: func(r *store.MockRepository) {
 				// create condition query
-				r.On("Create", mock.Anything, mockServerID, mock.Anything).
+				r.On("CreateMultiple", mock.Anything, mockServerID, mockFacilityCode, mock.Anything).
 					Return(nil).
 					Run(func(args mock.Arguments) {
-						c := args.Get(2).(*rctypes.Condition)
+						c := args.Get(3).(*rctypes.Condition)
 						assert.Equal(t, rctypes.ConditionStructVersion, c.Version, "condition version mismatch")
 						assert.Equal(t, rctypes.Inventory, c.Kind, "condition kind mismatch")
 						assert.Equal(t, json.RawMessage(expectedInventoryParams(mockServerID.String())), c.Parameters, "condition parameters mismatch")
@@ -266,12 +266,14 @@ func TestAddServer(t *testing.T) {
 			// mock repository
 			mockStore: func(r *store.MockRepository) {
 				// create condition query
-				r.On("Create", mock.Anything, mock.Anything, mock.Anything).
+				r.On("CreateMultiple", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 					Return(nil).
 					Run(func(args mock.Arguments) {
 						id := args.Get(1).(uuid.UUID)
-						c := args.Get(2).(*rctypes.Condition)
+						fc := args.Get(2).(string)
+						c := args.Get(3).(*rctypes.Condition)
 						assert.Equal(t, generatedServerID, id, "server ID mismatch")
+						assert.Equal(t, mockFacilityCode, fc, "facility mismatch")
 						assert.Equal(t, json.RawMessage(expectedInventoryParams(generatedServerID.String())), c.Parameters, "condition parameters mismatch")
 						assert.Equal(t, rctypes.ConditionStructVersion, c.Version, "condition version mismatch")
 						assert.Equal(t, rctypes.Inventory, c.Kind, "condition kind mismatch")
@@ -594,7 +596,7 @@ func TestAddServerRollback(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			rollbackCallCounter = 0
 			if tc.mockStoreCreateErr.calledTime > 0 {
-				repository.On("Create", mock.Anything, mock.Anything, mock.Anything).
+				repository.On("CreateMultiple", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 					Return(tc.mockStoreCreateErr.err).
 					Times(tc.mockStoreCreateErr.calledTime)
 			}
@@ -737,9 +739,9 @@ func TestServerConditionCreate(t *testing.T) {
 				r.On("GetActiveCondition", mock.Anything, serverID).
 					Return(nil, nil).
 					Once()
-				r.On("Create", mock.Anything, serverID, mock.IsType(&rctypes.Condition{})).
+				r.On("CreateMultiple", mock.Anything, serverID, facilityCode, mock.IsType(&rctypes.Condition{})).
 					Run(func(args mock.Arguments) {
-						c := args.Get(2).(*rctypes.Condition)
+						c := args.Get(3).(*rctypes.Condition)
 						assert.Equal(t, rctypes.ConditionStructVersion, c.Version, "condition version mismatch")
 						assert.Equal(t, rctypes.FirmwareInstall, c.Kind, "condition kind mismatch")
 						assert.Equal(t, json.RawMessage(parametersJSON), c.Parameters, "condition parameters mismatch")
@@ -786,9 +788,9 @@ func TestServerConditionCreate(t *testing.T) {
 					Return(nil, nil).
 					Once()
 
-				create := r.On("Create", mock.Anything, serverID, mock.IsType(&rctypes.Condition{})).
+				create := r.On("CreateMultiple", mock.Anything, serverID, facilityCode, mock.IsType(&rctypes.Condition{})).
 					Run(func(args mock.Arguments) {
-						c := args.Get(2).(*rctypes.Condition)
+						c := args.Get(3).(*rctypes.Condition)
 						expect := &rctypes.Fault{Panic: true, DelayDuration: "10s", FailAt: "foobar"}
 						assert.Equal(t, c.Fault, expect)
 					}).
@@ -866,9 +868,9 @@ func TestServerConditionCreate(t *testing.T) {
 				r.On("GetActiveCondition", mock.Anything, serverID).
 					Return(nil, nil).
 					Once()
-				r.On("Create", mock.Anything, serverID, mock.IsType(&rctypes.Condition{})).
+				r.On("CreateMultiple", mock.Anything, serverID, facilityCode, mock.IsType(&rctypes.Condition{})).
 					Run(func(args mock.Arguments) {
-						c := args.Get(2).(*rctypes.Condition)
+						c := args.Get(3).(*rctypes.Condition)
 						assert.Equal(t, rctypes.ConditionStructVersion, c.Version, "condition version mismatch")
 						assert.Equal(t, rctypes.FirmwareInstall, c.Kind, "condition kind mismatch")
 						assert.Equal(t, json.RawMessage(parametersJSON), c.Parameters, "condition parameters mismatch")

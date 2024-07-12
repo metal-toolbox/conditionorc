@@ -323,7 +323,7 @@ func TestActiveConditionsToReconcile_Creates(t *testing.T) {
 
 			ctx := context.Background()
 			for _, cond := range tc.conditions {
-				err := o.repository.CreateMultiple(ctx, cond.Target, cond)
+				err := o.repository.CreateMultiple(ctx, cond.Target, o.facility, cond)
 				require.NoError(t, err)
 			}
 
@@ -343,6 +343,7 @@ func TestActiveConditionsToReconcile_Updates(t *testing.T) {
 	o := Orchestrator{
 		logger:       logger,
 		streamBroker: evJS,
+		facility:     "fc-13",
 	}
 
 	cfg := &app.Configuration{StoreKind: model.NATS}
@@ -376,7 +377,7 @@ func TestActiveConditionsToReconcile_Updates(t *testing.T) {
 	// active-conditions handle
 	acKV := newCleanActiveConditionsKV(t)
 
-	if err := o.repository.CreateMultiple(ctx, sid, fwcond, invcond); err != nil {
+	if err := o.repository.CreateMultiple(ctx, sid, o.facility, fwcond, invcond); err != nil {
 		t.Fatal(err)
 	}
 

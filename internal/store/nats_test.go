@@ -109,7 +109,7 @@ func TestCreateReadUpdate(t *testing.T) {
 	require.Nil(t, active)
 
 	// add a condition
-	err = store.Create(context.TODO(), serverID, condition)
+	err = store.CreateMultiple(context.TODO(), serverID, "fc-13", condition)
 	require.NoError(t, err)
 
 	active, err = store.GetActiveCondition(context.TODO(), serverID)
@@ -120,6 +120,7 @@ func TestCreateReadUpdate(t *testing.T) {
 	cr, err := store.Get(context.TODO(), serverID)
 	require.NoError(t, err)
 	require.Equal(t, condition.ID.String(), cr.ID.String())
+	require.Equal(t, "fc-13", cr.Facility)
 
 	// update the condition
 	condition.State = rctypes.Active

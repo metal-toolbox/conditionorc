@@ -51,10 +51,6 @@ type Repository interface {
 	// @serverID: required
 	GetActiveCondition(ctx context.Context, serverID uuid.UUID) (*rctypes.Condition, error)
 
-	// @serverID: required
-	// @condition: required
-	Create(ctx context.Context, serverID uuid.UUID, condition *rctypes.Condition) error
-
 	// Create a condition record that encapsulates a unit of work encompassing multiple conditions
 	// If you create a condition record with 0 conditions, you don't actually create anything, but
 	// no error is returned.

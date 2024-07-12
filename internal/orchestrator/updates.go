@@ -760,7 +760,7 @@ func (o *Orchestrator) reconcileActiveConditionRecords(ctx context.Context) {
 		if err != nil {
 			// create record if it doesn't exist
 			if errors.Is(err, store.ErrConditionNotFound) {
-				if errCreate := o.repository.Create(ctx, cond.Target, cond); errCreate != nil {
+				if errCreate := o.repository.CreateMultiple(ctx, cond.Target, o.facility, cond); errCreate != nil {
 					le.WithError(errCreate).Warn("reconciler condition record create")
 				}
 
