@@ -8,6 +8,13 @@ packages:
       inpackage: True
     interfaces:
       Repository:
+  github.com/metal-toolbox/conditionorc/pkg/api/v1/events:
+    config:
+      dir: pkg/api/v1/events
+      fileName: "mock_{{.InterfaceName | firstLower}}.go"
+      inpackage: True
+    interfaces:
+      Setter:
   github.com/metal-toolbox/conditionorc/internal/fleetdb:
     config:
       dir: internal/fleetdb
