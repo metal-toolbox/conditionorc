@@ -342,7 +342,6 @@ func TestActiveConditionsToReconcile_Creates(t *testing.T) {
 }
 
 func TestActiveConditionsToReconcile_Updates(t *testing.T) {
-
 	o := Orchestrator{
 		logger:       logger,
 		streamBroker: evJS,
@@ -408,7 +407,7 @@ func TestActiveConditionsToReconcile_Updates(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// set condition CreatedAt to across the stale threshold - condition in queue, not exceeded queue age threshold
+	// set condition CreatedAt above stale threshold - condition in queue, not exceeded queue age threshold
 	cr.Conditions[0].CreatedAt = time.Now().Add(-1 * rctypes.StaleThreshold)
 
 	o.repository.Update(ctx, sid, cr.Conditions[0])
@@ -421,7 +420,7 @@ func TestActiveConditionsToReconcile_Updates(t *testing.T) {
 	assert.Len(t, creates, 0, "creates")
 	assert.Len(t, updates, 0, "updates")
 
-	// set condition CreatedAt to across the stale threshold - condition in queue, exceeded queue age threshold
+	// set condition CreatedAt above stale threshold - condition in queue, exceeded queue age threshold
 	cr.Conditions[0].CreatedAt = time.Now().Add(-1 * msgMaxAgeThreshold)
 	cr.Conditions[0].UpdatedAt = time.Time{}
 
