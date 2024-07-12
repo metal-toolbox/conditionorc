@@ -202,6 +202,7 @@ func TestConditionStatus(t *testing.T) {
 		})
 	}
 }
+
 func TestConditionCreate(t *testing.T) {
 	serverID := uuid.New()
 
@@ -227,12 +228,16 @@ func TestConditionCreate(t *testing.T) {
 				).Once()
 
 				r.On(
-					"Create",
+					"CreateMultiple",
 					mock.Anything,
 					serverID,
 					mock.Anything,
+					mock.Anything,
 				).Return(
-					func(_ context.Context, _ uuid.UUID, c *rctypes.Condition) error {
+					func(_ context.Context, _ uuid.UUID, fc string, cs ...*rctypes.Condition) error {
+						require.Equal(t, "facility", fc, "facility code mismatch")
+						require.Len(t, cs, 1, "conditions length")
+						c := cs[0]
 						require.Equal(t, rctypes.ConditionStructVersion, c.Version, "condition version mismatch")
 						require.Equal(t, rctypes.FirmwareInstall, c.Kind, "condition kind mismatch")
 						require.Equal(t, json.RawMessage(`{"hello":"world"}`), c.Parameters, "condition parameters mismatch")
@@ -292,7 +297,7 @@ func TestConditionCreate(t *testing.T) {
 
 			got, err := tester.client.ServerConditionCreate(context.TODO(), serverID, rctypes.FirmwareInstall, tc.payload)
 			if err != nil {
-				t.Error(err)
+				t.Fatal(err)
 			}
 
 			if err != nil {
@@ -308,6 +313,7 @@ func TestConditionCreate(t *testing.T) {
 		})
 	}
 }
+
 func TestFirmwareInstall(t *testing.T) {
 	serverID := uuid.New()
 
@@ -325,7 +331,7 @@ func TestFirmwareInstall(t *testing.T) {
 				AssetID: serverID,
 			},
 			mockStore: func(r *store.MockRepository) {
-				r.On("CreateMultiple", mock.Anything, serverID, mock.Anything, mock.Anything).
+				r.On("CreateMultiple", mock.Anything, serverID, "facility", mock.Anything, mock.Anything).
 					Return(nil).Once()
 			},
 			expectResponse: func() *v1types.ServerResponse {
@@ -343,7 +349,7 @@ func TestFirmwareInstall(t *testing.T) {
 				AssetID: serverID,
 			},
 			mockStore: func(r *store.MockRepository) {
-				r.On("CreateMultiple", mock.Anything, serverID, mock.Anything, mock.Anything).
+				r.On("CreateMultiple", mock.Anything, serverID, "facility", mock.Anything, mock.Anything).
 					Return(fmt.Errorf("%w:%s", store.ErrActiveCondition, "pound sand")).Once()
 			},
 			expectResponse: func() *v1types.ServerResponse {
@@ -388,6 +394,7 @@ func TestFirmwareInstall(t *testing.T) {
 		})
 	}
 }
+
 func TestServerEnroll(t *testing.T) {
 	serverID := uuid.New()
 	validParams := types.AddServerParams{
@@ -440,11 +447,14 @@ func TestServerEnroll(t *testing.T) {
 			},
 			mockStore: func(r *store.MockRepository) {
 				// expect valid payload
-				r.On("Create",
+				r.On("CreateMultiple",
 					mock.Anything,
 					serverID,
 					mock.Anything,
-				).Return(func(_ context.Context, _ uuid.UUID, c *rctypes.Condition) error {
+					mock.Anything,
+				).Return(func(_ context.Context, _ uuid.UUID, _ string, cs ...*rctypes.Condition) error {
+					require.Len(t, cs, 1)
+					c := cs[0]
 					require.Equal(t, rctypes.ConditionStructVersion, c.Version, "condition version mismatch")
 					require.Equal(t, rctypes.Inventory, c.Kind, "condition kind mismatch")
 					require.Equal(t, json.RawMessage(expectedInventoryParams(serverID.String())), c.Parameters, "condition parameters mismatch")
@@ -576,7 +586,8 @@ func TestServerEnrollEmptyUUID(t *testing.T) {
 		Return(rollback, nil).
 		Once()
 
-	tester.repository.On("Create",
+	tester.repository.On("CreateMultiple",
+		mock.Anything,
 		mock.Anything,
 		mock.Anything,
 		mock.MatchedBy(func(c *rctypes.Condition) bool {
