@@ -35,6 +35,7 @@ var (
 	errCompleteEvent   = errors.New("unable to complete event")
 	failedByReconciler = []byte(`{ "msg": "controller failed to process this condition in time" }`)
 	reconcilerCadence  = 1 * time.Minute
+	errRetryThis       = errors.New("retry this operation")
 )
 
 func (o *Orchestrator) startUpdateMonitor(ctx context.Context) {
@@ -478,25 +479,86 @@ func (o *Orchestrator) getEventsToReconcile(ctx context.Context) (evts []*v1type
 	return evts
 }
 
+func (o *Orchestrator) mergeUpdate(ctx context.Context, updEvt *v1types.ConditionUpdateEvent) (*rctypes.Condition, error) {
+	_, span := otel.Tracer(pkgName).Start(ctx, "orchestrator.mergeUpdate")
+	defer span.End()
+
+	metrics.RegisterSpanEvent(
+		span,
+		updEvt.ServerID.String(),
+		updEvt.ConditionID.String(),
+		string(updEvt.Kind),
+		"mergeUpdate",
+	)
+
+	if err := updEvt.Validate(); err != nil {
+		o.logger.WithError(err).WithFields(logrus.Fields{
+			"server_id":      updEvt.ConditionUpdate.ServerID,
+			"condition_kind": updEvt.Kind,
+		}).Error("conditionUpdateEvent validate error")
+		return nil, err
+	}
+
+	// query existing condition
+	existing, err := o.repository.GetActiveCondition(ctx, updEvt.ConditionUpdate.ServerID)
+	if err != nil {
+		if errors.Is(err, store.ErrConditionNotFound) {
+			o.logger.WithFields(logrus.Fields{
+				"server_id":      updEvt.ConditionUpdate.ServerID,
+				"condition_id":   updEvt.ConditionUpdate.ConditionID,
+				"condition_kind": updEvt.Kind,
+			}).Error("no existing pending/active condition found for update")
+			return nil, errors.Wrap(err, "fetching active condition to update")
+		}
+		return nil, errors.Wrap(errRetryThis, err.Error())
+	}
+
+	// merge update with existing
+	revisedCondition, err := updEvt.MergeExisting(existing)
+	if err != nil {
+		o.logger.WithError(err).WithFields(logrus.Fields{
+			"serverID":       updEvt.ConditionUpdate.ServerID,
+			"conditionKind":  updEvt.Kind,
+			"incoming_state": updEvt.State,
+			"existing_state": existing.State,
+		}).Warn("condition merge failed")
+		return nil, errors.Wrap(err, "merging condition update")
+	}
+
+	return revisedCondition, nil
+}
+
 func (o *Orchestrator) eventUpdate(ctx context.Context, evt *v1types.ConditionUpdateEvent) error {
-	if err := o.eventHandler.UpdateCondition(ctx, evt); err != nil {
+	updatedCondition, err := o.mergeUpdate(ctx, evt)
+	if err != nil {
 		return errors.Wrap(err, "updating condition")
 	}
 
-	// nothing else to do if the condition is not finalized
-	if !rctypes.StateIsComplete(evt.ConditionUpdate.State) {
-		return nil
+	// commit the update
+	if err := o.repository.Update(ctx, updatedCondition.Target, updatedCondition); err != nil {
+		o.logger.WithError(err).WithFields(logrus.Fields{
+			"serverID":    updatedCondition.Target.String(),
+			"conditionID": updatedCondition.ID.String(),
+		}).Info("condition update failed")
+		return errors.Wrap(errRetryThis, err.Error())
 	}
 
-	// deal with the completed event
-	delErr := status.DeleteCondition(evt.Kind, o.facility, evt.ConditionUpdate.ConditionID.String())
+	// nothing else to do if the condition is not finalized
+	if !rctypes.StateIsComplete(updatedCondition.State) {
+		return nil
+	}
+	return o.finalizeCondition(ctx, updatedCondition)
+}
+
+func (o *Orchestrator) finalizeCondition(ctx context.Context, cond *rctypes.Condition) error {
+	delErr := status.DeleteCondition(cond.Kind, o.facility, cond.ID.String())
 	if delErr != nil {
 		// if we fail to delete this event from the KV, the reconciler will catch it later
 		// and walk this code, so return early.
 		o.logger.WithError(delErr).WithFields(logrus.Fields{
-			"condition.id":   evt.ConditionUpdate.ConditionID,
-			"server.id":      evt.ConditionUpdate.ServerID,
-			"condition.kind": evt.Kind,
+			"condition.id":   cond.ID.String(),
+			"server.id":      cond.Target.String(),
+			"condition.kind": cond.Kind,
 		}).Warn("removing completed condition data")
 
 		metrics.DependencyError("nats", "remove completed condition condition")
@@ -506,18 +568,18 @@ func (o *Orchestrator) eventUpdate(ctx context.Context, evt *v1types.ConditionUp
 
 	metrics.ConditionCompleted.With(
 		prometheus.Labels{
-			"conditionKind": string(evt.Kind),
-			"state":         string(evt.ConditionUpdate.State),
+			"conditionKind": string(cond.Kind),
+			"state":         string(cond.State),
 		},
 	).Inc()
 
 	// queue any follow-on work as required
-	return o.queueFollowingCondition(ctx, evt)
+	return o.queueFollowingCondition(ctx, cond)
 }
 
 // Queue up follow on conditions
-func (o *Orchestrator) queueFollowingCondition(ctx context.Context, evt *v1types.ConditionUpdateEvent) error {
-	active, err := o.repository.GetActiveCondition(ctx, evt.ConditionUpdate.ServerID)
+func (o *Orchestrator) queueFollowingCondition(ctx context.Context, cond *rctypes.Condition) error {
+	active, err := o.repository.GetActiveCondition(ctx, cond.ID)
 	if err != nil && errors.Is(err, store.ErrConditionNotFound) {
 		// nothing more to do
 		return nil
@@ -525,8 +587,8 @@ func (o *Orchestrator) queueFollowingCondition(ctx context.Context, evt *v1types
 
 	if err != nil {
 		o.logger.WithError(err).WithFields(logrus.Fields{
-			"condition.id": evt.ConditionUpdate.ConditionID,
-			"server.id":    evt.ConditionUpdate.ServerID,
+			"condition.id": cond.ID.String(),
+			"server.id":    cond.Target.String(),
 		}).Warn("retrieving next active condition")
 
 		metrics.DependencyError("nats", "retrieve active condition")
@@ -535,17 +597,14 @@ func (o *Orchestrator) queueFollowingCondition(ctx context.Context, evt *v1types
 	}
 
 	// Publish the next event if that event is in the pending state.
-	//
-	// Seeing as we only *just* completed this event it's hard to believe we'd
-	// lose the race to publish the next one, but it's possible I suppose.
 	if active != nil && active.State == rctypes.Pending {
 		byt := active.MustBytes()
 		subject := fmt.Sprintf("%s.servers.%s", o.facility, active.Kind)
 		err := o.streamBroker.Publish(ctx, subject, byt)
 		if err != nil {
 			o.logger.WithError(err).WithFields(logrus.Fields{
-				"condition.id":   active.ID,
-				"server.id":      evt.ConditionUpdate.ServerID,
+				"condition.id":   active.ID.String(),
+				"server.id":      active.Target.String(),
 				"condition.kind": active.Kind,
 			}).Warn("publishing next active condition")
 
@@ -560,7 +619,7 @@ func (o *Orchestrator) queueFollowingCondition(ctx context.Context, evt *v1types
 
 		o.logger.WithFields(logrus.Fields{
 			"condition.id":   active.ID,
-			"server.id":      evt.ConditionUpdate.ServerID,
+			"server.id":      active.Target.String(),
 			"condition.kind": active.Kind,
 		}).Debug("published next condition in chain")
 	}
@@ -669,7 +728,7 @@ func (o *Orchestrator) reconcileActiveConditionRecords(ctx context.Context) {
 			"kind":           string(evt.Kind),
 		})
 
-		if err := o.eventHandler.UpdateCondition(ctx, evt); err != nil {
+		if err := o.eventUpdate(ctx, evt); err != nil {
 			le.WithError(err).Warn("reconciler event update")
 			continue
 		}
