@@ -23,11 +23,13 @@ import (
 	"github.com/nats-io/nats.go"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/goleak"
 
 	v1types "github.com/metal-toolbox/conditionorc/pkg/api/v1/types"
 	rctypes "github.com/metal-toolbox/rivets/condition"
+	eventsm "github.com/metal-toolbox/rivets/events"
 	rcontroller "github.com/metal-toolbox/rivets/events/controller"
 )
 
@@ -880,4 +882,98 @@ func TestConditionListenersExit(t *testing.T) {
 	case <-sentinelChan:
 	}
 	require.True(t, testPassed)
+}
+
+func TestQueueFollowingCondition(t *testing.T) {
+	t.Run("no following work", func(t *testing.T) {
+		condID := uuid.New()
+		repo := store.NewMockRepository(t)
+		//fleetDBClient := fleetdb.NewMockFleetDB(t)
+		//stream := eventsm.NewMockStream(t)
+		repo.On("GetActiveCondition", mock.Anything, condID).Return(nil, store.ErrConditionNotFound).Once()
+		o := &Orchestrator{
+			logger:     logger,
+			repository: repo,
+		}
+		condArg := &rctypes.Condition{ID: condID}
+		require.NoError(t, o.queueFollowingCondition(context.TODO(), condArg))
+	})
+	t.Run("lookup error", func(t *testing.T) {
+		condID := uuid.New()
+		repo := store.NewMockRepository(t)
+		repo.On("GetActiveCondition", mock.Anything, condID).Return(nil, errors.New("pound sand")).Once()
+		o := &Orchestrator{
+			logger:     logger,
+			repository: repo,
+		}
+		condArg := &rctypes.Condition{ID: condID}
+		err := o.queueFollowingCondition(context.TODO(), condArg)
+		require.Error(t, err)
+		require.ErrorIs(t, err, errCompleteEvent)
+	})
+	t.Run("publishing error", func(t *testing.T) {
+		condID := uuid.New()
+		repo := store.NewMockRepository(t)
+		next := &rctypes.Condition{
+			ID:     condID,
+			Kind:   rctypes.Kind("following-kind"),
+			Target: uuid.New(),
+			State:  rctypes.Pending,
+		}
+		condArg := &rctypes.Condition{ID: condID}
+		repo.On("GetActiveCondition", mock.Anything, condID).Return(next, nil).Once()
+		stream := eventsm.NewMockStream(t)
+		subject := "fc-13.servers.following-kind"
+		stream.On("Publish", mock.Anything, subject, mock.Anything).Return(errors.New("pound sand")).Once()
+		o := &Orchestrator{
+			facility:     "fc-13",
+			logger:       logger,
+			repository:   repo,
+			streamBroker: stream,
+		}
+		err := o.queueFollowingCondition(context.TODO(), condArg)
+		require.Error(t, err)
+		require.ErrorIs(t, err, errCompleteEvent)
+	})
+	t.Run("next condition state is not pending", func(t *testing.T) {
+		condID := uuid.New()
+		repo := store.NewMockRepository(t)
+		next := &rctypes.Condition{
+			ID:     condID,
+			Kind:   rctypes.Kind("following-kind"),
+			Target: uuid.New(),
+			State:  rctypes.Active,
+		}
+		condArg := &rctypes.Condition{ID: condID}
+		repo.On("GetActiveCondition", mock.Anything, condID).Return(next, nil).Once()
+		o := &Orchestrator{
+			logger:     logger,
+			repository: repo,
+		}
+		err := o.queueFollowingCondition(context.TODO(), condArg)
+		require.NoError(t, err)
+	})
+	t.Run("successful publish", func(t *testing.T) {
+		condID := uuid.New()
+		repo := store.NewMockRepository(t)
+		next := &rctypes.Condition{
+			ID:     condID,
+			Kind:   rctypes.Kind("following-kind"),
+			Target: uuid.New(),
+			State:  rctypes.Pending,
+		}
+		condArg := &rctypes.Condition{ID: condID}
+		repo.On("GetActiveCondition", mock.Anything, condID).Return(next, nil).Once()
+		stream := eventsm.NewMockStream(t)
+		subject := "fc-13.servers.following-kind"
+		stream.On("Publish", mock.Anything, subject, mock.Anything).Return(nil).Once()
+		o := &Orchestrator{
+			facility:     "fc-13",
+			logger:       logger,
+			repository:   repo,
+			streamBroker: stream,
+		}
+		err := o.queueFollowingCondition(context.TODO(), condArg)
+		require.NoError(t, err)
+	})
 }

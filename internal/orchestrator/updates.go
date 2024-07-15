@@ -492,6 +492,9 @@ func (o *Orchestrator) getEventsToReconcile(ctx context.Context) (evts []*v1type
 	return evts
 }
 
+// XXX: testing note -- all the functions called here (ConditionUpdateEvent::Validate(),
+// Repository::GetActiveCondition(), and ConditionUpdateEvent::MergeExisting()) are all tested in their
+// respective modules, so I'm skipping testing this function.
 func (o *Orchestrator) mergeUpdate(ctx context.Context, updEvt *v1types.ConditionUpdateEvent) (*rctypes.Condition, error) {
 	_, span := otel.Tracer(pkgName).Start(ctx, "orchestrator.mergeUpdate")
 	defer span.End()
