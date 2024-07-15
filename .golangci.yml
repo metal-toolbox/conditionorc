@@ -6,7 +6,7 @@ service:
 linters-settings:
   govet:
     auto-fix: true
-    check-shadowing: true
+    shadow: true
     settings:
       printf:
         funcs:
@@ -84,14 +84,11 @@ linters:
   enable-all: false
   disable-all: true
 
-run:
-  #  build-tags:
-  skip-dirs:
-    - internal/fixtures
-  skip-files:
-    - "(.*/)*.*_test.go"
-
 issues:
+  exclude-files:
+    - "(.*/)*.*_test.go"
+  exclude-dirs:
+    - internal/fixtures
   exclude-rules:
     - linters:
         - gosec
