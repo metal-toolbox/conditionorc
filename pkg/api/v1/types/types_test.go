@@ -48,31 +48,62 @@ func TestNewCondition(t *testing.T) {
 func TestConditionUpdate_mergeExisting(t *testing.T) {
 	tests := []struct {
 		name     string
-		update   *ConditionUpdate
+		update   *ConditionUpdateEvent
 		existing *rctypes.Condition
 		want     *rctypes.Condition
 		wantErr  error
 	}{
 		{
 			"no existing condition returns error",
-			&ConditionUpdate{},
+			&ConditionUpdateEvent{},
 			nil,
 			nil,
 			errConditionMerge,
 		},
 		{
-			"transition state invalid error",
-			&ConditionUpdate{State: rctypes.Active},
-			&rctypes.Condition{State: rctypes.Failed},
+			"condition kind does not match",
+			&ConditionUpdateEvent{
+				ConditionUpdate: ConditionUpdate{
+					ConditionID: uuid.MustParse("1AAA6757-E60F-48D8-A03F-D886ADB3E817"),
+					State:       rctypes.Active,
+				},
+				Kind: rctypes.Kind("test-type"),
+			},
+			&rctypes.Condition{
+				ID:    uuid.MustParse("1AAA6757-E60F-48D8-A03F-D886ADB3E817"),
+				Kind:  rctypes.Kind("different-type"),
+				State: rctypes.Active,
+			},
+			nil,
+			errConditionMerge,
+		},
+
+		{
+			"transition state invalid error, condition is already failed",
+			&ConditionUpdateEvent{
+				ConditionUpdate: ConditionUpdate{
+					ConditionID: uuid.MustParse("1AAA6757-E60F-48D8-A03F-D886ADB3E817"),
+					State:       rctypes.Active,
+				},
+				Kind: rctypes.Kind("test-type"),
+			},
+			&rctypes.Condition{
+				ID:    uuid.MustParse("1AAA6757-E60F-48D8-A03F-D886ADB3E817"),
+				Kind:  rctypes.Kind("test-type"),
+				State: rctypes.Failed,
+			},
 			nil,
 			errInvalidStateTransition,
 		},
 		{
 			"condition ID mismatch error",
-			&ConditionUpdate{
-				ConditionID: uuid.New(),
-				State:       rctypes.Active,
-				Status:      []byte("{'foo': 'bar'}"),
+			&ConditionUpdateEvent{
+				ConditionUpdate: ConditionUpdate{
+					ConditionID: uuid.New(),
+					State:       rctypes.Active,
+					Status:      []byte("{'foo': 'bar'}"),
+				},
+				Kind: rctypes.FirmwareInstall,
 			},
 			&rctypes.Condition{
 				ID:         uuid.New(),
@@ -86,14 +117,17 @@ func TestConditionUpdate_mergeExisting(t *testing.T) {
 		},
 		{
 			"Server ID mismatch error",
-			&ConditionUpdate{
-				ConditionID: uuid.New(),
-				ServerID:    uuid.New(),
-				State:       rctypes.Active,
-				Status:      []byte("{'foo': 'bar'}"),
+			&ConditionUpdateEvent{
+				ConditionUpdate: ConditionUpdate{
+					ConditionID: uuid.MustParse("48e632e0-d0af-013b-9540-2cde48001122"),
+					ServerID:    uuid.MustParse("f2cd1ef8-c759-4049-905e-f6fdf61719a9"),
+					State:       rctypes.Active,
+					Status:      []byte("{'foo': 'bar'}"),
+				},
+				Kind: rctypes.FirmwareInstall,
 			},
 			&rctypes.Condition{
-				ID:         uuid.New(),
+				ID:         uuid.MustParse("48e632e0-d0af-013b-9540-2cde48001122"),
 				Target:     uuid.New(),
 				Kind:       rctypes.FirmwareInstall,
 				Parameters: nil,
@@ -105,11 +139,14 @@ func TestConditionUpdate_mergeExisting(t *testing.T) {
 		},
 		{
 			"existing merged with update",
-			&ConditionUpdate{
-				ConditionID: uuid.MustParse("48e632e0-d0af-013b-9540-2cde48001122"),
-				ServerID:    uuid.MustParse("f2cd1ef8-c759-4049-905e-f6fdf61719a9"),
-				State:       rctypes.Active,
-				Status:      []byte("{'foo': 'bar'}"),
+			&ConditionUpdateEvent{
+				ConditionUpdate: ConditionUpdate{
+					ConditionID: uuid.MustParse("48e632e0-d0af-013b-9540-2cde48001122"),
+					ServerID:    uuid.MustParse("f2cd1ef8-c759-4049-905e-f6fdf61719a9"),
+					State:       rctypes.Active,
+					Status:      []byte("{'foo': 'bar'}"),
+				},
+				Kind: rctypes.FirmwareInstall,
 			},
 			&rctypes.Condition{
 				Kind:       rctypes.FirmwareInstall,

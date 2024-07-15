@@ -131,7 +131,7 @@ func (c *ConditionUpdateEvent) Validate() error {
 // The resourceVersion is not updated here and is left for the repository Store to update.
 //
 // This method makes sure that update does not overwrite existing data inadvertently.
-func (c *ConditionUpdate) MergeExisting(existing *rctypes.Condition) (*rctypes.Condition, error) {
+func (c *ConditionUpdateEvent) MergeExisting(existing *rctypes.Condition) (*rctypes.Condition, error) {
 	// condition must already exist for update.
 	if existing == nil {
 		return nil, errors.Wrap(errConditionMerge, "existing condition is nil")
@@ -140,6 +140,11 @@ func (c *ConditionUpdate) MergeExisting(existing *rctypes.Condition) (*rctypes.C
 	// condition identifier must match
 	if existing.ID != c.ConditionID {
 		return nil, errors.Wrap(errConditionMerge, "Condition ID in update does not match existing")
+	}
+
+	// kind must match
+	if existing.Kind != c.Kind {
+		return nil, errors.Wrap(errConditionMerge, "update kind does not match existing")
 	}
 
 	// transition is valid
