@@ -1,3 +1,4 @@
+// nolint
 package conditions
 
 import (
