@@ -36,7 +36,7 @@ type Client struct {
 type Option func(*Client) error
 
 // Creates a new Client, with reasonable defaults
-func NewClient(serverAddress string, opts ...Option) (*Client, error) {
+func NewClient(serverAddress string, opts ...Option) (Queryor, error) {
 	// create a client with sane default values
 	client := Client{
 		serverAddress: serverAddress,
@@ -71,6 +71,20 @@ func WithAuthToken(authToken string) Option {
 		c.authToken = authToken
 		return nil
 	}
+}
+
+// The Queryor interface enables
+type Queryor interface {
+	// Update a Condition status
+	ConditionStatusUpdate(ctx context.Context, conditionKind rctypes.Kind, serverID, conditionID uuid.UUID, controllerID registry.ControllerID, statusValue *rctypes.StatusValue, onlyUpdateTimestamp bool) (*v1types.ServerResponse, error)
+	// Fetch a Condition from the queue
+	ConditionQueuePop(ctx context.Context, conditionKind rctypes.Kind, serverID uuid.UUID) (*v1types.ServerResponse, error)
+	// Check in controller
+	ControllerCheckin(ctx context.Context, serverID, conditionID uuid.UUID, controllerID registry.ControllerID) (*v1types.ServerResponse, error)
+	// Publish Task
+	ConditionTaskPublish(ctx context.Context, conditionKind rctypes.Kind, serverID, conditionID uuid.UUID, task *rctypes.Task[any, any], onlyUpdateTimestamp bool) (*v1types.ServerResponse, error)
+	// Query task
+	ConditionTaskQuery(ctx context.Context, conditionKind rctypes.Kind, serverID uuid.UUID) (*v1types.ServerResponse, error)
 }
 
 func (c *Client) ConditionStatusUpdate(ctx context.Context, conditionKind rctypes.Kind, serverID, conditionID uuid.UUID, controllerID registry.ControllerID, statusValue *rctypes.StatusValue, onlyUpdateTimestamp bool) (*v1types.ServerResponse, error) {
