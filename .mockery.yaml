@@ -24,3 +24,11 @@ packages:
     interfaces:
       statusValueKV:
       taskKV:
+  github.com/metal-toolbox/conditionorc/pkg/api/v1/orchestrator/client:
+    config:
+      dir: pkg/api/v1/orchestrator/client
+      fileName: "mock_{{.InterfaceName | lower }}.go"
+      inpackage: True
+    interfaces:
+      HTTPRequestDoer:
+      Queryor:
