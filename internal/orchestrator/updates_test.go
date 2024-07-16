@@ -888,8 +888,6 @@ func TestQueueFollowingCondition(t *testing.T) {
 	t.Run("no following work", func(t *testing.T) {
 		condID := uuid.New()
 		repo := store.NewMockRepository(t)
-		//fleetDBClient := fleetdb.NewMockFleetDB(t)
-		//stream := eventsm.NewMockStream(t)
 		repo.On("GetActiveCondition", mock.Anything, condID).Return(nil, store.ErrConditionNotFound).Once()
 		o := &Orchestrator{
 			logger:     logger,
@@ -924,7 +922,7 @@ func TestQueueFollowingCondition(t *testing.T) {
 		repo.On("GetActiveCondition", mock.Anything, condID).Return(next, nil).Once()
 		stream := eventsm.NewMockStream(t)
 		subject := "fc-13.servers.following-kind"
-		stream.On("Publish", mock.Anything, subject, mock.Anything).Return(errors.New("pound sand")).Once()
+		stream.On("Publish", mock.Anything, subject, mock.Anything, false).Return(errors.New("pound sand")).Once()
 		o := &Orchestrator{
 			facility:     "fc-13",
 			logger:       logger,
@@ -966,7 +964,7 @@ func TestQueueFollowingCondition(t *testing.T) {
 		repo.On("GetActiveCondition", mock.Anything, condID).Return(next, nil).Once()
 		stream := eventsm.NewMockStream(t)
 		subject := "fc-13.servers.following-kind"
-		stream.On("Publish", mock.Anything, subject, mock.Anything).Return(nil).Once()
+		stream.On("Publish", mock.Anything, subject, mock.Anything, false).Return(nil).Once()
 		o := &Orchestrator{
 			facility:     "fc-13",
 			logger:       logger,
