@@ -11,7 +11,6 @@ import (
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 
-	v1EventHandlers "github.com/metal-toolbox/conditionorc/pkg/api/v1/events"
 	rctypes "github.com/metal-toolbox/rivets/condition"
 )
 
@@ -30,7 +29,6 @@ type Orchestrator struct {
 	concurrency   int
 	repository    store.Repository
 	streamBroker  events.Stream
-	eventHandler  *v1EventHandlers.Handler
 	replicaCount  int
 	notifier      notify.Sender
 	facility      string
@@ -113,12 +111,6 @@ func New(opts ...Option) *Orchestrator {
 	for _, opt := range opts {
 		opt(o)
 	}
-
-	o.eventHandler = v1EventHandlers.NewHandler(
-		o.repository,
-		o.streamBroker,
-		o.logger,
-	)
 
 	return o
 }

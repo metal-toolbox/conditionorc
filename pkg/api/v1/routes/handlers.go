@@ -333,7 +333,7 @@ func (r *Routes) firmwareInstall(c *gin.Context) (int, *v1types.ServerResponse) 
 		CreatedAt:             createTime,
 	}
 
-	if err = r.repository.CreateMultiple(otelCtx, serverID, fwCondition, invCondition); err != nil {
+	if err = r.repository.CreateMultiple(otelCtx, serverID, facilityCode, fwCondition, invCondition); err != nil {
 		if errors.Is(err, store.ErrActiveCondition) {
 			return http.StatusConflict, &v1types.ServerResponse{
 				Message: err.Error(),
@@ -378,7 +378,7 @@ func (r *Routes) firmwareInstall(c *gin.Context) (int, *v1types.ServerResponse) 
 
 func (r *Routes) conditionCreate(otelCtx context.Context, newCondition *rctypes.Condition, serverID uuid.UUID, facilityCode string) (int, *v1types.ServerResponse) {
 	// Create the new condition
-	err := r.repository.Create(otelCtx, serverID, newCondition)
+	err := r.repository.CreateMultiple(otelCtx, serverID, facilityCode, newCondition)
 	if err != nil {
 		r.logger.WithError(err).Info("condition create failed")
 

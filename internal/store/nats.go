@@ -223,7 +223,7 @@ func (n *natsStore) Create(ctx context.Context, serverID uuid.UUID, condition *r
 // CreateMultiple crafts a condition-record that is comprised of multiple individual conditions. Unlike Create
 // it checks for an existing, active ConditionRecord prior to queuing the new one, and will return an error if
 // it finds one.
-func (n *natsStore) CreateMultiple(ctx context.Context, serverID uuid.UUID, work ...*rctypes.Condition) error {
+func (n *natsStore) CreateMultiple(ctx context.Context, serverID uuid.UUID, facilityCode string, work ...*rctypes.Condition) error {
 	otelCtx, span := otel.Tracer(pkgName).Start(ctx, "NatsStore.CreateMultiple")
 	defer span.End()
 
@@ -249,8 +249,9 @@ func (n *natsStore) CreateMultiple(ctx context.Context, serverID uuid.UUID, work
 
 	id := uuid.New()
 	cr = &ConditionRecord{
-		ID:    id,
-		State: rctypes.Pending,
+		ID:       id,
+		State:    rctypes.Pending,
+		Facility: facilityCode,
 	}
 	for _, condition := range work {
 		condition.ID = id

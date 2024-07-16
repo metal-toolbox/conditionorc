@@ -23,11 +23,13 @@ import (
 	"github.com/nats-io/nats.go"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/goleak"
 
 	v1types "github.com/metal-toolbox/conditionorc/pkg/api/v1/types"
 	rctypes "github.com/metal-toolbox/rivets/condition"
+	eventsm "github.com/metal-toolbox/rivets/events"
 	rcontroller "github.com/metal-toolbox/rivets/events/controller"
 )
 
@@ -323,7 +325,7 @@ func TestActiveConditionsToReconcile_Creates(t *testing.T) {
 
 			ctx := context.Background()
 			for _, cond := range tc.conditions {
-				err := o.repository.CreateMultiple(ctx, cond.Target, cond)
+				err := o.repository.CreateMultiple(ctx, cond.Target, o.facility, cond)
 				require.NoError(t, err)
 			}
 
@@ -343,6 +345,7 @@ func TestActiveConditionsToReconcile_Updates(t *testing.T) {
 	o := Orchestrator{
 		logger:       logger,
 		streamBroker: evJS,
+		facility:     "fc-13",
 	}
 
 	cfg := &app.Configuration{StoreKind: model.NATS}
@@ -376,7 +379,7 @@ func TestActiveConditionsToReconcile_Updates(t *testing.T) {
 	// active-conditions handle
 	acKV := newCleanActiveConditionsKV(t)
 
-	if err := o.repository.CreateMultiple(ctx, sid, fwcond, invcond); err != nil {
+	if err := o.repository.CreateMultiple(ctx, sid, o.facility, fwcond, invcond); err != nil {
 		t.Fatal(err)
 	}
 
@@ -404,8 +407,22 @@ func TestActiveConditionsToReconcile_Updates(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// set condition CreatedAt to across the stale threshold
+	// set condition CreatedAt to across the stale threshold - condition in queue, not exceeded queue age threshold
 	cr.Conditions[0].CreatedAt = time.Now().Add(-1 * rctypes.StaleThreshold)
+
+	o.repository.Update(ctx, sid, cr.Conditions[0])
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// expect updates and no creates
+	creates, updates = o.activeConditionsToReconcile(ctx)
+	assert.Len(t, creates, 0, "creates")
+	assert.Len(t, updates, 0, "updates")
+
+	// set condition CreatedAt to across the stale threshold - condition in queue, exceeded queue age threshold
+	cr.Conditions[0].CreatedAt = time.Now().Add(-1 * msgMaxAgeThreshold)
+	cr.Conditions[0].UpdatedAt = time.Time{}
 
 	o.repository.Update(ctx, sid, cr.Conditions[0])
 	if err != nil {
@@ -442,6 +459,63 @@ func TestEventNeedsReconciliation(t *testing.T) {
 
 	evt.ControllerID = liveWorker
 	require.False(t, o.eventNeedsReconciliation(evt), "controller active")
+}
+
+func TestFilterIncompleteRecords(t *testing.T) {
+	t.Parallel()
+	winningID := uuid.MustParse("D1BCE35F-5604-4517-925A-57B5A601AC5C")
+	recs := []*store.ConditionRecord{
+		{
+			// no conditions -- skipped
+			ID:       uuid.MustParse("1E133C1F-680E-4FC4-85B8-8ADD1E9D480F"),
+			State:    rctypes.Pending,
+			Facility: "fc-13",
+		},
+		{
+			// wrong facility -- skipped
+			ID:       uuid.MustParse("F3AC3378-1FF8-47F4-BEDA-67D3DABA5E59"),
+			State:    rctypes.Active,
+			Facility: "fc-26",
+			// careful, this condition is incomplete
+			Conditions: []*rctypes.Condition{
+				{
+					ID:    uuid.MustParse("F3AC3378-1FF8-47F4-BEDA-67D3DABA5E59"),
+					Kind:  rctypes.Inventory,
+					State: rctypes.Active,
+				},
+			},
+		},
+		{
+			// finalized condition -- skipped
+			ID:       uuid.MustParse("C6DC6EE8-724C-486C-AF77-BFCFB611D593"),
+			State:    rctypes.Failed,
+			Facility: "fc-13",
+			Conditions: []*rctypes.Condition{
+				{
+					ID:    uuid.MustParse("C6DC6EE8-724C-486C-AF77-BFCFB611D593"),
+					Kind:  rctypes.Inventory,
+					State: rctypes.Failed,
+				},
+			},
+		},
+		{
+			// a winner
+			ID:       winningID,
+			State:    rctypes.Active,
+			Facility: "fc-13",
+			Conditions: []*rctypes.Condition{
+				{
+					ID:    winningID,
+					Kind:  rctypes.Inventory,
+					State: rctypes.Active,
+				},
+			},
+		},
+	}
+
+	got := filterIncompleteRecords(recs, "fc-13")
+	require.Len(t, got, 1)
+	require.Equal(t, winningID, got[0].ID)
 }
 
 func TestFilterToReconcile(t *testing.T) {
@@ -541,7 +615,37 @@ func TestFilterToReconcile(t *testing.T) {
 			},
 		},
 		{
-			name: "pending in active-conditions within stale threshold and not listed in status KV",
+			name: "CR in Pending state and Condition is still in queue",
+			records: []*store.ConditionRecord{
+				{
+					ID:    cid1,
+					State: rctypes.Pending,
+					Conditions: []*rctypes.Condition{
+						{
+							ID:        cid1,
+							Kind:      rctypes.FirmwareInstall,
+							State:     rctypes.Pending,
+							Target:    sid1,
+							CreatedAt: createdTS.Add(-rctypes.StaleThreshold - 2*time.Minute),
+							UpdatedAt: time.Time{},
+						},
+						{
+							ID:        cid1,
+							Kind:      rctypes.Inventory,
+							State:     rctypes.Pending,
+							Target:    sid1,
+							CreatedAt: createdTS.Add(-rctypes.StaleThreshold + 1),
+							UpdatedAt: time.Time{},
+						},
+					},
+				},
+			},
+			updateEvents: map[string]*v1types.ConditionUpdateEvent{},
+			wantCreates:  nil,
+			wantUpdates:  nil,
+		},
+		{
+			name: "CR in Pending state within stale threshold and not listed in status KV",
 			records: []*store.ConditionRecord{
 				{
 					ID:    cid1,
@@ -778,4 +882,98 @@ func TestConditionListenersExit(t *testing.T) {
 	case <-sentinelChan:
 	}
 	require.True(t, testPassed)
+}
+
+func TestQueueFollowingCondition(t *testing.T) {
+	t.Run("no following work", func(t *testing.T) {
+		condID := uuid.New()
+		repo := store.NewMockRepository(t)
+		//fleetDBClient := fleetdb.NewMockFleetDB(t)
+		//stream := eventsm.NewMockStream(t)
+		repo.On("GetActiveCondition", mock.Anything, condID).Return(nil, store.ErrConditionNotFound).Once()
+		o := &Orchestrator{
+			logger:     logger,
+			repository: repo,
+		}
+		condArg := &rctypes.Condition{ID: condID}
+		require.NoError(t, o.queueFollowingCondition(context.TODO(), condArg))
+	})
+	t.Run("lookup error", func(t *testing.T) {
+		condID := uuid.New()
+		repo := store.NewMockRepository(t)
+		repo.On("GetActiveCondition", mock.Anything, condID).Return(nil, errors.New("pound sand")).Once()
+		o := &Orchestrator{
+			logger:     logger,
+			repository: repo,
+		}
+		condArg := &rctypes.Condition{ID: condID}
+		err := o.queueFollowingCondition(context.TODO(), condArg)
+		require.Error(t, err)
+		require.ErrorIs(t, err, errCompleteEvent)
+	})
+	t.Run("publishing error", func(t *testing.T) {
+		condID := uuid.New()
+		repo := store.NewMockRepository(t)
+		next := &rctypes.Condition{
+			ID:     condID,
+			Kind:   rctypes.Kind("following-kind"),
+			Target: uuid.New(),
+			State:  rctypes.Pending,
+		}
+		condArg := &rctypes.Condition{ID: condID}
+		repo.On("GetActiveCondition", mock.Anything, condID).Return(next, nil).Once()
+		stream := eventsm.NewMockStream(t)
+		subject := "fc-13.servers.following-kind"
+		stream.On("Publish", mock.Anything, subject, mock.Anything).Return(errors.New("pound sand")).Once()
+		o := &Orchestrator{
+			facility:     "fc-13",
+			logger:       logger,
+			repository:   repo,
+			streamBroker: stream,
+		}
+		err := o.queueFollowingCondition(context.TODO(), condArg)
+		require.Error(t, err)
+		require.ErrorIs(t, err, errCompleteEvent)
+	})
+	t.Run("next condition state is not pending", func(t *testing.T) {
+		condID := uuid.New()
+		repo := store.NewMockRepository(t)
+		next := &rctypes.Condition{
+			ID:     condID,
+			Kind:   rctypes.Kind("following-kind"),
+			Target: uuid.New(),
+			State:  rctypes.Active,
+		}
+		condArg := &rctypes.Condition{ID: condID}
+		repo.On("GetActiveCondition", mock.Anything, condID).Return(next, nil).Once()
+		o := &Orchestrator{
+			logger:     logger,
+			repository: repo,
+		}
+		err := o.queueFollowingCondition(context.TODO(), condArg)
+		require.NoError(t, err)
+	})
+	t.Run("successful publish", func(t *testing.T) {
+		condID := uuid.New()
+		repo := store.NewMockRepository(t)
+		next := &rctypes.Condition{
+			ID:     condID,
+			Kind:   rctypes.Kind("following-kind"),
+			Target: uuid.New(),
+			State:  rctypes.Pending,
+		}
+		condArg := &rctypes.Condition{ID: condID}
+		repo.On("GetActiveCondition", mock.Anything, condID).Return(next, nil).Once()
+		stream := eventsm.NewMockStream(t)
+		subject := "fc-13.servers.following-kind"
+		stream.On("Publish", mock.Anything, subject, mock.Anything).Return(nil).Once()
+		o := &Orchestrator{
+			facility:     "fc-13",
+			logger:       logger,
+			repository:   repo,
+			streamBroker: stream,
+		}
+		err := o.queueFollowingCondition(context.TODO(), condArg)
+		require.NoError(t, err)
+	})
 }
