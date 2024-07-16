@@ -314,7 +314,7 @@ func (r *Routes) firmwareInstall(c *gin.Context) (int, *v1types.ServerResponse) 
 	}
 
 	serverConditions := r.firmwareInstallComposite(serverID, fw)
-	if err = r.repository.CreateMultiple(otelCtx, serverID, serverConditions.Conditions...); err != nil {
+	if err = r.repository.CreateMultiple(otelCtx, serverID, facilityCode, serverConditions.Conditions...); err != nil {
 		if errors.Is(err, store.ErrActiveCondition) {
 			return http.StatusConflict, &v1types.ServerResponse{
 				Message: err.Error(),
