@@ -28,6 +28,8 @@ type FleetDB interface {
 	GetServer(ctx context.Context, serverID uuid.UUID) (*model.Server, error)
 	// DeleteServer
 	DeleteServer(ctx context.Context, serverID uuid.UUID) error
+	// WriteEventHistory commits the final state of this Condition to FleetDB
+	WriteEventHistory(ctx context.Context, cond *rctypes.Condition) error
 }
 
 func NewFleetDBClient(ctx context.Context, config *app.Configuration, conditionDefs rctypes.Definitions,

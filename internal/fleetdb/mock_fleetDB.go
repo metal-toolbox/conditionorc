@@ -5,8 +5,11 @@ package fleetdb
 import (
 	context "context"
 
-	model "github.com/metal-toolbox/conditionorc/internal/model"
+	condition "github.com/metal-toolbox/rivets/condition"
+
 	mock "github.com/stretchr/testify/mock"
+
+	model "github.com/metal-toolbox/conditionorc/internal/model"
 
 	uuid "github.com/google/uuid"
 )
@@ -189,6 +192,53 @@ func (_c *MockFleetDB_GetServer_Call) Return(_a0 *model.Server, _a1 error) *Mock
 }
 
 func (_c *MockFleetDB_GetServer_Call) RunAndReturn(run func(context.Context, uuid.UUID) (*model.Server, error)) *MockFleetDB_GetServer_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// WriteEventHistory provides a mock function with given fields: ctx, cond
+func (_m *MockFleetDB) WriteEventHistory(ctx context.Context, cond *condition.Condition) error {
+	ret := _m.Called(ctx, cond)
+
+	if len(ret) == 0 {
+		panic("no return value specified for WriteEventHistory")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, *condition.Condition) error); ok {
+		r0 = rf(ctx, cond)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// MockFleetDB_WriteEventHistory_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'WriteEventHistory'
+type MockFleetDB_WriteEventHistory_Call struct {
+	*mock.Call
+}
+
+// WriteEventHistory is a helper method to define mock.On call
+//   - ctx context.Context
+//   - cond *condition.Condition
+func (_e *MockFleetDB_Expecter) WriteEventHistory(ctx interface{}, cond interface{}) *MockFleetDB_WriteEventHistory_Call {
+	return &MockFleetDB_WriteEventHistory_Call{Call: _e.mock.On("WriteEventHistory", ctx, cond)}
+}
+
+func (_c *MockFleetDB_WriteEventHistory_Call) Run(run func(ctx context.Context, cond *condition.Condition)) *MockFleetDB_WriteEventHistory_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(*condition.Condition))
+	})
+	return _c
+}
+
+func (_c *MockFleetDB_WriteEventHistory_Call) Return(_a0 error) *MockFleetDB_WriteEventHistory_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockFleetDB_WriteEventHistory_Call) RunAndReturn(run func(context.Context, *condition.Condition) error) *MockFleetDB_WriteEventHistory_Call {
 	_c.Call.Return(run)
 	return _c
 }
