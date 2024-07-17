@@ -326,7 +326,7 @@ func (r *Routes) firmwareInstall(c *gin.Context) (int, *v1types.ServerResponse) 
 		}
 	}
 
-	if err = r.publishCondition(otelCtx, serverID, facilityCode, serverConditions.Conditions[0], false); err != nil {
+	if err = r.publishCondition(otelCtx, serverID, facilityCode, serverConditions.Conditions[0]); err != nil {
 		r.logger.WithField("kind", serverConditions.Conditions[0].Kind).WithError(err).Warn("error publishing condition")
 		// mark first condition as failed
 		serverConditions.Conditions[0].State = rctypes.Failed
@@ -391,7 +391,7 @@ func (r *Routes) conditionCreate(otelCtx context.Context, newCondition *rctypes.
 	}
 
 	// publish the condition and in case of publish failure - revert.
-	err = r.publishCondition(otelCtx, serverID, facilityCode, newCondition, false)
+	err = r.publishCondition(otelCtx, serverID, facilityCode, newCondition)
 	if err != nil {
 		r.logger.WithError(err).Warn("condition create failed to publish")
 
@@ -456,7 +456,7 @@ func RegisterSpanEvent(span trace.Span, serverID, conditionID, conditionKind, ev
 	))
 }
 
-func (r *Routes) publishCondition(ctx context.Context, serverID uuid.UUID, facilityCode string, publishCondition *rctypes.Condition, rollupSubject bool) error {
+func (r *Routes) publishCondition(ctx context.Context, serverID uuid.UUID, facilityCode string, publishCondition *rctypes.Condition) error {
 	errPublish := errors.New("error publishing condition")
 
 	otelCtx, span := otel.Tracer(pkgName).Start(
@@ -488,7 +488,6 @@ func (r *Routes) publishCondition(ctx context.Context, serverID uuid.UUID, facil
 		otelCtx,
 		subjectSuffix,
 		byt,
-		rollupSubject,
 	); err != nil {
 		return errors.Wrap(errPublish, err.Error())
 	}

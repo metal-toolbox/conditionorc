@@ -616,7 +616,7 @@ func (o *Orchestrator) queueFollowingCondition(ctx context.Context, cond *rctype
 	if active != nil && active.State == rctypes.Pending {
 		byt := active.MustBytes()
 		subject := fmt.Sprintf("%s.servers.%s", o.facility, active.Kind)
-		err := o.streamBroker.Publish(ctx, subject, byt, false)
+		err := o.streamBroker.Publish(ctx, subject, byt)
 		if err != nil {
 			o.logger.WithError(err).WithFields(logrus.Fields{
 				"condition.id":   active.ID.String(),
