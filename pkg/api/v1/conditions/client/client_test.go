@@ -299,7 +299,6 @@ func TestConditionCreate(t *testing.T) {
 					mock.Anything,
 					mock.Anything,
 					mock.Anything,
-					false,
 				).Return(nil).Once()
 			}
 
@@ -386,7 +385,6 @@ func TestFirmwareInstall(t *testing.T) {
 					mock.Anything,
 					mock.Anything,
 					mock.Anything,
-					false,
 				).Return(nil).Times(1)
 			}
 
@@ -546,7 +544,6 @@ func TestServerEnroll(t *testing.T) {
 					mock.Anything,
 					mock.Anything,
 					mock.Anything,
-					false,
 				).Return(nil).Times(1)
 			}
 
@@ -624,7 +621,6 @@ func TestServerEnrollEmptyUUID(t *testing.T) {
 		mock.Anything,
 		mock.Anything,
 		mock.Anything,
-		false,
 	).Return(nil)
 
 	got, err := tester.client.ServerEnroll(context.TODO(), "", v1types.ConditionCreate{Parameters: validParams.MustJSON()})

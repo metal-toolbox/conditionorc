@@ -157,7 +157,6 @@ func TestAddServer(t *testing.T) {
 					mock.Anything,
 					fmt.Sprintf("%s.servers.%s", mockFacilityCode, rctypes.Inventory),
 					mock.Anything,
-					false,
 				).Return(nil).Once()
 			},
 			request: func(t *testing.T) *http.Request {
@@ -301,7 +300,6 @@ func TestAddServer(t *testing.T) {
 					mock.Anything,
 					fmt.Sprintf("%s.servers.%s", mockFacilityCode, rctypes.Inventory),
 					mock.Anything,
-					false,
 				).Return(nil).Once()
 			},
 			request: func(t *testing.T) *http.Request {
@@ -617,7 +615,7 @@ func TestAddServerRollback(t *testing.T) {
 			}
 
 			if tc.mockStreamErr.calledTime > 0 {
-				stream.On("Publish", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+				stream.On("Publish", mock.Anything, mock.Anything, mock.Anything).
 					Return(tc.mockStreamErr.err).
 					Times(tc.mockStreamErr.calledTime)
 			}
@@ -770,7 +768,6 @@ func TestServerConditionCreate(t *testing.T) {
 					mock.Anything,
 					fmt.Sprintf("%s.servers.%s", facilityCode, rctypes.FirmwareInstall),
 					mock.Anything,
-					false,
 				).Return(nil).Once()
 			},
 			request: func(t *testing.T) *http.Request {
@@ -823,7 +820,6 @@ func TestServerConditionCreate(t *testing.T) {
 					mock.Anything,
 					fmt.Sprintf("%s.servers.%s", facilityCode, rctypes.FirmwareInstall),
 					mock.Anything,
-					false,
 				).Return(nil).Once()
 			},
 			request: func(t *testing.T) *http.Request {
@@ -914,7 +910,6 @@ func TestServerConditionCreate(t *testing.T) {
 					mock.Anything,
 					fmt.Sprintf("%s.servers.%s", facilityCode, rctypes.FirmwareInstall),
 					mock.Anything,
-					false,
 				).
 					Return(errors.New("gremlins in the pipes")).
 					Once()
