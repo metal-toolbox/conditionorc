@@ -154,6 +154,8 @@ func (s *fleetDBImpl) DeleteServer(ctx context.Context, serverID uuid.UUID) erro
 }
 
 // WriteEventHistory commits a condition in a final state to FleetDB
+//
+//nolint:revive // calling `fleetDBImpl` s is almost as stupid as changing a bunch of accepted and tested code
 func (i *fleetDBImpl) WriteEventHistory(ctx context.Context, cond *rctypes.Condition) error {
 	otelCtx, span := otel.Tracer(pkgName).Start(ctx, "FleetDB.WriteEventHistory")
 	defer span.End()
