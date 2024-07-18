@@ -1,3 +1,4 @@
+// nolint
 package routes
 
 import (
@@ -89,17 +90,6 @@ func asBytes(t *testing.T, b *bytes.Buffer) []byte {
 	}
 
 	return body
-}
-
-func asJSONBytes(t *testing.T, s *v1types.ServerResponse) []byte {
-	t.Helper()
-
-	b, err := json.Marshal(s)
-	if err != nil {
-		t.Error(err)
-	}
-
-	return b
 }
 
 func setupTestServer(t *testing.T) (*tester, *gin.Engine, error) {
