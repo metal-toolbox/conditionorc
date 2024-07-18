@@ -60,7 +60,7 @@ func (l *liveness) register(controllerID string) (registry.ControllerID, error) 
 	id := registry.GetID(controllerID)
 	le := l.logger.WithField("id", id.String())
 
-	l.logger.WithField("id", id.String()).Info("registry controllerID assigned")
+	le.Info("registry controllerID assigned")
 	if err := registry.RegisterController(id); err != nil {
 		metrics.DependencyError("liveness", "register")
 		le.WithError(err).Warn("initial controller liveness registration failed")
