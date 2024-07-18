@@ -314,11 +314,7 @@ func (r *Routes) firmwareInstall(c *gin.Context) (int, *v1types.ServerResponse) 
 	}
 
 	serverConditions := r.firmwareInstallComposite(serverID, fw)
-<<<<<<< HEAD:pkg/api/v1/conditions/routes/handlers.go
 	if err = r.repository.CreateMultiple(otelCtx, serverID, facilityCode, serverConditions.Conditions...); err != nil {
-=======
-	if err = r.repository.CreateMultiple(otelCtx, serverID, serverConditions.Conditions...); err != nil {
->>>>>>> c85f527 (api/v1: include acquire, release server conditions in composite):pkg/api/v1/routes/handlers.go
 		if errors.Is(err, store.ErrActiveCondition) {
 			return http.StatusConflict, &v1types.ServerResponse{
 				Message: err.Error(),
@@ -330,11 +326,7 @@ func (r *Routes) firmwareInstall(c *gin.Context) (int, *v1types.ServerResponse) 
 		}
 	}
 
-<<<<<<< HEAD:pkg/api/v1/conditions/routes/handlers.go
 	if err = r.publishCondition(otelCtx, serverID, facilityCode, serverConditions.Conditions[0]); err != nil {
-=======
-	if err = r.publishCondition(otelCtx, serverID, facilityCode, serverConditions.Conditions[0], false); err != nil {
->>>>>>> c85f527 (api/v1: include acquire, release server conditions in composite):pkg/api/v1/routes/handlers.go
 		r.logger.WithField("kind", serverConditions.Conditions[0].Kind).WithError(err).Warn("error publishing condition")
 		// mark first condition as failed
 		serverConditions.Conditions[0].State = rctypes.Failed
