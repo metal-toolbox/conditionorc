@@ -182,6 +182,7 @@ func (i *fleetDBImpl) WriteEventHistory(ctx context.Context, cond *rctypes.Condi
 		Type:        string(cond.Kind),
 		Start:       cond.CreatedAt,
 		End:         lastUpdate,
+		Target:      cond.Target,
 		Parameters:  cond.Parameters,
 		FinalState:  string(cond.State),
 		FinalStatus: cond.Status,

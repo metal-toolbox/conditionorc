@@ -567,10 +567,24 @@ func (o *Orchestrator) eventUpdate(ctx context.Context, evt *v1types.ConditionUp
 }
 
 func (o *Orchestrator) finalizeCondition(ctx context.Context, cond *rctypes.Condition) error {
+	// if we fail to update the event history or to delete this event from the KV,
+	// the reconciler  will catch it later and walk this code, so return early. It
+	// is kosher to replay event history iff the contents of that history (id,
+	// condition kind, target, parameters, state and status) are identical.
+	if err := o.db.WriteEventHistory(ctx, cond); err != nil {
+		o.logger.WithError(err).WithFields(logrus.Fields{
+			"condition.id":   cond.ID.String(),
+			"server.id":      cond.Target.String(),
+			"condition.kind": cond.Kind,
+		}).Warn("updating event history")
+
+		metrics.DependencyError("fleetdb", "update event history")
+
+		return errors.Wrap(errCompleteEvent, err.Error())
+	}
+
 	delErr := status.DeleteCondition(cond.Kind, o.facility, cond.ID.String())
 	if delErr != nil {
-		// if we fail to delete this event from the KV, the reconciler will catch it later
-		// and walk this code, so return early.
 		o.logger.WithError(delErr).WithFields(logrus.Fields{
 			"condition.id":   cond.ID.String(),
 			"server.id":      cond.Target.String(),

@@ -4,6 +4,7 @@ import (
 	"context"
 	"sync"
 
+	"github.com/metal-toolbox/conditionorc/internal/fleetdb"
 	"github.com/metal-toolbox/conditionorc/internal/orchestrator/notify"
 	"github.com/metal-toolbox/conditionorc/internal/store"
 	"github.com/metal-toolbox/conditionorc/internal/version"
@@ -33,6 +34,7 @@ type Orchestrator struct {
 	notifier      notify.Sender
 	facility      string
 	conditionDefs rctypes.Definitions
+	db            fleetdb.FleetDB
 }
 
 // Option type sets a parameter on the Orchestrator type.
@@ -101,6 +103,13 @@ func WithFacility(f string) Option {
 func WithConditionDefs(defs rctypes.Definitions) Option {
 	return func(o *Orchestrator) {
 		o.conditionDefs = defs
+	}
+}
+
+// WithFleetDBClient sets the database client to use on this Orchestrator
+func WithFleetDBClient(client fleetdb.FleetDB) Option {
+	return func(o *Orchestrator) {
+		o.db = client
 	}
 }
 
