@@ -179,10 +179,9 @@ type ServerProvisionRequest struct {
 	Hostname             string    `json:"Hostname,omitempty"`
 	ProviderType         string    `json:"ProviderType,omitempty"`
 	OperatingSystemID    string    `json:"OperatingSystemID,omitempty"`
-	InfrastructureID     []string  `json:"InfrastructureID,omitempty"`
-	UserData             *string   `json:"UserData,omitempty"`
-	StorageConfiguration *string   `json:"StorageConfiguration,omitempty"`
-	NetworkConfiguration *string   `json:"NetworkConfiguration,omitempty"`
-	Tags                 *[]string `json:"Tags,omitempty"`
+	UserData             string    `json:"UserData,omitempty"`
+	StorageConfiguration string    `json:"StorageConfiguration,omitempty"`
+	NetworkConfiguration string    `json:"NetworkConfiguration,omitempty"`
+	Tags                 []string  `json:"Tags,omitempty"`
 	State                string    `json:"State,omitempty"`
 }
