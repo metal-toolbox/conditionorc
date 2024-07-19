@@ -43,6 +43,7 @@ var (
 	pkgName           = "internal/fleetdb"
 	errServerLookup   = errors.New("unable to retrieve server")
 	ErrServerNotFound = errors.New("server not found")
+	errIncomplete     = errors.New("condition is still active")
 )
 
 func serverServiceError(operation string) {
@@ -149,5 +150,53 @@ func (s *fleetDBImpl) DeleteServer(ctx context.Context, serverID uuid.UUID) erro
 	defer span.End()
 
 	_, err := s.client.Delete(otelCtx, fleetdbapi.Server{UUID: serverID})
+	return err
+}
+
+// WriteEventHistory commits a condition in a final state to FleetDB
+//
+//nolint:revive // calling `fleetDBImpl` s is almost as stupid as changing a bunch of accepted and tested code
+func (i *fleetDBImpl) WriteEventHistory(ctx context.Context, cond *rctypes.Condition) error {
+	otelCtx, span := otel.Tracer(pkgName).Start(ctx, "FleetDB.WriteEventHistory")
+	defer span.End()
+
+	le := i.logger.WithFields(logrus.Fields{
+		"condition.id":    cond.ID.String(),
+		"server.id":       cond.Target.String(),
+		"condition.state": string(cond.State),
+		"condition.kind":  string(cond.Kind),
+	})
+
+	// only final conditions can be written to history
+	if !cond.IsComplete() {
+		le.Error("incomplete condition attempted for history")
+		return errIncomplete
+	}
+
+	lastUpdate := cond.UpdatedAt
+	if lastUpdate.IsZero() {
+		le.Error("last updated time is zero")
+		lastUpdate = time.Now()
+	}
+
+	evt := &fleetdbapi.Event{
+		EventID:     cond.ID,
+		Type:        string(cond.Kind),
+		Start:       cond.CreatedAt,
+		End:         lastUpdate,
+		Target:      cond.Target,
+		Parameters:  cond.Parameters,
+		FinalState:  string(cond.State),
+		FinalStatus: cond.Status,
+	}
+
+	_, err := i.client.UpdateEvent(otelCtx, evt)
+	if err != nil {
+		se := &fleetdbapi.ServerError{}
+		if errors.As(err, se) {
+			le.WithField("status.code", se.StatusCode)
+		}
+		le.WithError(err).Warn("updating event history")
+	}
 	return err
 }

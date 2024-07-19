@@ -132,6 +132,9 @@ func TestStatusKV(t *testing.T) {
 	c, err = GetSingleCondition(testKind, "fc13", "secondkey")
 	require.Nil(t, c)
 	require.ErrorIs(t, err, nats.ErrKeyNotFound)
+	// delete something that isn't there and it's not an error
+	err = DeleteCondition(testKind, "fc13", "secondkey")
+	require.NoError(t, err)
 
 	es, err = GetAllConditions(testKind, "fc8")
 	require.NoError(t, err)

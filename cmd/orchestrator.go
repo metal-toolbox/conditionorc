@@ -106,6 +106,7 @@ var cmdOrchestrator = &cobra.Command{
 			orchestrator.WithNotifier(notifier),
 			orchestrator.WithFacility(facility),
 			orchestrator.WithConditionDefs(app.Config.ConditionDefinitions),
+			orchestrator.WithFleetDBClient(fleetDBClient),
 		}
 
 		if app.Config.NatsOptions.KVReplicationFactor > 0 {
