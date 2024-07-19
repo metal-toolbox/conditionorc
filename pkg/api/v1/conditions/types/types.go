@@ -170,3 +170,19 @@ func (c *ConditionUpdateEvent) MergeExisting(existing *rctypes.Condition) (*rcty
 		CreatedAt:             existing.CreatedAt,
 	}, nil
 }
+
+// ServerProvisionRequest is the request payload to provision a server.
+// Duplicated from FCP without Spec: https://github.com/equinixmetal/facility-controlplane/blob/main/pkg/api/v1/types.go#L388-L402
+type ServerProvisionRequest struct {
+	ServerID             uuid.UUID `json:"serverID,omitempty"`
+	InstanceID           uuid.UUID `json:"instanceID,omitempty"`
+	Hostname             string    `json:"Hostname,omitempty"`
+	ProviderType         string    `json:"ProviderType,omitempty"`
+	OperatingSystemID    string    `json:"OperatingSystemID,omitempty"`
+	InfrastructureID     []string  `json:"InfrastructureID,omitempty"`
+	UserData             *string   `json:"UserData,omitempty"`
+	StorageConfiguration *string   `json:"StorageConfiguration,omitempty"`
+	NetworkConfiguration *string   `json:"NetworkConfiguration,omitempty"`
+	Tags                 *[]string `json:"Tags,omitempty"`
+	State                string    `json:"State,omitempty"`
+}

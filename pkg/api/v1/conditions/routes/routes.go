@@ -138,6 +138,9 @@ func (r *Routes) composeAuthHandler(scopes []string) gin.HandlerFunc {
 
 // Routes returns routes for the Conditions API service.
 func (r *Routes) Routes(g *gin.RouterGroup) {
+	// API for server provision
+	g.POST("/serverProvision", r.composeAuthHandler(createScopes("server")), wrapAPICall(r.serverProvision))
+
 	servers := g.Group("/servers/:uuid")
 
 	serverEnroll := g.Group("/serverEnroll")
