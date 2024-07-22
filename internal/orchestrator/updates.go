@@ -625,8 +625,11 @@ func (o *Orchestrator) queueFollowingCondition(ctx context.Context, cond *rctype
 		return errors.Wrap(errCompleteEvent, err.Error())
 	}
 
-	// Publish the next event if that event is in the pending state.
-	if active != nil && active.State == rctypes.Pending {
+	// Publish the next event if that event is in the pending state
+	//
+	// Conditions for controllers that run inband are not published to the JS,
+	// they are retrieved by the inband controllers themselves through the Orchestrator API.
+	if active != nil && active.State == rctypes.Pending && active.StreamPublishRequired() {
 		byt := active.MustBytes()
 		subject := fmt.Sprintf("%s.servers.%s", o.facility, active.Kind)
 		err := o.streamBroker.Publish(ctx, subject, byt)
