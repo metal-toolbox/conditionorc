@@ -11,7 +11,6 @@ import (
 	"github.com/sirupsen/logrus"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
-	"go.opentelemetry.io/otel/trace"
 
 	"github.com/metal-toolbox/conditionorc/internal/store"
 	v1types "github.com/metal-toolbox/conditionorc/pkg/api/v1/orchestrator/types"
@@ -336,10 +335,10 @@ func (r *Routes) taskPublish(c *gin.Context) (int, *v1types.ServerResponse) {
 	}
 }
 
-// @Summary ConditionQueuePop
+// @Summary ConditionPending
 // @Tag Conditions
-// @Description Pops a conditions from the NATS Jestream and registers the serverID as a controller.
-// @ID conditionQueue
+// @Description Returns the pending Condition based on the given parameters.
+// @ID conditionPending
 // @Param uuid path string true "Server ID"
 // @Param conditionKind path string true "Condition Kind"
 // @Accept json
@@ -348,8 +347,8 @@ func (r *Routes) taskPublish(c *gin.Context) (int, *v1types.ServerResponse) {
 // Failure 400 {object} v1types.ServerResponse
 // Failure 404 {object} v1types.ServerResponse
 // Failure 500 {object} v1types.ServerResponse
-// @Router /servers/{uuid}/condition-queue/{conditionKind} [get]
-func (r *Routes) conditionQueuePop(c *gin.Context) (int, *v1types.ServerResponse) {
+// @Router /servers/{uuid}/condition-pending/{conditionKind} [get]
+func (r *Routes) conditionPending(c *gin.Context) (int, *v1types.ServerResponse) {
 	ctx, span := otel.Tracer(pkgName).Start(c.Request.Context(), "Routes.conditionQueuePop")
 	span.SetAttributes(
 		attribute.KeyValue{Key: "serverId", Value: attribute.StringValue(c.Param("uuid"))},
@@ -390,84 +389,18 @@ func (r *Routes) conditionQueuePop(c *gin.Context) (int, *v1types.ServerResponse
 		}
 	}
 
-	var activeConditionExists bool
+	var found *rctypes.Condition
 	for _, cond := range conditionRecord.Conditions {
-		if cond.Kind == conditionKind && !rctypes.StateIsComplete(cond.State) {
-			activeConditionExists = true
+		if cond.Kind == conditionKind && cond.State == rctypes.Pending {
+			found = cond
 		}
 	}
 
-	if !activeConditionExists {
+	if found == nil {
 		return http.StatusNotFound, &v1types.ServerResponse{
-			Message: "no active condition found for server",
+			Message: "no pending condition found for server",
 		}
 	}
 
-	// TODO: if a task exists for this condition in an active state, don't proceed
-
-	// pop condition from the Jetstream queue
-	cond, err := r.conditionJetstream.pop(ctx, conditionKind, serverID)
-	if err != nil {
-		if errors.Is(err, errNoConditionInQueue) {
-			return http.StatusNotFound, &v1types.ServerResponse{
-				Message: "no condition in queue",
-			}
-		}
-
-		r.logger.WithError(err).Info("condition queue fetch error")
-
-		return http.StatusInternalServerError, &v1types.ServerResponse{
-			Message: "Condition Queue fetch error error: " + err.Error(),
-		}
-	}
-
-	st := rctypes.NewTaskStatusRecord("controller fetched condition using client IP: " + c.RemoteIP())
-	sv := &rctypes.StatusValue{
-		Target:   serverID.String(),
-		WorkerID: serverID.String(),
-		TraceID:  trace.SpanFromContext(ctx).SpanContext().TraceID().String(),
-		SpanID:   trace.SpanFromContext(ctx).SpanContext().SpanID().String(),
-		State:    string(rctypes.Pending),
-		Status:   st.MustMarshal(),
-	}
-
-	// create condition status value entry
-	if err := r.statusValueKV.publish(
-		r.facilityCode,
-		cond.ID,
-		registry.GetID("dummy-id-to-be-purged"),
-		cond.Kind,
-		sv,
-		true,
-		false,
-	); err != nil {
-		r.logger.WithField("condition.id", cond.ID).WithError(err).Info("status KV publish error")
-
-		return http.StatusInternalServerError, &v1types.ServerResponse{
-			Message: "Condition first status publish error: " + err.Error(),
-		}
-	}
-
-	// setup task to be published
-	task := rctypes.NewTaskFromCondition(cond)
-	task.TraceID = trace.SpanFromContext(ctx).SpanContext().TraceID().String()
-	task.SpanID = trace.SpanFromContext(ctx).SpanContext().SpanID().String()
-
-	if err := r.taskKV.publish(
-		ctx,
-		serverID.String(),
-		cond.ID.String(),
-		conditionKind,
-		task,
-		true,
-		false,
-	); err != nil {
-		r.logger.WithField("condition.id", cond.ID).WithError(err).Info("task KV publish error")
-
-		return http.StatusInternalServerError, &v1types.ServerResponse{
-			Message: "Condition Task publish error: " + err.Error(),
-		}
-	}
-
-	return http.StatusOK, &v1types.ServerResponse{Condition: cond}
+	return http.StatusOK, &v1types.ServerResponse{Condition: found}
 }

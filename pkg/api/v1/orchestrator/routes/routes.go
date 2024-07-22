@@ -39,7 +39,6 @@ type Routes struct {
 	logger               *logrus.Logger
 	statusValueKV        statusValueKV
 	taskKV               taskKV
-	conditionJetstream   conditionJetstream
 }
 
 // Option type sets a parameter on the Routes type.
@@ -108,13 +107,6 @@ func WithTaskKV(t taskKV) Option {
 	}
 }
 
-// WithConditionJetstream sets the condition jetstream from which conditions are retrieved  for controllers.
-func WithConditionJetstream(j conditionJetstream) Option {
-	return func(r *Routes) {
-		r.conditionJetstream = j
-	}
-}
-
 // apiHandler is a function that performs real work for the Orchestrator API
 type apiHandler func(c *gin.Context) (int, *v1types.ServerResponse)
 
@@ -152,17 +144,6 @@ func NewRoutes(options ...Option) (*Routes, error) {
 		}
 
 		routes.taskKV = tkv
-	}
-
-	if routes.conditionJetstream == nil {
-		js := initConditionJetstream(
-			routes.streamSubjectPrefix,
-			routes.facilityCode,
-			routes.logger,
-			routes.streamBroker,
-		)
-
-		routes.conditionJetstream = js
 	}
 
 	if routes.repository == nil {
@@ -207,9 +188,9 @@ func (r *Routes) Routes(g *gin.RouterGroup) {
 	)
 
 	controller.GET(
-		"/condition-queue/:conditionKind",
+		"/condition-pending/:conditionKind",
 		r.composeAuthHandler(readScopes("conditionQueuePop")),
-		wrapAPICall(r.conditionQueuePop),
+		wrapAPICall(r.conditionPending),
 	)
 }
 
