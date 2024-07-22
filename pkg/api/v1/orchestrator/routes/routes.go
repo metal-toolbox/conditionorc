@@ -38,7 +38,6 @@ type Routes struct {
 	conditionDefinitions rctypes.Definitions
 	logger               *logrus.Logger
 	statusValueKV        statusValueKV
-	livenessKV           livenessKV
 	taskKV               taskKV
 	conditionJetstream   conditionJetstream
 }
@@ -102,13 +101,6 @@ func WithStatusKVPublisher(p statusValueKV) Option {
 	}
 }
 
-// WithLivenessKV sets the controller liveness publisher.
-func WithLivenessKV(l livenessKV) Option {
-	return func(r *Routes) {
-		r.livenessKV = l
-	}
-}
-
 // WithTaskKV sets the condition task queryor, publisher.
 func WithTaskKV(t taskKV) Option {
 	return func(r *Routes) {
@@ -151,15 +143,6 @@ func NewRoutes(options ...Option) (*Routes, error) {
 
 	if routes.statusValueKV == nil {
 		routes.statusValueKV = initStatusValueKV()
-	}
-
-	if routes.livenessKV == nil {
-		lkv, err := initLivenessKV(routes.logger, routes.streamBroker)
-		if err != nil {
-			return nil, errors.Wrap(err, "liveness KV init error")
-		}
-
-		routes.livenessKV = lkv
 	}
 
 	if routes.taskKV == nil {
@@ -209,12 +192,6 @@ func (r *Routes) Routes(g *gin.RouterGroup) {
 		"/condition-status/:conditionKind/:conditionID",
 		r.composeAuthHandler(createScopes("statusUpdate")),
 		wrapAPICall(r.conditionStatusUpdate),
-	)
-
-	controller.GET(
-		"/controller-checkin/:conditionID",
-		r.composeAuthHandler(createScopes("checkin")),
-		wrapAPICall(r.livenessCheckin),
 	)
 
 	controller.GET(

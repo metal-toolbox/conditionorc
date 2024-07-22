@@ -23,6 +23,5 @@ packages:
       inpackage: True
     interfaces:
       statusValueKV:
-      livenessKV:
       taskKV:
       conditionJetstream:
