@@ -346,18 +346,22 @@ func (r *Routes) firmwareInstall(c *gin.Context) (int, *v1types.ServerResponse) 
 		}
 	}
 
-	if err = r.publishCondition(otelCtx, serverID, facilityCode, serverConditions.Conditions[0]); err != nil {
-		r.logger.WithField("kind", serverConditions.Conditions[0].Kind).WithError(err).Warn("error publishing condition")
-		// mark first condition as failed
-		serverConditions.Conditions[0].State = rctypes.Failed
-		serverConditions.Conditions[0].Status = failedPublishStatus
+	// Conditions handled by inband controllers are not published to the Jetstream since they
+	// are retrieved by controllers directly through the Orchestrator API.
+	if serverConditions.Conditions[0].StreamPublishRequired() {
+		if err = r.publishCondition(otelCtx, serverID, facilityCode, serverConditions.Conditions[0]); err != nil {
+			r.logger.WithField("kind", serverConditions.Conditions[0].Kind).WithError(err).Warn("error publishing condition")
+			// mark first condition as failed
+			serverConditions.Conditions[0].State = rctypes.Failed
+			serverConditions.Conditions[0].Status = failedPublishStatus
 
-		if markErr := r.repository.Update(otelCtx, serverID, serverConditions.Conditions[0]); markErr != nil {
-			// an operator is going to have to sort this out
-			r.logger.WithError(err).Warn("marking unpublished condition failed")
-		}
-		return http.StatusInternalServerError, &v1types.ServerResponse{
-			Message: "publishing condition" + err.Error(),
+			if markErr := r.repository.Update(otelCtx, serverID, serverConditions.Conditions[0]); markErr != nil {
+				// an operator is going to have to sort this out
+				r.logger.WithError(err).Warn("marking unpublished condition failed")
+			}
+			return http.StatusInternalServerError, &v1types.ServerResponse{
+				Message: "publishing condition" + err.Error(),
+			}
 		}
 	}
 
@@ -410,24 +414,26 @@ func (r *Routes) conditionCreate(otelCtx context.Context, newCondition *rctypes.
 	}
 
 	// publish the condition and in case of publish failure - revert.
-	err = r.publishCondition(otelCtx, serverID, facilityCode, newCondition)
-	if err != nil {
-		r.logger.WithError(err).Warn("condition create failed to publish")
+	if newCondition.StreamPublishRequired() {
+		err = r.publishCondition(otelCtx, serverID, facilityCode, newCondition)
+		if err != nil {
+			r.logger.WithError(err).Warn("condition create failed to publish")
 
-		metrics.PublishErrors.With(
-			prometheus.Labels{"conditionKind": string(newCondition.Kind)},
-		).Inc()
+			metrics.PublishErrors.With(
+				prometheus.Labels{"conditionKind": string(newCondition.Kind)},
+			).Inc()
 
-		newCondition.State = rctypes.Failed
-		newCondition.Status = failedPublishStatus
+			newCondition.State = rctypes.Failed
+			newCondition.Status = failedPublishStatus
 
-		updateErr := r.repository.Update(otelCtx, serverID, newCondition)
-		if updateErr != nil {
-			r.logger.WithError(updateErr).Warn("condition deletion failed")
-		}
+			updateErr := r.repository.Update(otelCtx, serverID, newCondition)
+			if updateErr != nil {
+				r.logger.WithError(updateErr).Warn("condition deletion failed")
+			}
 
-		return http.StatusInternalServerError, &v1types.ServerResponse{
-			Message: "condition create failed: " + err.Error(),
+			return http.StatusInternalServerError, &v1types.ServerResponse{
+				Message: "condition create failed: " + err.Error(),
+			}
 		}
 	}
 
