@@ -183,5 +183,4 @@ type ServerProvisionRequest struct {
 	StorageConfiguration string    `json:"StorageConfiguration,omitempty"`
 	NetworkConfiguration string    `json:"NetworkConfiguration,omitempty"`
 	Tags                 []string  `json:"Tags,omitempty"`
-	State                string    `json:"State,omitempty"`
 }
