@@ -146,83 +146,6 @@ func (r *Routes) conditionStatusUpdate(c *gin.Context) (int, *v1types.ServerResp
 	}
 }
 
-// @Summary livenessCheckin
-// @Tag Controllers
-// @Description Check-in endpoint for controllers.
-// @ID conditionQueue
-// @Param uuid path string true "Server ID"
-// @Param conditionKind path string true "Condition Kind"
-// @Param conditionID path string true "Condition ID"
-// @Accept json
-// @Produce json
-// @Success 200 {object} v1types.ServerResponse
-// Failure 400 {object} v1types.ServerResponse
-// Failure 500 {object} v1types.ServerResponse
-// @Router /servers/:uuid/controller-checkin/:conditionID [get]
-func (r *Routes) livenessCheckin(c *gin.Context) (int, *v1types.ServerResponse) {
-	ctx, span := otel.Tracer(pkgName).Start(c.Request.Context(), "Routes.livenessCheckin")
-	span.SetAttributes(
-		attribute.KeyValue{Key: "serverId", Value: attribute.StringValue(c.Param("uuid"))},
-		attribute.KeyValue{Key: "conditionID", Value: attribute.StringValue(c.Param("conditionID"))},
-		attribute.KeyValue{Key: "controllerID", Value: attribute.StringValue(c.Request.URL.Query().Get("controller_id"))},
-	)
-	defer span.End()
-
-	serverID, err := uuid.Parse(c.Param("uuid"))
-	if err != nil {
-		return http.StatusBadRequest, &v1types.ServerResponse{
-			Message: "invalid server id: " + err.Error(),
-		}
-	}
-
-	paramControllerID := c.Request.URL.Query().Get("controller_id")
-	if paramControllerID == "" {
-		return http.StatusBadRequest, &v1types.ServerResponse{
-			Message: "invalid controller ID, none specified",
-		}
-	}
-
-	controllerID, err := registry.ControllerIDFromString(paramControllerID)
-	if err != nil {
-		return http.StatusBadRequest, &v1types.ServerResponse{
-			Message: "invalid controller ID: " + err.Error(),
-		}
-	}
-
-	_, err = uuid.Parse(c.Param("conditionID"))
-	if err != nil {
-		return http.StatusBadRequest, &v1types.ServerResponse{
-			Message: "invalid conditionID: " + err.Error(),
-		}
-	}
-
-	// the controller pop'ed the condition from the queue
-	// which set the condition state to be active, so we expect an active condition
-	// to check in this controller
-	activeCond, err := r.repository.GetActiveCondition(ctx, serverID)
-	if err != nil {
-		return http.StatusInternalServerError, &v1types.ServerResponse{
-			Message: "condition lookup: " + err.Error(),
-		}
-	}
-
-	if activeCond == nil {
-		return http.StatusNotFound, &v1types.ServerResponse{
-			Message: "no active condition found for server",
-		}
-	}
-
-	if err := r.livenessKV.checkin(controllerID); err != nil {
-		return http.StatusInternalServerError, &v1types.ServerResponse{
-			Message: "check-in failed: " + err.Error(),
-		}
-	}
-
-	return http.StatusOK, &v1types.ServerResponse{
-		Message: "check-in successful",
-	}
-}
-
 // @Summary taskQuery
 // @Tag Conditions
 // @Description Queries a *rivets.Task object from KV for a condition
@@ -498,20 +421,10 @@ func (r *Routes) conditionQueuePop(c *gin.Context) (int, *v1types.ServerResponse
 		}
 	}
 
-	// register this worker
-	controllerID, err := r.livenessKV.register(serverID.String())
-	if err != nil {
-		r.logger.WithField("condition.id", cond.ID).WithError(err).Info("controller registration error")
-
-		return http.StatusInternalServerError, &v1types.ServerResponse{
-			Message: "Controller registration error: " + err.Error(),
-		}
-	}
-
 	st := rctypes.NewTaskStatusRecord("controller fetched condition using client IP: " + c.RemoteIP())
 	sv := &rctypes.StatusValue{
-		WorkerID: controllerID.String(),
 		Target:   serverID.String(),
+		WorkerID: serverID.String(),
 		TraceID:  trace.SpanFromContext(ctx).SpanContext().TraceID().String(),
 		SpanID:   trace.SpanFromContext(ctx).SpanContext().SpanID().String(),
 		State:    string(rctypes.Pending),
@@ -522,7 +435,7 @@ func (r *Routes) conditionQueuePop(c *gin.Context) (int, *v1types.ServerResponse
 	if err := r.statusValueKV.publish(
 		r.facilityCode,
 		cond.ID,
-		controllerID,
+		registry.GetID("dummy-id-to-be-purged"),
 		cond.Kind,
 		sv,
 		true,
@@ -537,7 +450,6 @@ func (r *Routes) conditionQueuePop(c *gin.Context) (int, *v1types.ServerResponse
 
 	// setup task to be published
 	task := rctypes.NewTaskFromCondition(cond)
-	task.WorkerID = controllerID.String()
 	task.TraceID = trace.SpanFromContext(ctx).SpanContext().TraceID().String()
 	task.SpanID = trace.SpanFromContext(ctx).SpanContext().SpanID().String()
 

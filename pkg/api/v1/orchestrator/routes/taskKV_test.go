@@ -12,7 +12,25 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/nats-io/nats-server/v2/server"
+	srvtest "github.com/nats-io/nats-server/v2/test"
 )
+
+func runNATSServer(t *testing.T) *server.Server {
+	opts := srvtest.DefaultTestOptions
+	opts.Port = -1
+	opts.JetStream = true
+	opts.StoreDir = t.TempDir()
+
+	return srvtest.RunServer(&opts)
+}
+
+func shutdownNATSServer(t *testing.T, s *server.Server) {
+	t.Helper()
+	s.Shutdown()
+	s.WaitForShutdown()
+}
 
 func TestTaskKV(t *testing.T) {
 	// Start a NATS server
