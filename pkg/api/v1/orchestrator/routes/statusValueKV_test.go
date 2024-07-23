@@ -7,7 +7,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/metal-toolbox/conditionorc/internal/status"
 	"github.com/metal-toolbox/rivets/events"
-	"github.com/metal-toolbox/rivets/events/registry"
 	"github.com/nats-io/nats.go"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
@@ -43,17 +42,17 @@ func TestStatusValuePublish(t *testing.T) {
 
 	facilityCode := "test-facility"
 	conditionID := uuid.New()
-	controllerID := registry.GetID("test-controller")
 	conditionKind := rctypes.FirmwareInstall
+	serverID := uuid.New()
 
 	t.Run("Create new status value", func(t *testing.T) {
 		newSV := &rctypes.StatusValue{
-			WorkerID: controllerID.String(),
+			WorkerID: serverID.String(),
 			State:    string(rctypes.Pending),
 			Status:   json.RawMessage(`{"message":"woot"}`),
 		}
 
-		err := sv.publish(facilityCode, conditionID, controllerID, conditionKind, newSV, true, false)
+		err := sv.publish(facilityCode, conditionID, serverID, conditionKind, newSV, true, false)
 		require.NoError(t, err)
 
 		// Verify the status value was created
@@ -76,12 +75,12 @@ func TestStatusValuePublish(t *testing.T) {
 
 	t.Run("Update existing status value", func(t *testing.T) {
 		updatedSV := &rctypes.StatusValue{
-			WorkerID: controllerID.String(),
+			WorkerID: serverID.String(),
 			State:    string(rctypes.Active),
 			Status:   json.RawMessage(`{"message":"woot woot"}`),
 		}
 
-		err := sv.publish(facilityCode, conditionID, controllerID, conditionKind, updatedSV, false, false)
+		err := sv.publish(facilityCode, conditionID, serverID, conditionKind, updatedSV, false, false)
 		require.NoError(t, err)
 
 		// Verify the status value was updated
@@ -103,7 +102,7 @@ func TestStatusValuePublish(t *testing.T) {
 	})
 
 	t.Run("Update timestamp only", func(t *testing.T) {
-		err := sv.publish(facilityCode, conditionID, controllerID, conditionKind, nil, false, true)
+		err := sv.publish(facilityCode, conditionID, serverID, conditionKind, nil, false, true)
 		require.NoError(t, err)
 
 		// Verify only the updatedAt timestamp was updated
@@ -122,10 +121,10 @@ func TestStatusValuePublish(t *testing.T) {
 		assert.True(t, retrievedSV.UpdatedAt.After(retrievedSV.CreatedAt))
 	})
 
-	t.Run("Attempt to update with mismatched controller ID", func(t *testing.T) {
-		differentControllerID := registry.GetID("different-controller")
-		err := sv.publish(facilityCode, conditionID, differentControllerID, conditionKind, nil, false, true)
+	t.Run("Attempt to update with mismatched server ID", func(t *testing.T) {
+		differentServerID := uuid.New()
+		err := sv.publish(facilityCode, conditionID, differentServerID, conditionKind, nil, false, true)
 		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "controller mismatch error")
+		assert.Contains(t, err.Error(), "serverID mismatch error")
 	})
 }
