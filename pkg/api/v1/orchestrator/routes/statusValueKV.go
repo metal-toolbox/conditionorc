@@ -6,7 +6,6 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/metal-toolbox/conditionorc/internal/status"
-	"github.com/metal-toolbox/rivets/events/registry"
 	"github.com/nats-io/nats.go"
 	"github.com/pkg/errors"
 
@@ -16,8 +15,8 @@ import (
 type statusValueKV interface {
 	publish(
 		facilityCode string,
-		conditionID uuid.UUID,
-		controllerID registry.ControllerID,
+		conditionID,
+		serverID uuid.UUID,
 		conditionKind rctypes.Kind,
 		newSV *rctypes.StatusValue,
 		create,
@@ -34,8 +33,8 @@ func initStatusValueKV() statusValueKV {
 
 func (s *statusValue) publish(
 	facilityCode string,
-	conditionID uuid.UUID,
-	controllerID registry.ControllerID,
+	conditionID,
+	serverID uuid.UUID,
 	conditionKind rctypes.Kind,
 	newSV *rctypes.StatusValue,
 	create,
@@ -71,8 +70,8 @@ func (s *statusValue) publish(
 			return errors.Wrap(errUnmarshalKey, errJSON.Error())
 		}
 
-		if curSV.WorkerID != controllerID.String() {
-			return errors.Wrap(errControllerMismatch, curSV.WorkerID)
+		if curSV.WorkerID != serverID.String() {
+			return errors.Wrap(errServerIDMismatch, curSV.WorkerID)
 		}
 
 		publishSV = curSV
