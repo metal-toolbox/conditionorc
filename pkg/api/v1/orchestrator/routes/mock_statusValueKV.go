@@ -6,8 +6,6 @@ import (
 	condition "github.com/metal-toolbox/rivets/condition"
 	mock "github.com/stretchr/testify/mock"
 
-	registry "github.com/metal-toolbox/rivets/events/registry"
-
 	uuid "github.com/google/uuid"
 )
 
@@ -24,17 +22,17 @@ func (_m *MockstatusValueKV) EXPECT() *MockstatusValueKV_Expecter {
 	return &MockstatusValueKV_Expecter{mock: &_m.Mock}
 }
 
-// publish provides a mock function with given fields: facilityCode, conditionID, controllerID, conditionKind, newSV, create, onlyTimestamp
-func (_m *MockstatusValueKV) publish(facilityCode string, conditionID uuid.UUID, controllerID registry.ControllerID, conditionKind condition.Kind, newSV *condition.StatusValue, create bool, onlyTimestamp bool) error {
-	ret := _m.Called(facilityCode, conditionID, controllerID, conditionKind, newSV, create, onlyTimestamp)
+// publish provides a mock function with given fields: facilityCode, conditionID, serverID, conditionKind, newSV, create, onlyTimestamp
+func (_m *MockstatusValueKV) publish(facilityCode string, conditionID uuid.UUID, serverID uuid.UUID, conditionKind condition.Kind, newSV *condition.StatusValue, create bool, onlyTimestamp bool) error {
+	ret := _m.Called(facilityCode, conditionID, serverID, conditionKind, newSV, create, onlyTimestamp)
 
 	if len(ret) == 0 {
 		panic("no return value specified for publish")
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(string, uuid.UUID, registry.ControllerID, condition.Kind, *condition.StatusValue, bool, bool) error); ok {
-		r0 = rf(facilityCode, conditionID, controllerID, conditionKind, newSV, create, onlyTimestamp)
+	if rf, ok := ret.Get(0).(func(string, uuid.UUID, uuid.UUID, condition.Kind, *condition.StatusValue, bool, bool) error); ok {
+		r0 = rf(facilityCode, conditionID, serverID, conditionKind, newSV, create, onlyTimestamp)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -50,18 +48,18 @@ type MockstatusValueKV_publish_Call struct {
 // publish is a helper method to define mock.On call
 //   - facilityCode string
 //   - conditionID uuid.UUID
-//   - controllerID registry.ControllerID
+//   - serverID uuid.UUID
 //   - conditionKind condition.Kind
 //   - newSV *condition.StatusValue
 //   - create bool
 //   - onlyTimestamp bool
-func (_e *MockstatusValueKV_Expecter) publish(facilityCode interface{}, conditionID interface{}, controllerID interface{}, conditionKind interface{}, newSV interface{}, create interface{}, onlyTimestamp interface{}) *MockstatusValueKV_publish_Call {
-	return &MockstatusValueKV_publish_Call{Call: _e.mock.On("publish", facilityCode, conditionID, controllerID, conditionKind, newSV, create, onlyTimestamp)}
+func (_e *MockstatusValueKV_Expecter) publish(facilityCode interface{}, conditionID interface{}, serverID interface{}, conditionKind interface{}, newSV interface{}, create interface{}, onlyTimestamp interface{}) *MockstatusValueKV_publish_Call {
+	return &MockstatusValueKV_publish_Call{Call: _e.mock.On("publish", facilityCode, conditionID, serverID, conditionKind, newSV, create, onlyTimestamp)}
 }
 
-func (_c *MockstatusValueKV_publish_Call) Run(run func(facilityCode string, conditionID uuid.UUID, controllerID registry.ControllerID, conditionKind condition.Kind, newSV *condition.StatusValue, create bool, onlyTimestamp bool)) *MockstatusValueKV_publish_Call {
+func (_c *MockstatusValueKV_publish_Call) Run(run func(facilityCode string, conditionID uuid.UUID, serverID uuid.UUID, conditionKind condition.Kind, newSV *condition.StatusValue, create bool, onlyTimestamp bool)) *MockstatusValueKV_publish_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(string), args[1].(uuid.UUID), args[2].(registry.ControllerID), args[3].(condition.Kind), args[4].(*condition.StatusValue), args[5].(bool), args[6].(bool))
+		run(args[0].(string), args[1].(uuid.UUID), args[2].(uuid.UUID), args[3].(condition.Kind), args[4].(*condition.StatusValue), args[5].(bool), args[6].(bool))
 	})
 	return _c
 }
@@ -71,7 +69,7 @@ func (_c *MockstatusValueKV_publish_Call) Return(_a0 error) *MockstatusValueKV_p
 	return _c
 }
 
-func (_c *MockstatusValueKV_publish_Call) RunAndReturn(run func(string, uuid.UUID, registry.ControllerID, condition.Kind, *condition.StatusValue, bool, bool) error) *MockstatusValueKV_publish_Call {
+func (_c *MockstatusValueKV_publish_Call) RunAndReturn(run func(string, uuid.UUID, uuid.UUID, condition.Kind, *condition.StatusValue, bool, bool) error) *MockstatusValueKV_publish_Call {
 	_c.Call.Return(run)
 	return _c
 }
