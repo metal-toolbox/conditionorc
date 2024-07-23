@@ -171,25 +171,25 @@ func (r *Routes) Routes(g *gin.RouterGroup) {
 
 	controller.PUT(
 		"/condition-status/:conditionKind/:conditionID",
-		r.composeAuthHandler(createScopes("statusUpdate")),
+		r.composeAuthHandler(createScopes("orchestratorAPI")),
 		wrapAPICall(r.conditionStatusUpdate),
 	)
 
 	controller.GET(
 		"/condition-task/:conditionKind",
-		r.composeAuthHandler(createScopes("taskQuery")),
+		r.composeAuthHandler(createScopes("orchestratorAPI")),
 		wrapAPICall(r.taskQuery),
 	)
 
 	controller.POST(
 		"/condition-task/:conditionKind/:conditionID",
-		r.composeAuthHandler(createScopes("taskPublish")),
+		r.composeAuthHandler(createScopes("orchestratorAPI")),
 		wrapAPICall(r.taskPublish),
 	)
 
 	controller.GET(
 		"/condition-pending/:conditionKind",
-		r.composeAuthHandler(readScopes("conditionQueuePop")),
+		r.composeAuthHandler(readScopes("orchestratorAPI")),
 		wrapAPICall(r.conditionPending),
 	)
 }
