@@ -78,7 +78,6 @@ func (t *taskKVImpl) get(ctx context.Context, conditionKind rctypes.Kind, condit
 				"serverID":     serverID,
 				"facilityCode": t.facilityCode,
 				"conditionID":  conditionID,
-				"controllerID": serverID,
 				"key":          key,
 			}).Debug("Task key not found")
 
@@ -87,7 +86,6 @@ func (t *taskKVImpl) get(ctx context.Context, conditionKind rctypes.Kind, condit
 
 		span.AddEvent("Task query error",
 			trace.WithAttributes(
-				attribute.String("controllerID", serverID.String()),
 				attribute.String("serverID", serverID.String()),
 				attribute.String("conditionID", conditionID.String()),
 				attribute.String("error", err.Error()),
@@ -99,7 +97,6 @@ func (t *taskKVImpl) get(ctx context.Context, conditionKind rctypes.Kind, condit
 			"serverID":     serverID,
 			"facilityCode": t.facilityCode,
 			"conditionID":  conditionID,
-			"controllerID": serverID,
 			"key":          key,
 		}).Warn("Task query error")
 		return nil, errors.Wrap(errQueryTask, err.Error())
@@ -128,7 +125,6 @@ func (t *taskKVImpl) publish(
 	failed := func(err error) error {
 		span.AddEvent("Task publish error",
 			trace.WithAttributes(
-				attribute.String("controllerID", serverID),
 				attribute.String("serverID", serverID),
 				attribute.String("conditionID", conditionID),
 				attribute.String("error", err.Error()),
@@ -140,7 +136,6 @@ func (t *taskKVImpl) publish(
 			"serverID":     serverID,
 			"facilityCode": t.facilityCode,
 			"conditionID":  conditionID,
-			"controllerID": serverID,
 			"key":          key,
 		}).Warn("Task publish error")
 
