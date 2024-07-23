@@ -269,6 +269,26 @@ func (r *Routes) serverEnroll(c *gin.Context) (int, *v1types.ServerResponse) {
 	return st, resp
 }
 
+// @Summary Server Provision
+// @Tag Servers
+// @Description an API to perform the server provision.
+// @Accept json
+// @Produce json
+// @Success 200 {object} v1types.ServerResponse
+// @Router /serverProvision [post]
+func (r *Routes) serverProvision(c *gin.Context) (int, *v1types.ServerResponse) {
+	var sp v1types.ServerProvisionRequest
+	if err := c.ShouldBindJSON(&sp); err != nil {
+		r.logger.WithError(err).Warn("unmarshal server provision payload")
+
+		return http.StatusBadRequest, &v1types.ServerResponse{
+			Message: "invalid server provision payload: " + err.Error(),
+		}
+	}
+
+	return 501, &v1types.ServerResponse{Message: "unimplemented"}
+}
+
 // @Summary Firmware Install
 // @Tag Conditions
 // @Description Installs firmware on a device and validates with a subsequent inventory
