@@ -6,7 +6,6 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
-	"github.com/metal-toolbox/rivets/events/registry"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"go.opentelemetry.io/otel"
@@ -18,9 +17,9 @@ import (
 )
 
 var (
-	errPublishStatus      = errors.New("error in condition status publish")
-	errUnmarshalKey       = errors.New("error unmarshal key, value for update")
-	errControllerMismatch = errors.New("condition controller mismatch error")
+	errPublishStatus    = errors.New("error in condition status publish")
+	errUnmarshalKey     = errors.New("error unmarshal key, value for update")
+	errServerIDMismatch = errors.New("condition serverID mismatch error")
 )
 
 func (r *Routes) conditionKindValid(kind rctypes.Kind) bool {
@@ -28,9 +27,6 @@ func (r *Routes) conditionKindValid(kind rctypes.Kind) bool {
 	return found != nil
 }
 
-// TODO:
-// - Check remote IP matches the expected server remote IP?
-//
 // @Summary ConditionStatusUpdate
 // @Tag Conditions
 // @Description Publishes an update to the Condition StatusValue KV
@@ -53,7 +49,6 @@ func (r *Routes) conditionStatusUpdate(c *gin.Context) (int, *v1types.ServerResp
 		attribute.KeyValue{Key: "conditionKind", Value: attribute.StringValue(c.Param("conditionKind"))},
 		attribute.KeyValue{Key: "conditionID", Value: attribute.StringValue(c.Param("conditionID"))},
 		attribute.KeyValue{Key: "timestampUpdate", Value: attribute.StringValue(c.Request.URL.Query().Get("ts_update"))},
-		attribute.KeyValue{Key: "controllerID", Value: attribute.StringValue(c.Request.URL.Query().Get("controller_id"))},
 	)
 	defer span.End()
 
@@ -61,20 +56,6 @@ func (r *Routes) conditionStatusUpdate(c *gin.Context) (int, *v1types.ServerResp
 	if err != nil {
 		return http.StatusBadRequest, &v1types.ServerResponse{
 			Message: "invalid server id: " + err.Error(),
-		}
-	}
-
-	paramControllerID := c.Request.URL.Query().Get("controller_id")
-	if paramControllerID == "" {
-		return http.StatusBadRequest, &v1types.ServerResponse{
-			Message: "expected controller_id param",
-		}
-	}
-
-	controllerID, err := registry.ControllerIDFromString(paramControllerID)
-	if err != nil {
-		return http.StatusBadRequest, &v1types.ServerResponse{
-			Message: fmt.Sprintf("invalid controller_id: %s, err: %s", paramControllerID, err.Error()),
 		}
 	}
 
@@ -110,18 +91,35 @@ func (r *Routes) conditionStatusUpdate(c *gin.Context) (int, *v1types.ServerResp
 		}
 	}
 
-	// the controller pop'ed the condition from the queue which created the StatusKV entry
-	// we expect an active condition to allow this update
-	activeCond, err := r.repository.GetActiveCondition(ctx, serverID)
+	// expect condition to be in an incomplete state to accept this update.
+	cr, err := r.repository.Get(ctx, serverID)
 	if err != nil {
 		return http.StatusInternalServerError, &v1types.ServerResponse{
 			Message: "condition lookup: " + err.Error(),
 		}
 	}
 
-	if activeCond == nil {
+	var found bool
+	var updateable bool
+	for _, cond := range cr.Conditions {
+		if cond.Kind == conditionKind {
+			found = true
+
+			if !rctypes.StateIsComplete(cond.State) {
+				updateable = true
+			}
+		}
+	}
+
+	if !found {
 		return http.StatusBadRequest, &v1types.ServerResponse{
-			Message: "no active condition found for server",
+			Message: "no matching condition found in record: " + string(conditionKind),
+		}
+	}
+
+	if !updateable {
+		return http.StatusBadRequest, &v1types.ServerResponse{
+			Message: "update denied, condition in final state",
 		}
 	}
 
@@ -129,7 +127,7 @@ func (r *Routes) conditionStatusUpdate(c *gin.Context) (int, *v1types.ServerResp
 	if err := r.statusValueKV.publish(
 		r.facilityCode,
 		conditionID,
-		controllerID,
+		serverID,
 		conditionKind,
 		&statusValue,
 		false,

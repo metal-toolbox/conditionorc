@@ -20,7 +20,6 @@ import (
 
 	rctypes "github.com/metal-toolbox/rivets/condition"
 	eventsm "github.com/metal-toolbox/rivets/events"
-	"github.com/metal-toolbox/rivets/events/registry"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	mock "github.com/stretchr/testify/mock"
@@ -105,21 +104,18 @@ func setupTestServer(t *testing.T) (*tester, *gin.Engine, error) {
 func TestConditionStatusUpdate(t *testing.T) {
 	serverID := uuid.New()
 	conditionID := uuid.New()
-	controllerID := registry.GetID("test-controller")
-	cond := &rctypes.Condition{
-		ID:   conditionID,
-		Kind: rctypes.FirmwareInstall,
-	}
+	conditionKind := rctypes.FirmwareInstall
 
 	mtester, server, err := setupTestServer(t)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	surl := fmt.Sprintf("/api/v1/servers/%s/condition-status/%s/%s", serverID, rctypes.FirmwareInstall, conditionID)
+	surl := fmt.Sprintf("/api/v1/servers/%s/condition-status/%s/%s", serverID, conditionKind, conditionID)
+
 	testcases := []struct {
 		name            string
-		mockStore       func(r *store.MockRepository)
+		mockRepository  func(r *store.MockRepository)
 		mockKVPublisher func(p *MockstatusValueKV)
 		request         func(t *testing.T) *http.Request
 		assertResponse  func(t *testing.T, r *httptest.ResponseRecorder)
@@ -127,7 +123,7 @@ func TestConditionStatusUpdate(t *testing.T) {
 		{
 			name: "invalid server id",
 			request: func(t *testing.T) *http.Request {
-				request, err := http.NewRequestWithContext(context.TODO(), http.MethodPut, fmt.Sprintf("/api/v1/servers/%s/condition-status/%s/%s", "invalid_serverid", rctypes.FirmwareInstall, conditionID), http.NoBody)
+				request, err := http.NewRequestWithContext(context.TODO(), http.MethodPut, fmt.Sprintf("/api/v1/servers/%s/condition-status/%s/%s", "invalid_serverid", conditionKind, conditionID), http.NoBody)
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -139,24 +135,26 @@ func TestConditionStatusUpdate(t *testing.T) {
 			},
 		},
 		{
-			name: "missing controller_id",
+			name: "invalid status value payload",
 			request: func(t *testing.T) *http.Request {
-				request, err := http.NewRequestWithContext(context.TODO(), http.MethodPut, surl, http.NoBody)
+				request, err := http.NewRequestWithContext(context.TODO(), http.MethodPut, surl, bytes.NewBufferString(`invalid json`))
 				if err != nil {
 					t.Fatal(err)
 				}
+				request.Header.Set("Content-Type", "application/json")
 				return request
 			},
 			assertResponse: func(t *testing.T, r *httptest.ResponseRecorder) {
 				assert.Equal(t, http.StatusBadRequest, r.Code)
-				assert.Contains(t, string(asBytes(t, r.Body)), "expected controller_id param")
+				assert.Contains(t, string(asBytes(t, r.Body)), "invalid StatusValue payload")
 			},
 		},
 		{
-			name: "invalid controller_id",
+			name: "unsupported condition kind",
 			request: func(t *testing.T) *http.Request {
-				endpoint := surl + "?controller_id=invalid"
-				request, err := http.NewRequestWithContext(context.TODO(), http.MethodPut, endpoint, http.NoBody)
+				payload := `{"status": "in_progress", "message": "Updating firmware"}`
+				endpoint := fmt.Sprintf("/api/v1/servers/%s/condition-status/%s/%s", serverID, "unsupported_kind", conditionID)
+				request, err := http.NewRequestWithContext(context.TODO(), http.MethodPut, endpoint, bytes.NewBufferString(payload))
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -164,25 +162,78 @@ func TestConditionStatusUpdate(t *testing.T) {
 			},
 			assertResponse: func(t *testing.T, r *httptest.ResponseRecorder) {
 				assert.Equal(t, http.StatusBadRequest, r.Code)
-				assert.Contains(t, string(asBytes(t, r.Body)), "invalid controller_id")
+				assert.Contains(t, string(asBytes(t, r.Body)), "unsupported condition kind")
+			},
+		},
+		{
+			name: "no matching condition found",
+			mockRepository: func(r *store.MockRepository) {
+				r.On("Get", mock.Anything, serverID).
+					Return(&store.ConditionRecord{
+						Conditions: []*rctypes.Condition{
+							{Kind: rctypes.Kind("other_kind"), State: rctypes.Active},
+						},
+					}, nil).
+					Once()
+			},
+			request: func(t *testing.T) *http.Request {
+				payload := `{"status": "in_progress", "message": "Updating firmware"}`
+				request, err := http.NewRequestWithContext(context.TODO(), http.MethodPut, surl, bytes.NewBufferString(payload))
+				if err != nil {
+					t.Fatal(err)
+				}
+				request.Header.Set("Content-Type", "application/json")
+				return request
+			},
+			assertResponse: func(t *testing.T, r *httptest.ResponseRecorder) {
+				assert.Equal(t, http.StatusBadRequest, r.Code)
+				assert.Contains(t, string(asBytes(t, r.Body)), "no matching condition found in record")
+			},
+		},
+		{
+			name: "condition in final state",
+			mockRepository: func(r *store.MockRepository) {
+				r.On("Get", mock.Anything, serverID).
+					Return(&store.ConditionRecord{
+						Conditions: []*rctypes.Condition{
+							{Kind: conditionKind, State: rctypes.Succeeded},
+						},
+					}, nil).
+					Once()
+			},
+			request: func(t *testing.T) *http.Request {
+				payload := `{"status": "in_progress", "message": "Updating firmware"}`
+				request, err := http.NewRequestWithContext(context.TODO(), http.MethodPut, surl, bytes.NewBufferString(payload))
+				if err != nil {
+					t.Fatal(err)
+				}
+				request.Header.Set("Content-Type", "application/json")
+				return request
+			},
+			assertResponse: func(t *testing.T, r *httptest.ResponseRecorder) {
+				assert.Equal(t, http.StatusBadRequest, r.Code)
+				assert.Contains(t, string(asBytes(t, r.Body)), "update denied, condition in final state")
 			},
 		},
 		{
 			name: "successful update",
-			mockStore: func(r *store.MockRepository) {
-				r.On("GetActiveCondition", mock.Anything, serverID).
-					Return(cond, nil).
+			mockRepository: func(r *store.MockRepository) {
+				r.On("Get", mock.Anything, serverID).
+					Return(&store.ConditionRecord{
+						Conditions: []*rctypes.Condition{
+							{Kind: conditionKind, State: rctypes.Active},
+						},
+					}, nil).
 					Once()
 			},
 			mockKVPublisher: func(p *MockstatusValueKV) {
-				p.On("publish", facility, cond.ID, controllerID, cond.Kind, mock.Anything, false, false).
+				p.On("publish", facility, conditionID, serverID, conditionKind, mock.Anything, false, false).
 					Return(nil).
 					Once()
 			},
 			request: func(t *testing.T) *http.Request {
-				endpoint := fmt.Sprintf("%s?controller_id=%s", surl, controllerID.String())
 				payload := `{"status": "in_progress", "message": "Updating firmware"}`
-				request, err := http.NewRequestWithContext(context.TODO(), http.MethodPut, endpoint, bytes.NewBufferString(payload))
+				request, err := http.NewRequestWithContext(context.TODO(), http.MethodPut, surl, bytes.NewBufferString(payload))
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -195,42 +246,23 @@ func TestConditionStatusUpdate(t *testing.T) {
 			},
 		},
 		{
-			name: "no active condition",
-			mockStore: func(r *store.MockRepository) {
-				r.On("GetActiveCondition", mock.Anything, serverID).
-					Return(nil, nil).
-					Once()
-			},
-
-			request: func(t *testing.T) *http.Request {
-				endpoint := fmt.Sprintf("%s?controller_id=%s", surl, controllerID.String())
-				payload := `{"status": "in_progress", "message": "Updating firmware"}`
-				request, err := http.NewRequestWithContext(context.TODO(), http.MethodPut, endpoint, bytes.NewBufferString(payload))
-				if err != nil {
-					t.Fatal(err)
-				}
-				request.Header.Set("Content-Type", "application/json")
-				return request
-			},
-			assertResponse: func(t *testing.T, r *httptest.ResponseRecorder) {
-				assert.Equal(t, http.StatusBadRequest, r.Code)
-				assert.Contains(t, string(asBytes(t, r.Body)), "no active condition found for server")
-			},
-		},
-		{
 			name: "timestamp update only",
-			mockStore: func(r *store.MockRepository) {
-				r.On("GetActiveCondition", mock.Anything, serverID).
-					Return(cond, nil).
+			mockRepository: func(r *store.MockRepository) {
+				r.On("Get", mock.Anything, serverID).
+					Return(&store.ConditionRecord{
+						Conditions: []*rctypes.Condition{
+							{Kind: conditionKind, State: rctypes.Active},
+						},
+					}, nil).
 					Once()
 			},
 			mockKVPublisher: func(p *MockstatusValueKV) {
-				p.On("publish", facility, cond.ID, controllerID, cond.Kind, mock.Anything, false, true).
+				p.On("publish", facility, conditionID, serverID, conditionKind, mock.Anything, false, true).
 					Return(nil).
 					Once()
 			},
 			request: func(t *testing.T) *http.Request {
-				endpoint := fmt.Sprintf("%s?controller_id=%s&ts_update=true", surl, controllerID.String())
+				endpoint := surl + "?ts_update=true"
 				request, err := http.NewRequestWithContext(context.TODO(), http.MethodPut, endpoint, http.NoBody)
 				if err != nil {
 					t.Fatal(err)
@@ -246,8 +278,8 @@ func TestConditionStatusUpdate(t *testing.T) {
 
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
-			if tc.mockStore != nil {
-				tc.mockStore(mtester.mockStore)
+			if tc.mockRepository != nil {
+				tc.mockRepository(mtester.mockStore)
 			}
 			if tc.mockKVPublisher != nil {
 				tc.mockKVPublisher(mtester.mockStatusValueKV)
