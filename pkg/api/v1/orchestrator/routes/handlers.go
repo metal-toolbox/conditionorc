@@ -143,9 +143,11 @@ func (r *Routes) conditionStatusUpdate(c *gin.Context) (int, *v1types.ServerResp
 	}
 }
 
-// @Summary taskQuery
+// @Summary taskQuery returns the active condition for a serverID
 // @Tag Conditions
 // @Description Queries a *rivets.Task object from KV for a condition
+// @Description Controllers will not have always know the taskID and so this enables querying
+// @Description the active Task object using the serverID, conditionKind parameters.
 // @ID taskQuery
 // @Param uuid path string true "Server ID"
 // @Param conditionKind path string true "Condition Kind"
@@ -183,32 +185,40 @@ func (r *Routes) taskQuery(c *gin.Context) (int, *v1types.ServerResponse) {
 		}
 	}
 
-	// the controller pop'ed the condition from the queue which created the Task entry
-	// we expect an active condition to allow this query
-	activeCond, err := r.repository.GetActiveCondition(ctx, serverID)
+	cr, err := r.repository.Get(ctx, serverID)
 	if err != nil {
-		if errors.Is(err, store.ErrConditionNotFound) {
-			return http.StatusBadRequest, &v1types.ServerResponse{
-				Message: "no active condition found for server",
-			}
-		}
-
-		r.logger.WithField("condition.kind", conditionKind).WithError(err).Info("active condition query error")
-
 		return http.StatusInternalServerError, &v1types.ServerResponse{
-			Message: "condition lookup error: " + err.Error(),
+			Message: "condition lookup: " + err.Error(),
 		}
 	}
 
-	if activeCond.Kind != conditionKind {
-		return http.StatusServiceUnavailable, &v1types.ServerResponse{
-			Message: fmt.Sprintf("current active condition: %s, retry in a while", activeCond.Kind),
+	var found bool
+	var activeCond *rctypes.Condition
+	for idx, cond := range cr.Conditions {
+		if cond.Kind == conditionKind {
+			found = true
+		}
+
+		if !rctypes.StateIsComplete(cond.State) {
+			activeCond = cr.Conditions[idx]
+		}
+	}
+
+	if !found {
+		return http.StatusBadRequest, &v1types.ServerResponse{
+			Message: "no matching condition found in record: " + string(conditionKind),
+		}
+	}
+
+	if activeCond == nil {
+		return http.StatusBadRequest, &v1types.ServerResponse{
+			Message: "no active condition found in record",
 		}
 	}
 
 	task, err := r.taskKV.get(c.Request.Context(), conditionKind, activeCond.ID, serverID)
 	if err != nil {
-		r.logger.WithField("condition.id", activeCond.ID).WithError(err).Info("task KV query error")
+		r.logger.WithField("conditionID", activeCond.ID).WithError(err).Info("task KV query error")
 
 		return http.StatusInternalServerError, &v1types.ServerResponse{
 			Message: err.Error(),
@@ -296,14 +306,14 @@ func (r *Routes) taskPublish(c *gin.Context) (int, *v1types.ServerResponse) {
 	// we expect an active condition to allow this publish
 	activeCond, err := r.repository.GetActiveCondition(ctx, serverID)
 	if err != nil {
+		if errors.Is(err, store.ErrConditionNotFound) {
+			return http.StatusBadRequest, &v1types.ServerResponse{
+				Message: err.Error(),
+			}
+		}
+
 		return http.StatusInternalServerError, &v1types.ServerResponse{
 			Message: "condition lookup: " + err.Error(),
-		}
-	}
-
-	if activeCond == nil {
-		return http.StatusBadRequest, &v1types.ServerResponse{
-			Message: "no active condition found for server",
 		}
 	}
 
