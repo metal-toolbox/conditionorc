@@ -307,7 +307,7 @@ func TestTaskQuery(t *testing.T) {
 
 	testcases := []struct {
 		name           string
-		mockStore      func(r *store.MockRepository)
+		mockRepository func(r *store.MockRepository)
 		mockTaskKV     func(tk *MocktaskKV)
 		request        func(t *testing.T) *http.Request
 		assertResponse func(t *testing.T, r *httptest.ResponseRecorder)
@@ -315,7 +315,7 @@ func TestTaskQuery(t *testing.T) {
 		{
 			name: "invalid server id",
 			request: func(t *testing.T) *http.Request {
-				request, err := http.NewRequestWithContext(context.TODO(), http.MethodPut, fmt.Sprintf("/api/v1/servers/%s/condition-status/%s/%s", "invalid_serverid", rctypes.FirmwareInstall, conditionID), http.NoBody)
+				request, err := http.NewRequestWithContext(context.TODO(), http.MethodGet, fmt.Sprintf("/api/v1/servers/%s/condition-task/%s", "invalid_serverid", conditionKind), http.NoBody)
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -327,7 +327,7 @@ func TestTaskQuery(t *testing.T) {
 			},
 		},
 		{
-			name: "invalid condition kind",
+			name: "unsupported condition kind",
 			request: func(t *testing.T) *http.Request {
 				url := fmt.Sprintf("/api/v1/servers/%s/condition-task/invalidkind", serverID)
 				request, err := http.NewRequestWithContext(context.TODO(), http.MethodGet, url, http.NoBody)
@@ -342,10 +342,33 @@ func TestTaskQuery(t *testing.T) {
 			},
 		},
 		{
-			name: "no active condition",
-			mockStore: func(r *store.MockRepository) {
-				r.On("GetActiveCondition", mock.Anything, serverID).
-					Return(nil, store.ErrConditionNotFound).
+			name: "repository error",
+			mockRepository: func(r *store.MockRepository) {
+				r.On("Get", mock.Anything, serverID).
+					Return(nil, errors.New("repository error")).
+					Once()
+			},
+			request: func(t *testing.T) *http.Request {
+				request, err := http.NewRequestWithContext(context.TODO(), http.MethodGet, surl, http.NoBody)
+				if err != nil {
+					t.Fatal(err)
+				}
+				return request
+			},
+			assertResponse: func(t *testing.T, r *httptest.ResponseRecorder) {
+				assert.Equal(t, http.StatusInternalServerError, r.Code)
+				assert.Contains(t, string(asBytes(t, r.Body)), "condition lookup")
+			},
+		},
+		{
+			name: "no matching condition found",
+			mockRepository: func(r *store.MockRepository) {
+				r.On("Get", mock.Anything, serverID).
+					Return(&store.ConditionRecord{
+						Conditions: []*rctypes.Condition{
+							{Kind: rctypes.Kind("other_kind"), State: rctypes.Active},
+						},
+					}, nil).
 					Once()
 			},
 			request: func(t *testing.T) *http.Request {
@@ -357,14 +380,18 @@ func TestTaskQuery(t *testing.T) {
 			},
 			assertResponse: func(t *testing.T, r *httptest.ResponseRecorder) {
 				assert.Equal(t, http.StatusBadRequest, r.Code)
-				assert.Contains(t, string(asBytes(t, r.Body)), "no active condition found for server")
+				assert.Contains(t, string(asBytes(t, r.Body)), "no matching condition found in record")
 			},
 		},
 		{
-			name: "active condition kind mismatch",
-			mockStore: func(r *store.MockRepository) {
-				r.On("GetActiveCondition", mock.Anything, serverID).
-					Return(&rctypes.Condition{ID: conditionID, Kind: rctypes.Inventory, State: rctypes.Pending}, nil).
+			name: "no active condition found",
+			mockRepository: func(r *store.MockRepository) {
+				r.On("Get", mock.Anything, serverID).
+					Return(&store.ConditionRecord{
+						Conditions: []*rctypes.Condition{
+							{Kind: conditionKind, State: rctypes.Succeeded},
+						},
+					}, nil).
 					Once()
 			},
 			request: func(t *testing.T) *http.Request {
@@ -375,15 +402,19 @@ func TestTaskQuery(t *testing.T) {
 				return request
 			},
 			assertResponse: func(t *testing.T, r *httptest.ResponseRecorder) {
-				assert.Equal(t, http.StatusServiceUnavailable, r.Code)
-				assert.Contains(t, string(asBytes(t, r.Body)), "current active condition")
+				assert.Equal(t, http.StatusBadRequest, r.Code)
+				assert.Contains(t, string(asBytes(t, r.Body)), "no active condition found in record")
 			},
 		},
 		{
 			name: "task KV query error",
-			mockStore: func(r *store.MockRepository) {
-				r.On("GetActiveCondition", mock.Anything, serverID).
-					Return(&rctypes.Condition{ID: conditionID, Kind: conditionKind}, nil).
+			mockRepository: func(r *store.MockRepository) {
+				r.On("Get", mock.Anything, serverID).
+					Return(&store.ConditionRecord{
+						Conditions: []*rctypes.Condition{
+							{ID: conditionID, Kind: conditionKind, State: rctypes.Active},
+						},
+					}, nil).
 					Once()
 			},
 			mockTaskKV: func(tk *MocktaskKV) {
@@ -405,9 +436,13 @@ func TestTaskQuery(t *testing.T) {
 		},
 		{
 			name: "task ID mismatch",
-			mockStore: func(r *store.MockRepository) {
-				r.On("GetActiveCondition", mock.Anything, serverID).
-					Return(&rctypes.Condition{ID: conditionID, Kind: conditionKind}, nil).
+			mockRepository: func(r *store.MockRepository) {
+				r.On("Get", mock.Anything, serverID).
+					Return(&store.ConditionRecord{
+						Conditions: []*rctypes.Condition{
+							{ID: conditionID, Kind: conditionKind, State: rctypes.Active},
+						},
+					}, nil).
 					Once()
 			},
 			mockTaskKV: func(tk *MocktaskKV) {
@@ -429,9 +464,13 @@ func TestTaskQuery(t *testing.T) {
 		},
 		{
 			name: "successful task query",
-			mockStore: func(r *store.MockRepository) {
-				r.On("GetActiveCondition", mock.Anything, serverID).
-					Return(&rctypes.Condition{ID: conditionID, Kind: conditionKind}, nil).
+			mockRepository: func(r *store.MockRepository) {
+				r.On("Get", mock.Anything, serverID).
+					Return(&store.ConditionRecord{
+						Conditions: []*rctypes.Condition{
+							{ID: conditionID, Kind: conditionKind, State: rctypes.Active},
+						},
+					}, nil).
 					Once()
 			},
 			mockTaskKV: func(tk *MocktaskKV) {
@@ -460,8 +499,8 @@ func TestTaskQuery(t *testing.T) {
 
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
-			if tc.mockStore != nil {
-				tc.mockStore(mtester.mockStore)
+			if tc.mockRepository != nil {
+				tc.mockRepository(mtester.mockStore)
 			}
 			if tc.mockTaskKV != nil {
 				tc.mockTaskKV(mtester.mocktaskKV)
@@ -514,7 +553,7 @@ func TestTaskPublish(t *testing.T) {
 			name: "no active condition",
 			mockStore: func(r *store.MockRepository) {
 				r.On("GetActiveCondition", mock.Anything, serverID).
-					Return(nil, nil).
+					Return(nil, errors.Wrap(store.ErrConditionNotFound, "expected an active condition")).
 					Once()
 			},
 			request: func(t *testing.T) *http.Request {
@@ -529,7 +568,7 @@ func TestTaskPublish(t *testing.T) {
 			},
 			assertResponse: func(t *testing.T, r *httptest.ResponseRecorder) {
 				assert.Equal(t, http.StatusBadRequest, r.Code)
-				assert.Contains(t, string(asBytes(t, r.Body)), "no active condition found for server")
+				assert.Contains(t, string(asBytes(t, r.Body)), "expected an active condition: condition not found")
 			},
 		},
 		{
