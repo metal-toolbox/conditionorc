@@ -343,10 +343,10 @@ func (r *Routes) taskPublish(c *gin.Context) (int, *v1types.ServerResponse) {
 	}
 }
 
-// @Summary ConditionPending
+// @Summary ConditionGet
 // @Tag Conditions
-// @Description Returns the pending Condition based on the given parameters.
-// @ID conditionPending
+// @Description Returns the active/pending Condition based on the given parameters.
+// @ID conditionGet
 // @Param uuid path string true "Server ID"
 // @Param conditionKind path string true "Condition Kind"
 // @Accept json
@@ -355,9 +355,9 @@ func (r *Routes) taskPublish(c *gin.Context) (int, *v1types.ServerResponse) {
 // Failure 400 {object} v1types.ServerResponse
 // Failure 404 {object} v1types.ServerResponse
 // Failure 500 {object} v1types.ServerResponse
-// @Router /servers/{uuid}/condition-pending/{conditionKind} [get]
-func (r *Routes) conditionPending(c *gin.Context) (int, *v1types.ServerResponse) {
-	ctx, span := otel.Tracer(pkgName).Start(c.Request.Context(), "Routes.conditionQueuePop")
+// @Router /servers/{uuid}/condition/{conditionKind} [get]
+func (r *Routes) conditionGet(c *gin.Context) (int, *v1types.ServerResponse) {
+	ctx, span := otel.Tracer(pkgName).Start(c.Request.Context(), "Routes.conditionGet")
 	span.SetAttributes(
 		attribute.KeyValue{Key: "serverId", Value: attribute.StringValue(c.Param("uuid"))},
 		attribute.KeyValue{Key: "conditionKind", Value: attribute.StringValue(c.Param("conditionKind"))},
@@ -382,11 +382,11 @@ func (r *Routes) conditionPending(c *gin.Context) (int, *v1types.ServerResponse)
 		}
 	}
 
-	conditionRecord, err := r.repository.Get(ctx, serverID)
+	found, err := r.repository.GetActiveCondition(ctx, serverID)
 	if err != nil {
 		if errors.Is(err, store.ErrConditionNotFound) {
 			return http.StatusNotFound, &v1types.ServerResponse{
-				Message: "condition not found for server",
+				Message: "no pending/active condition not found for server",
 			}
 		}
 
@@ -397,18 +397,8 @@ func (r *Routes) conditionPending(c *gin.Context) (int, *v1types.ServerResponse)
 		}
 	}
 
-	var found *rctypes.Condition
-	for _, cond := range conditionRecord.Conditions {
-		if cond.Kind == conditionKind && cond.State == rctypes.Pending {
-			found = cond
-		}
+	return http.StatusOK, &v1types.ServerResponse{
+		Condition: found,
+		Message:   "found condition in state: " + string(found.State),
 	}
-
-	if found == nil {
-		return http.StatusNotFound, &v1types.ServerResponse{
-			Message: "no pending condition found for server",
-		}
-	}
-
-	return http.StatusOK, &v1types.ServerResponse{Condition: found}
 }

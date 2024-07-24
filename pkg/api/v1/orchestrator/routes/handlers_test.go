@@ -691,16 +691,17 @@ func TestTaskPublish(t *testing.T) {
 	}
 }
 
-func TestConditionPending(t *testing.T) {
+func TestConditionGet(t *testing.T) {
 	serverID := uuid.New()
 	conditionKind := rctypes.FirmwareInstall
+	conditionID := uuid.New()
 
 	mtester, server, err := setupTestServer(t)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	surl := fmt.Sprintf("/api/v1/servers/%s/condition-pending/%s", serverID, conditionKind)
+	surl := fmt.Sprintf("/api/v1/servers/%s/condition/%s", serverID, conditionKind)
 
 	testcases := []struct {
 		name           string
@@ -711,7 +712,7 @@ func TestConditionPending(t *testing.T) {
 		{
 			name: "invalid server id",
 			request: func(t *testing.T) *http.Request {
-				request, err := http.NewRequestWithContext(context.TODO(), http.MethodGet, "/api/v1/servers/invalid-uuid/condition-pending/"+string(conditionKind), nil)
+				request, err := http.NewRequestWithContext(context.TODO(), http.MethodGet, "/api/v1/servers/invalid-uuid/condition/"+string(conditionKind), nil)
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -725,7 +726,7 @@ func TestConditionPending(t *testing.T) {
 		{
 			name: "unsupported condition kind",
 			request: func(t *testing.T) *http.Request {
-				request, err := http.NewRequestWithContext(context.TODO(), http.MethodGet, fmt.Sprintf("/api/v1/servers/%s/condition-pending/unsupported-kind", serverID), nil)
+				request, err := http.NewRequestWithContext(context.TODO(), http.MethodGet, fmt.Sprintf("/api/v1/servers/%s/condition/unsupported-kind", serverID), nil)
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -737,9 +738,9 @@ func TestConditionPending(t *testing.T) {
 			},
 		},
 		{
-			name: "condition not found",
+			name: "no pending/active condition found",
 			mockRepository: func(r *store.MockRepository) {
-				r.On("Get", mock.Anything, serverID).
+				r.On("GetActiveCondition", mock.Anything, serverID).
 					Return(nil, store.ErrConditionNotFound).
 					Once()
 			},
@@ -752,13 +753,13 @@ func TestConditionPending(t *testing.T) {
 			},
 			assertResponse: func(t *testing.T, r *httptest.ResponseRecorder) {
 				assert.Equal(t, http.StatusNotFound, r.Code)
-				assert.Contains(t, string(asBytes(t, r.Body)), "condition not found for server")
+				assert.Contains(t, string(asBytes(t, r.Body)), "no pending/active condition not found for server")
 			},
 		},
 		{
 			name: "repository error",
 			mockRepository: func(r *store.MockRepository) {
-				r.On("Get", mock.Anything, serverID).
+				r.On("GetActiveCondition", mock.Anything, serverID).
 					Return(nil, errors.New("repository error")).
 					Once()
 			},
@@ -775,39 +776,15 @@ func TestConditionPending(t *testing.T) {
 			},
 		},
 		{
-			name: "no pending condition found",
+			name: "active condition found",
 			mockRepository: func(r *store.MockRepository) {
-				r.On("Get", mock.Anything, serverID).
-					Return(&store.ConditionRecord{
-						Conditions: []*rctypes.Condition{
-							{Kind: conditionKind, State: rctypes.Active},
-						},
-					}, nil).
-					Once()
-			},
-			request: func(t *testing.T) *http.Request {
-				request, err := http.NewRequestWithContext(context.TODO(), http.MethodGet, surl, nil)
-				if err != nil {
-					t.Fatal(err)
-				}
-				return request
-			},
-			assertResponse: func(t *testing.T, r *httptest.ResponseRecorder) {
-				assert.Equal(t, http.StatusNotFound, r.Code)
-				assert.Contains(t, string(asBytes(t, r.Body)), "no pending condition found for server")
-			},
-		},
-		{
-			name: "pending condition found",
-			mockRepository: func(r *store.MockRepository) {
-				pendingCondition := &rctypes.Condition{
+				condition := &rctypes.Condition{
+					ID:    conditionID,
 					Kind:  conditionKind,
-					State: rctypes.Pending,
+					State: rctypes.Active,
 				}
-				r.On("Get", mock.Anything, serverID).
-					Return(&store.ConditionRecord{
-						Conditions: []*rctypes.Condition{pendingCondition},
-					}, nil).
+				r.On("GetActiveCondition", mock.Anything, serverID).
+					Return(condition, nil).
 					Once()
 			},
 			request: func(t *testing.T) *http.Request {
@@ -823,8 +800,41 @@ func TestConditionPending(t *testing.T) {
 				err := json.Unmarshal(asBytes(t, r.Body), &response)
 				assert.NoError(t, err)
 				assert.NotNil(t, response.Condition)
+				assert.Equal(t, conditionID, response.Condition.ID)
+				assert.Equal(t, conditionKind, response.Condition.Kind)
+				assert.Equal(t, rctypes.Active, response.Condition.State)
+				assert.Contains(t, response.Message, "found condition in state: active")
+			},
+		},
+		{
+			name: "pending condition found",
+			mockRepository: func(r *store.MockRepository) {
+				condition := &rctypes.Condition{
+					ID:    conditionID,
+					Kind:  conditionKind,
+					State: rctypes.Pending,
+				}
+				r.On("GetActiveCondition", mock.Anything, serverID).
+					Return(condition, nil).
+					Once()
+			},
+			request: func(t *testing.T) *http.Request {
+				request, err := http.NewRequestWithContext(context.TODO(), http.MethodGet, surl, nil)
+				if err != nil {
+					t.Fatal(err)
+				}
+				return request
+			},
+			assertResponse: func(t *testing.T, r *httptest.ResponseRecorder) {
+				assert.Equal(t, http.StatusOK, r.Code)
+				var response v1types.ServerResponse
+				err := json.Unmarshal(asBytes(t, r.Body), &response)
+				assert.NoError(t, err)
+				assert.NotNil(t, response.Condition)
+				assert.Equal(t, conditionID, response.Condition.ID)
 				assert.Equal(t, conditionKind, response.Condition.Kind)
 				assert.Equal(t, rctypes.Pending, response.Condition.State)
+				assert.Contains(t, response.Message, "found condition in state: pending")
 			},
 		},
 	}
