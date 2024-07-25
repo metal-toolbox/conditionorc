@@ -542,6 +542,12 @@ github.com/metal-toolbox/fleetdb v1.19.1 h1:P5m+/m6zGe/vd8G6G9HaG5eQfZcIH0kuDMv+
 github.com/metal-toolbox/fleetdb v1.19.1/go.mod h1:27bM6eslJoB5Bp+QTGVxnpc+SJ2qBlh+em49Hfsvfdg=
 github.com/metal-toolbox/rivets v1.1.0 h1:0SAyKD36rgBOFoFqcTGYrVI9zSyGyJUgdtT30S9efh4=
 github.com/metal-toolbox/rivets v1.1.0/go.mod h1:VQ/Ahd+ztJ5pZMdVRceMGchlHw8D+hIl3Av7ojMEAh0=
+github.com/metal-toolbox/rivets v1.1.1-0.20240725080715-6e213a0ba090 h1:FkFeLlCfwOgpotTK2CBiSurGCHY5p+bZqBvniVwDjBg=
+github.com/metal-toolbox/rivets v1.1.1-0.20240725080715-6e213a0ba090/go.mod h1:i78a1x0w2uNyMlvUgyO6ST552u9wV2Xa4+A73oA4WJY=
+github.com/metal-toolbox/rivets v1.1.1-0.20240725082134-7a73509a6b6f h1:8t36R6pp0t4bH5AvTDktKyEn6FVTK41CsfdC92g2+Ns=
+github.com/metal-toolbox/rivets v1.1.1-0.20240725082134-7a73509a6b6f/go.mod h1:i78a1x0w2uNyMlvUgyO6ST552u9wV2Xa4+A73oA4WJY=
+github.com/metal-toolbox/rivets v1.2.0 h1:QhN3tWH7NqKDqwRDYylxukw0mNQ/FkyvBYkwS0CJULE=
+github.com/metal-toolbox/rivets v1.2.0/go.mod h1:i78a1x0w2uNyMlvUgyO6ST552u9wV2Xa4+A73oA4WJY=
 github.com/microsoft/go-mssqldb v0.17.0/go.mod h1:OkoNGhGEs8EZqchVTtochlXruEhEOaO4S0d2sB5aeGQ=
 github.com/miekg/dns v1.1.26/go.mod h1:bPDLeHnStXmXAq1m/Ch/hvfNHr14JKNPMBo3VZKjuso=
 github.com/miekg/dns v1.1.41/go.mod h1:p6aan82bvRIyn+zDIv9xYNUpwa73JcSh9BKwknJysuI=
