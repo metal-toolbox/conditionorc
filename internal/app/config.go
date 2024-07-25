@@ -155,10 +155,6 @@ func (a *App) envVarOverrides() error {
 		return err
 	}
 
-	if err := a.apiServerJWTAuthParams(); err != nil {
-		return errors.Wrap(ErrConfig, err.Error())
-	}
-
 	return nil
 }
 
@@ -166,21 +162,6 @@ func (a *App) envVarOverrides() error {
 var (
 	defaultNatsConnectTimeout = 100 * time.Millisecond
 )
-
-func (a *App) apiServerJWTAuthParams() error {
-	if !a.v.GetBool("oidc.enabled") {
-		return nil
-	}
-
-	cfgs, err := ginjwt.GetAuthConfigsFromFlags(a.v)
-	if err != nil {
-		return err
-	}
-	a.Logger.WithField("config.length", len(cfgs)).Debug("oidc configurations found")
-	a.Config.APIServerJWTAuth = cfgs
-
-	return nil
-}
 
 // nolint:gocyclo // nats env config load is cyclomatic
 func (a *App) envVarNatsOverrides() error {
