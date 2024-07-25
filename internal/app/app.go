@@ -28,7 +28,7 @@ type App struct {
 // New returns returns a new instance of the conditionorc app
 func New(_ context.Context, appKind model.AppKind, cfgFile string, loglevel model.LogLevel) (*App, <-chan os.Signal, error) {
 	app := &App{
-		v:       viper.New(),
+		v:       viper.GetViper(),
 		AppKind: appKind,
 		Config: &Configuration{
 			file: cfgFile,
