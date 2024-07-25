@@ -31,7 +31,6 @@ import (
 	v1types "github.com/metal-toolbox/conditionorc/pkg/api/v1/conditions/types"
 	rctypes "github.com/metal-toolbox/rivets/condition"
 	eventsm "github.com/metal-toolbox/rivets/events"
-	rcontroller "github.com/metal-toolbox/rivets/events/controller"
 )
 
 var (
@@ -588,7 +587,7 @@ func TestFilterToReconcile(t *testing.T) {
 							Target: sid1,
 							// exceed thresholds
 							CreatedAt: createdTS.Add(-rctypes.StaleThreshold - 2*time.Minute),
-							UpdatedAt: updatedTS.Add(-rcontroller.StatusStaleThreshold - 2*time.Minute),
+							UpdatedAt: updatedTS.Add(-rctypes.StatusStaleThreshold - 2*time.Minute),
 						},
 						{
 							ID:        cid1,
@@ -718,7 +717,7 @@ func TestFilterToReconcile(t *testing.T) {
 							Target: sid1,
 							// thresholds on record exceeded
 							CreatedAt: createdTS.Add(-rctypes.StaleThreshold - 2*time.Minute),
-							UpdatedAt: updatedTS.Add(-rcontroller.StatusStaleThreshold - 2*time.Minute),
+							UpdatedAt: updatedTS.Add(-rctypes.StatusStaleThreshold - 2*time.Minute),
 						},
 					},
 				},

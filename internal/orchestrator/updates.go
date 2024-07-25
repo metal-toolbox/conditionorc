@@ -23,7 +23,6 @@ import (
 
 	v1types "github.com/metal-toolbox/conditionorc/pkg/api/v1/conditions/types"
 	rctypes "github.com/metal-toolbox/rivets/condition"
-	rcontroller "github.com/metal-toolbox/rivets/events/controller"
 )
 
 var (
@@ -361,7 +360,7 @@ func filterToReconcile(records []*store.ConditionRecord, updateEvts map[string]*
 
 		// condition active with stale updatedAt
 		return time.Since(createdAt) >= rctypes.StaleThreshold &&
-			time.Since(updatedAt) >= rcontroller.StatusStaleThreshold
+			time.Since(updatedAt) >= rctypes.StatusStaleThreshold
 	}
 
 	// updates
@@ -660,7 +659,7 @@ func (o *Orchestrator) queueFollowingCondition(ctx context.Context, cond *rctype
 // This reconciles conditions in the Condition status KV - $condition.$facility
 func (o *Orchestrator) eventNeedsReconciliation(evt *v1types.ConditionUpdateEvent) bool {
 	// the last update should be later than the condition stale threshold
-	if time.Since(evt.ConditionUpdate.UpdatedAt) < rcontroller.StatusStaleThreshold {
+	if time.Since(evt.ConditionUpdate.UpdatedAt) < rctypes.StatusStaleThreshold {
 		return false
 	}
 
@@ -692,7 +691,7 @@ func (o *Orchestrator) eventNeedsReconciliation(evt *v1types.ConditionUpdateEven
 	}
 
 	// controller most likely dead
-	if time.Since(lastTime) > rcontroller.LivenessStaleThreshold {
+	if time.Since(lastTime) > rctypes.LivenessStaleThreshold {
 		le.WithField(
 			"last.checkin",
 			time.Since(lastTime),
