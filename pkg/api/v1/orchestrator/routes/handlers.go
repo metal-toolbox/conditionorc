@@ -345,7 +345,7 @@ func (r *Routes) taskPublish(c *gin.Context) (int, *v1types.ServerResponse) {
 
 // @Summary ConditionGet
 // @Tag Conditions
-// @Description Returns the active/pending Condition based on the given parameters.
+// @Description Returns the active/pending Condition for the serverID.
 // @ID conditionGet
 // @Param uuid path string true "Server ID"
 // @Param conditionKind path string true "Condition Kind"
@@ -355,12 +355,11 @@ func (r *Routes) taskPublish(c *gin.Context) (int, *v1types.ServerResponse) {
 // Failure 400 {object} v1types.ServerResponse
 // Failure 404 {object} v1types.ServerResponse
 // Failure 500 {object} v1types.ServerResponse
-// @Router /servers/{uuid}/condition/{conditionKind} [get]
+// @Router /servers/{uuid}/condition [get]
 func (r *Routes) conditionGet(c *gin.Context) (int, *v1types.ServerResponse) {
 	ctx, span := otel.Tracer(pkgName).Start(c.Request.Context(), "Routes.conditionGet")
 	span.SetAttributes(
 		attribute.KeyValue{Key: "serverId", Value: attribute.StringValue(c.Param("uuid"))},
-		attribute.KeyValue{Key: "conditionKind", Value: attribute.StringValue(c.Param("conditionKind"))},
 	)
 	defer span.End()
 
@@ -368,17 +367,6 @@ func (r *Routes) conditionGet(c *gin.Context) (int, *v1types.ServerResponse) {
 	if err != nil {
 		return http.StatusBadRequest, &v1types.ServerResponse{
 			Message: "invalid server id: " + err.Error(),
-		}
-	}
-
-	conditionKind := rctypes.Kind(c.Param("conditionKind"))
-	if !r.conditionKindValid(conditionKind) {
-		r.logger.WithFields(logrus.Fields{
-			"kind": conditionKind,
-		}).Info("unsupported condition kind")
-
-		return http.StatusBadRequest, &v1types.ServerResponse{
-			Message: "unsupported condition kind: " + string(conditionKind),
 		}
 	}
 

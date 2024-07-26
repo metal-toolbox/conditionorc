@@ -188,7 +188,7 @@ func (r *Routes) Routes(g *gin.RouterGroup) {
 	)
 
 	controller.GET(
-		"/condition/:conditionKind",
+		"/condition",
 		r.composeAuthHandler(readScopes("orchestratorAPI")),
 		wrapAPICall(r.conditionGet),
 	)
