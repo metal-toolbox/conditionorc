@@ -701,7 +701,7 @@ func TestConditionGet(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	surl := fmt.Sprintf("/api/v1/servers/%s/condition/%s", serverID, conditionKind)
+	surl := fmt.Sprintf("/api/v1/servers/%s/condition", serverID)
 
 	testcases := []struct {
 		name           string
@@ -712,7 +712,7 @@ func TestConditionGet(t *testing.T) {
 		{
 			name: "invalid server id",
 			request: func(t *testing.T) *http.Request {
-				request, err := http.NewRequestWithContext(context.TODO(), http.MethodGet, "/api/v1/servers/invalid-uuid/condition/"+string(conditionKind), nil)
+				request, err := http.NewRequestWithContext(context.TODO(), http.MethodGet, "/api/v1/servers/invalid-uuid/condition", nil)
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -721,20 +721,6 @@ func TestConditionGet(t *testing.T) {
 			assertResponse: func(t *testing.T, r *httptest.ResponseRecorder) {
 				assert.Equal(t, http.StatusBadRequest, r.Code)
 				assert.Contains(t, string(asBytes(t, r.Body)), "invalid server id")
-			},
-		},
-		{
-			name: "unsupported condition kind",
-			request: func(t *testing.T) *http.Request {
-				request, err := http.NewRequestWithContext(context.TODO(), http.MethodGet, fmt.Sprintf("/api/v1/servers/%s/condition/unsupported-kind", serverID), nil)
-				if err != nil {
-					t.Fatal(err)
-				}
-				return request
-			},
-			assertResponse: func(t *testing.T, r *httptest.ResponseRecorder) {
-				assert.Equal(t, http.StatusBadRequest, r.Code)
-				assert.Contains(t, string(asBytes(t, r.Body)), "unsupported condition kind")
 			},
 		},
 		{
