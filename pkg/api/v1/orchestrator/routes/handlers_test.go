@@ -344,8 +344,8 @@ func TestTaskQuery(t *testing.T) {
 		{
 			name: "repository error",
 			mockRepository: func(r *store.MockRepository) {
-				r.On("Get", mock.Anything, serverID).
-					Return(nil, errors.New("repository error")).
+				r.On("GetActiveCondition", mock.Anything, serverID).
+					Return(nil, errors.Wrap(store.ErrRepository, "cosmic rays")).
 					Once()
 			},
 			request: func(t *testing.T) *http.Request {
@@ -361,14 +361,10 @@ func TestTaskQuery(t *testing.T) {
 			},
 		},
 		{
-			name: "no matching condition found",
+			name: "no active/pending condition found",
 			mockRepository: func(r *store.MockRepository) {
-				r.On("Get", mock.Anything, serverID).
-					Return(&store.ConditionRecord{
-						Conditions: []*rctypes.Condition{
-							{Kind: rctypes.Kind("other_kind"), State: rctypes.Active},
-						},
-					}, nil).
+				r.On("GetActiveCondition", mock.Anything, serverID).
+					Return(nil, store.ErrConditionNotFound).
 					Once()
 			},
 			request: func(t *testing.T) *http.Request {
@@ -379,50 +375,27 @@ func TestTaskQuery(t *testing.T) {
 				return request
 			},
 			assertResponse: func(t *testing.T, r *httptest.ResponseRecorder) {
-				assert.Equal(t, http.StatusBadRequest, r.Code)
-				assert.Contains(t, string(asBytes(t, r.Body)), "no matching condition found in record")
-			},
-		},
-		{
-			name: "no active condition found",
-			mockRepository: func(r *store.MockRepository) {
-				r.On("Get", mock.Anything, serverID).
-					Return(&store.ConditionRecord{
-						Conditions: []*rctypes.Condition{
-							{Kind: conditionKind, State: rctypes.Succeeded},
-						},
-					}, nil).
-					Once()
-			},
-			request: func(t *testing.T) *http.Request {
-				request, err := http.NewRequestWithContext(context.TODO(), http.MethodGet, surl, http.NoBody)
-				if err != nil {
-					t.Fatal(err)
-				}
-				return request
-			},
-			assertResponse: func(t *testing.T, r *httptest.ResponseRecorder) {
-				assert.Equal(t, http.StatusBadRequest, r.Code)
-				assert.Contains(t, string(asBytes(t, r.Body)), "no active condition found in record")
+				assert.Equal(t, http.StatusNotFound, r.Code)
+				assert.Contains(t, string(asBytes(t, r.Body)), store.ErrConditionNotFound.Error())
 			},
 		},
 		{
 			name: "task KV query error",
 			mockRepository: func(r *store.MockRepository) {
-				r.On("Get", mock.Anything, serverID).
-					Return(&store.ConditionRecord{
-						Conditions: []*rctypes.Condition{
-							{ID: conditionID, Kind: conditionKind, State: rctypes.Active},
-						},
-					}, nil).
+				r.On("GetActiveCondition", mock.Anything, serverID).
+					Return(
+						&rctypes.Condition{ID: conditionID, Kind: conditionKind, State: rctypes.Active},
+						nil,
+					).
 					Once()
 			},
 			mockTaskKV: func(tk *MocktaskKV) {
 				tk.On("get", mock.Anything, conditionKind, conditionID, serverID).
-					Return(nil, fmt.Errorf("task KV query error")).
+					Return(nil, errQueryTask).
 					Once()
 			},
 			request: func(t *testing.T) *http.Request {
+				fmt.Println(surl)
 				request, err := http.NewRequestWithContext(context.TODO(), http.MethodGet, surl, http.NoBody)
 				if err != nil {
 					t.Fatal(err)
@@ -431,23 +404,22 @@ func TestTaskQuery(t *testing.T) {
 			},
 			assertResponse: func(t *testing.T, r *httptest.ResponseRecorder) {
 				assert.Equal(t, http.StatusInternalServerError, r.Code)
-				assert.Contains(t, string(asBytes(t, r.Body)), "task KV query error")
+				assert.Contains(t, string(asBytes(t, r.Body)), errQueryTask.Error())
 			},
 		},
 		{
-			name: "task ID mismatch",
+			name: "task obj stale/mismatch",
 			mockRepository: func(r *store.MockRepository) {
-				r.On("Get", mock.Anything, serverID).
-					Return(&store.ConditionRecord{
-						Conditions: []*rctypes.Condition{
-							{ID: conditionID, Kind: conditionKind, State: rctypes.Active},
-						},
-					}, nil).
+				r.On("GetActiveCondition", mock.Anything, serverID).
+					Return(
+						&rctypes.Condition{ID: conditionID, Kind: conditionKind, State: rctypes.Active},
+						nil,
+					).
 					Once()
 			},
 			mockTaskKV: func(tk *MocktaskKV) {
 				tk.On("get", mock.Anything, conditionKind, conditionID, serverID).
-					Return(&rctypes.Task[any, any]{ID: uuid.New(), Kind: conditionKind}, nil).
+					Return(nil, errStaleTask).
 					Once()
 			},
 			request: func(t *testing.T) *http.Request {
@@ -458,19 +430,18 @@ func TestTaskQuery(t *testing.T) {
 				return request
 			},
 			assertResponse: func(t *testing.T, r *httptest.ResponseRecorder) {
-				assert.Equal(t, http.StatusBadRequest, r.Code)
-				assert.Contains(t, string(asBytes(t, r.Body)), "does not match active ConditionID")
+				assert.Equal(t, http.StatusUnprocessableEntity, r.Code)
+				assert.Contains(t, string(asBytes(t, r.Body)), errStaleTask.Error())
 			},
 		},
 		{
 			name: "successful task query",
 			mockRepository: func(r *store.MockRepository) {
-				r.On("Get", mock.Anything, serverID).
-					Return(&store.ConditionRecord{
-						Conditions: []*rctypes.Condition{
-							{ID: conditionID, Kind: conditionKind, State: rctypes.Active},
-						},
-					}, nil).
+				r.On("GetActiveCondition", mock.Anything, serverID).
+					Return(
+						&rctypes.Condition{ID: conditionID, Kind: conditionKind, State: rctypes.Active},
+						nil,
+					).
 					Once()
 			},
 			mockTaskKV: func(tk *MocktaskKV) {
