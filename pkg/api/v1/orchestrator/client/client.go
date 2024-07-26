@@ -6,7 +6,6 @@ import (
 	"net/http"
 
 	"github.com/google/uuid"
-	"github.com/metal-toolbox/rivets/events/registry"
 
 	v1types "github.com/metal-toolbox/conditionorc/pkg/api/v1/orchestrator/types"
 	rctypes "github.com/metal-toolbox/rivets/condition"
@@ -75,46 +74,38 @@ func WithAuthToken(authToken string) Option {
 
 // The Queryor interface enables
 type Queryor interface {
+	// Retrieve the current in-complete condition for the serverID
+	// The returned condition is in either the Active or Pending states.
+	ConditionQuery(ctx context.Context, serverID uuid.UUID) (*v1types.ServerResponse, error)
 	// Update a Condition status
-	ConditionStatusUpdate(ctx context.Context, conditionKind rctypes.Kind, serverID, conditionID uuid.UUID, controllerID registry.ControllerID, statusValue *rctypes.StatusValue, onlyUpdateTimestamp bool) (*v1types.ServerResponse, error)
-	// Fetch a Condition from the queue
-	ConditionQueuePop(ctx context.Context, conditionKind rctypes.Kind, serverID uuid.UUID) (*v1types.ServerResponse, error)
-	// Check in controller
-	ControllerCheckin(ctx context.Context, serverID, conditionID uuid.UUID, controllerID registry.ControllerID) (*v1types.ServerResponse, error)
+	ConditionStatusUpdate(ctx context.Context, conditionKind rctypes.Kind, serverID, conditionID uuid.UUID, statusValue *rctypes.StatusValue, onlyUpdateTimestamp bool) (*v1types.ServerResponse, error)
 	// Publish Task
 	ConditionTaskPublish(ctx context.Context, conditionKind rctypes.Kind, serverID, conditionID uuid.UUID, task *rctypes.Task[any, any], onlyUpdateTimestamp bool) (*v1types.ServerResponse, error)
 	// Query task
 	ConditionTaskQuery(ctx context.Context, conditionKind rctypes.Kind, serverID uuid.UUID) (*v1types.ServerResponse, error)
 }
 
-func (c *Client) ConditionStatusUpdate(ctx context.Context, conditionKind rctypes.Kind, serverID, conditionID uuid.UUID, controllerID registry.ControllerID, statusValue *rctypes.StatusValue, onlyUpdateTimestamp bool) (*v1types.ServerResponse, error) {
+func (c *Client) ConditionQuery(ctx context.Context, serverID uuid.UUID) (*v1types.ServerResponse, error) {
+	path := fmt.Sprintf("servers/%s/condition", serverID.String())
+
+	return c.get(ctx, path)
+}
+
+func (c *Client) ConditionStatusUpdate(ctx context.Context, conditionKind rctypes.Kind, serverID, conditionID uuid.UUID, statusValue *rctypes.StatusValue, onlyUpdateTimestamp bool) (*v1types.ServerResponse, error) {
 	path := fmt.Sprintf(
-		"servers/%s/condition-status/%s/%s?controller_id=%s",
+		"servers/%s/condition-status/%s/%s",
 		serverID.String(),
 		conditionKind,
 		conditionID.String(),
-		controllerID.String(),
 	)
 
 	if onlyUpdateTimestamp {
-		path += "&ts_update=true"
+		path += "?ts_update=true"
 	} else if statusValue == nil {
 		statusValue = &rctypes.StatusValue{}
 	}
 
 	return c.put(ctx, path, statusValue)
-}
-
-func (c *Client) ConditionQueuePop(ctx context.Context, conditionKind rctypes.Kind, serverID uuid.UUID) (*v1types.ServerResponse, error) {
-	path := fmt.Sprintf("servers/%s/condition-queue/%s", serverID.String(), conditionKind)
-
-	return c.get(ctx, path)
-}
-
-func (c *Client) ControllerCheckin(ctx context.Context, serverID, conditionID uuid.UUID, controllerID registry.ControllerID) (*v1types.ServerResponse, error) {
-	path := fmt.Sprintf("servers/%s/controller-checkin/%s?controller_id=%s", serverID.String(), conditionID.String(), controllerID.String())
-
-	return c.get(ctx, path)
 }
 
 func (c *Client) ConditionTaskPublish(ctx context.Context, conditionKind rctypes.Kind, serverID, conditionID uuid.UUID, task *rctypes.Task[any, any], onlyUpdateTimestamp bool) (*v1types.ServerResponse, error) {
