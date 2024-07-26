@@ -2,6 +2,7 @@ package routes
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/google/uuid"
@@ -19,6 +20,7 @@ var (
 	errPublishTask = errors.New("error in condition task publish")
 	errNoTask      = errors.New("no task available")
 	errQueryTask   = errors.New("error in condition task query")
+	errStaleTask   = errors.New("stale task in kv")
 )
 
 type taskKV interface {
@@ -71,19 +73,15 @@ func (t *taskKVImpl) get(ctx context.Context, conditionKind rctypes.Kind, condit
 	defer span.End()
 
 	key := rctypes.TaskKVRepositoryKey(t.facilityCode, conditionKind, serverID.String())
-	currEntry, err := t.kv.Get(key)
-	if err != nil {
-		if errors.Is(err, nats.ErrKeyNotFound) {
-			t.logger.WithError(err).WithFields(logrus.Fields{
-				"serverID":     serverID,
-				"facilityCode": t.facilityCode,
-				"conditionID":  conditionID,
-				"key":          key,
-			}).Debug("Task key not found")
+	tle := t.logger.WithFields(logrus.Fields{
+		"serverID":     serverID,
+		"facilityCode": t.facilityCode,
+		"conditionID":  conditionID,
+		"key":          key,
+	})
 
-			return nil, errors.Wrap(errNoTask, err.Error())
-		}
-
+	fail := func(err error) (*rctypes.Task[any, any], error) {
+		tle.WithError(err).Warn("Task query error")
 		span.AddEvent("Task query error",
 			trace.WithAttributes(
 				attribute.String("serverID", serverID.String()),
@@ -93,16 +91,36 @@ func (t *taskKVImpl) get(ctx context.Context, conditionKind rctypes.Kind, condit
 			),
 		)
 
-		t.logger.WithError(err).WithFields(logrus.Fields{
-			"serverID":     serverID,
-			"facilityCode": t.facilityCode,
-			"conditionID":  conditionID,
-			"key":          key,
-		}).Warn("Task query error")
-		return nil, errors.Wrap(errQueryTask, err.Error())
+		return nil, err
 	}
 
-	return rctypes.TaskFromMessage(currEntry.Value())
+	currEntry, err := t.kv.Get(key)
+	if err != nil {
+		if errors.Is(err, nats.ErrKeyNotFound) {
+			return fail(errors.Wrap(errNoTask, err.Error()))
+		}
+
+		return fail(errors.Wrap(errQueryTask, err.Error()))
+	}
+
+	task, err := rctypes.TaskFromMessage(currEntry.Value())
+	if err != nil {
+		return fail(errors.Wrap(errQueryTask, err.Error()))
+	}
+
+	if task.ID != conditionID {
+		return fail(
+			errors.Wrap(errStaleTask,
+				fmt.Sprintf(
+					"active/pending ConditionID: %s does not match current TaskID: %s",
+					conditionID,
+					task.ID,
+				),
+			),
+		)
+	}
+
+	return task, nil
 }
 
 func (t *taskKVImpl) publish(

@@ -120,4 +120,10 @@ func TestTaskKV(t *testing.T) {
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), errNoTask.Error())
 	})
+
+	t.Run("Get Task returns stale entry error", func(t *testing.T) {
+		// task object in KV is considered stale if the condition ID does not match the task ID
+		_, err = taskKV.get(ctx, conditionKind, uuid.New(), serverID)
+		assert.Contains(t, err.Error(), errStaleTask.Error())
+	})
 }
