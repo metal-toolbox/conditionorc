@@ -8,11 +8,6 @@ definitions:
       createdAt:
         description: CreatedAt is when this object was created.
         type: string
-      exclusive:
-        description: |-
-          Exclusive indicates this condition holds exclusive access to the device
-          and other conditions have to wait until this is in a finalized state.
-        type: boolean
       failOnCheckpointError:
         description: |-
           Should the worker executing this condition fail if its unable to checkpoint
@@ -48,6 +43,10 @@ definitions:
         items:
           type: integer
         type: array
+      target:
+        description: Target is the identifier for the target server this Condition
+          is applicable for.
+        type: string
       updatedAt:
         description: UpdatedAt is when this object was last updated.
         type: string
@@ -129,14 +128,26 @@ definitions:
     type: object
   condition.Kind:
     enum:
-    - inventory
+    - broker
+    - broker.acquireServer
+    - broker.releaseServer
     - virtualMediaMount
     - firmwareInstall
+    - firmwareInstallInband
+    - inventory
+    - serverControl
+    - biosControl
     type: string
     x-enum-varnames:
-    - Inventory
+    - Broker
+    - BrokerAcquireServer
+    - BrokerReleaseServer
     - VirtualMediaMount
     - FirmwareInstall
+    - FirmwareInstallInband
+    - Inventory
+    - ServerControl
+    - BiosControl
   condition.State:
     enum:
     - pending
@@ -149,6 +160,25 @@ definitions:
     - Active
     - Failed
     - Succeeded
+  github_com_metal-toolbox_conditionorc_pkg_api_v1_conditions_types.ServerResponse:
+    properties:
+      message:
+        type: string
+      records:
+        $ref: '#/definitions/types.ConditionsResponse'
+      statusCode:
+        type: integer
+    type: object
+  routes.FirmwareValidationRequest:
+    properties:
+      firmware_set_id:
+        type: string
+      server_id:
+        type: string
+    required:
+    - firmware_set_id
+    - server_id
+    type: object
   types.ConditionsResponse:
     properties:
       conditions:
@@ -159,15 +189,6 @@ definitions:
         type: string
       state:
         $ref: '#/definitions/condition.State'
-    type: object
-  types.ServerResponse:
-    properties:
-      message:
-        type: string
-      records:
-        $ref: '#/definitions/types.ConditionsResponse'
-      statusCode:
-        type: integer
     type: object
 info:
   contact: {}
@@ -194,8 +215,21 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/types.ServerResponse'
+            $ref: '#/definitions/github_com_metal-toolbox_conditionorc_pkg_api_v1_conditions_types.ServerResponse'
       summary: Server Enroll
+  /serverProvision:
+    post:
+      consumes:
+      - application/json
+      description: an API to perform the server provision.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/github_com_metal-toolbox_conditionorc_pkg_api_v1_conditions_types.ServerResponse'
+      summary: Server Provision
   /servers/{uuid}:
     delete:
       description: |-
@@ -211,7 +245,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/types.ServerResponse'
+            $ref: '#/definitions/github_com_metal-toolbox_conditionorc_pkg_api_v1_conditions_types.ServerResponse'
       summary: Server Delete
   /servers/{uuid}/condition/{conditionKind}:
     post:
@@ -237,7 +271,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/types.ServerResponse'
+            $ref: '#/definitions/github_com_metal-toolbox_conditionorc_pkg_api_v1_conditions_types.ServerResponse'
       summary: Condition Create
   /servers/{uuid}/firmwareInstall:
     post:
@@ -264,7 +298,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/types.ServerResponse'
+            $ref: '#/definitions/github_com_metal-toolbox_conditionorc_pkg_api_v1_conditions_types.ServerResponse'
       summary: Firmware Install
   /servers/{uuid}/status:
     get:
@@ -284,6 +318,27 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/types.ServerResponse'
+            $ref: '#/definitions/github_com_metal-toolbox_conditionorc_pkg_api_v1_conditions_types.ServerResponse'
       summary: Condition Status
+  /validateFirmware:
+    post:
+      consumes:
+      - application/json
+      description: Initiates a firmware install, an inventory, and a firmware validation
+        in a single workflow.
+      parameters:
+      - description: 'firmware validation options: server id and firmware set id'
+        in: body
+        name: data
+        required: true
+        schema:
+          $ref: '#/definitions/routes.FirmwareValidationRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/github_com_metal-toolbox_conditionorc_pkg_api_v1_conditions_types.ServerResponse'
+      summary: Validate Firmware
 swagger: "2.0"

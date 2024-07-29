@@ -168,6 +168,11 @@ func (r *Routes) Routes(g *gin.RouterGroup) {
 			r.composeAuthHandler(createScopes("condition")),
 			wrapAPICall(r.serverConditionCreate))
 	}
+
+	// fwValidate as a group doesn't assume you know a server that you want to act on. It is in the payload
+	// in the first iteration but is not intended to be a parameter forever.
+	fwValidate := g.Group("/validateFirmware")
+	fwValidate.POST("", r.composeAuthHandler(createScopes("condition")), wrapAPICall(r.validateFirmware))
 }
 
 func createScopes(items ...string) []string {

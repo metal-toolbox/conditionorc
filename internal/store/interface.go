@@ -46,8 +46,7 @@ type Repository interface {
 	// @serverID: required
 	Get(ctx context.Context, serverID uuid.UUID) (*ConditionRecord, error)
 
-	// Get the currently active condition. If there is nothing active, return nil. Errors only
-	// when the underlying storage is unavailable
+	// Get the currently active condition. If there is nothing active, return ErrNoConditionFound.
 	// @serverID: required
 	GetActiveCondition(ctx context.Context, serverID uuid.UUID) (*rctypes.Condition, error)
 
