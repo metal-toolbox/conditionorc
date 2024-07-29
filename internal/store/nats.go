@@ -282,7 +282,7 @@ func (n *natsStore) Update(ctx context.Context, serverID uuid.UUID, updated *rct
 	le := n.log.WithFields(logrus.Fields{
 		"serverID":      serverID.String(),
 		"conditionKind": updated.Kind,
-		"conditionID":   updated.ID.String(),
+		"update.ID":     updated.ID.String(),
 	})
 
 	cr, err := n.getCurrentConditionRecord(otelCtx, serverID)
@@ -294,8 +294,8 @@ func (n *natsStore) Update(ctx context.Context, serverID uuid.UUID, updated *rct
 
 	// stupid games, stupid prizes sanity check
 	if cr.ID != updated.ID {
-		le.WithField("record.ID", cr.ID.String()).Warn("condition id mismatch")
-		return errors.Wrap(ErrRepository, "condition id mismatch")
+		le.WithField("current.ID", cr.ID.String()).Warn("condition id mismatch")
+		return errors.Wrap(ErrActiveCondition, "condition id mismatch")
 	}
 
 	// XXX: Having multiple conditions composed together into a single unit of work makes

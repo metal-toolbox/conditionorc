@@ -785,7 +785,7 @@ func (o *Orchestrator) reconcileActiveConditionRecords(ctx context.Context) {
 			"kind":           string(cond.Kind),
 		})
 
-		_, err := o.repository.Get(ctx, cond.Target)
+		lastCR, err := o.repository.Get(ctx, cond.Target)
 		if err != nil {
 			// create record if it doesn't exist
 			if errors.Is(err, store.ErrConditionNotFound) {
@@ -801,9 +801,19 @@ func (o *Orchestrator) reconcileActiveConditionRecords(ctx context.Context) {
 			continue
 		}
 
+		if lastCR.ID != cond.ID {
+			// a newer condition was queued after the failure that caused this one to need reconciliation
+			// don't do anything more here, it will only confuse things
+			le.WithField("current.ID", lastCR.ID.String()).Info("more recent condition found")
+			if delErr := status.DeleteCondition(cond.Kind, o.facility, cond.ID.String()); delErr != nil {
+				le.WithError(delErr).Warn("deleting unlinked condition")
+			}
+			continue
+		}
+
 		// update record if it exists
 		if errUpdate := o.repository.Update(ctx, cond.Target, cond); errUpdate != nil {
-			le.WithError(errUpdate).Warn("reconciler condition record create")
+			le.WithError(errUpdate).Warn("reconciler condition record update")
 		}
 		le.Info("active-condition KV condition record reconciled - updated existing record")
 	}
