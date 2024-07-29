@@ -805,6 +805,11 @@ func (o *Orchestrator) reconcileActiveConditionRecords(ctx context.Context) {
 			// a newer condition was queued after the failure that caused this one to need reconciliation
 			// don't do anything more here, it will only confuse things
 			le.WithField("current.ID", lastCR.ID.String()).Info("more recent condition found")
+			if rctypes.StateIsComplete(cond.State) {
+				if histErr := o.db.WriteEventHistory(ctx, cond); histErr != nil {
+					le.WithError(histErr).Warn("writing event history for unlinked condition")
+				}
+			}
 			if delErr := status.DeleteCondition(cond.Kind, o.facility, cond.ID.String()); delErr != nil {
 				le.WithError(delErr).Warn("deleting unlinked condition")
 			}
