@@ -180,9 +180,11 @@ func (i *fleetDBImpl) WriteEventHistory(ctx context.Context, cond *rctypes.Condi
 	}
 
 	createdTS := cond.CreatedAt
+
 	if createdTS.IsZero() {
-		le.Error("created time is zero")
-		createdTS = lastUpdate
+		errCreatedAt := errors.New("condition createdAt value is zero")
+		le.Error(errCreatedAt)
+		return errCreatedAt
 	}
 
 	evt := &fleetdbapi.Event{
