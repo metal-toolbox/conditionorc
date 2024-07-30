@@ -461,63 +461,6 @@ func TestEventNeedsReconciliation(t *testing.T) {
 	require.False(t, o.eventNeedsReconciliation(evt), "controller active")
 }
 
-func TestFilterIncompleteRecords(t *testing.T) {
-	t.Parallel()
-	winningID := uuid.MustParse("D1BCE35F-5604-4517-925A-57B5A601AC5C")
-	recs := []*store.ConditionRecord{
-		{
-			// no conditions -- skipped
-			ID:       uuid.MustParse("1E133C1F-680E-4FC4-85B8-8ADD1E9D480F"),
-			State:    rctypes.Pending,
-			Facility: "fc-13",
-		},
-		{
-			// wrong facility -- skipped
-			ID:       uuid.MustParse("F3AC3378-1FF8-47F4-BEDA-67D3DABA5E59"),
-			State:    rctypes.Active,
-			Facility: "fc-26",
-			// careful, this condition is incomplete
-			Conditions: []*rctypes.Condition{
-				{
-					ID:    uuid.MustParse("F3AC3378-1FF8-47F4-BEDA-67D3DABA5E59"),
-					Kind:  rctypes.Inventory,
-					State: rctypes.Active,
-				},
-			},
-		},
-		{
-			// finalized condition -- skipped
-			ID:       uuid.MustParse("C6DC6EE8-724C-486C-AF77-BFCFB611D593"),
-			State:    rctypes.Failed,
-			Facility: "fc-13",
-			Conditions: []*rctypes.Condition{
-				{
-					ID:    uuid.MustParse("C6DC6EE8-724C-486C-AF77-BFCFB611D593"),
-					Kind:  rctypes.Inventory,
-					State: rctypes.Failed,
-				},
-			},
-		},
-		{
-			// a winner
-			ID:       winningID,
-			State:    rctypes.Active,
-			Facility: "fc-13",
-			Conditions: []*rctypes.Condition{
-				{
-					ID:    winningID,
-					Kind:  rctypes.Inventory,
-					State: rctypes.Active,
-				},
-			},
-		},
-	}
-
-	got := filterIncompleteRecords(recs, "fc-13")
-	require.Len(t, got, 1)
-	require.Equal(t, winningID, got[0].ID)
-}
-
 func TestFilterToReconcile(t *testing.T) {
 	t.Parallel()
 
@@ -533,6 +476,8 @@ func TestFilterToReconcile(t *testing.T) {
 	createdTS := time.Now()
 	updatedTS := createdTS.Add(1 * time.Minute)
 
+	facility := "fac22"
+
 	tests := []struct {
 		name         string
 		records      []*store.ConditionRecord                 // records in active-conditions
@@ -544,8 +489,9 @@ func TestFilterToReconcile(t *testing.T) {
 			name: "pending in active-conditions and pending in status KV",
 			records: []*store.ConditionRecord{
 				{
-					ID:    cid1,
-					State: rctypes.Pending,
+					ID:       cid1,
+					State:    rctypes.Pending,
+					Facility: facility,
 					Conditions: []*rctypes.Condition{
 						{
 							ID:     cid1,
@@ -577,8 +523,9 @@ func TestFilterToReconcile(t *testing.T) {
 			name: "pending in active-conditions exceeded stale threshold and not listed in status KV",
 			records: []*store.ConditionRecord{
 				{
-					ID:    cid1,
-					State: rctypes.Pending,
+					ID:       cid1,
+					State:    rctypes.Pending,
+					Facility: facility,
 					Conditions: []*rctypes.Condition{
 						{
 							ID:     cid1,
@@ -609,17 +556,140 @@ func TestFilterToReconcile(t *testing.T) {
 						ServerID:    sid1,
 						State:       rctypes.Failed,
 						Status:      failedByReconciler,
+						CreatedAt:   createdTS.Add(-rctypes.StaleThreshold - 2*time.Minute),
 					},
 					Kind: rctypes.FirmwareInstall,
 				},
 			},
 		},
 		{
+			name: "CR with no conditions",
+			records: []*store.ConditionRecord{
+				{
+					ID:         cid1,
+					State:      rctypes.Pending,
+					Facility:   facility,
+					Conditions: []*rctypes.Condition{},
+				},
+			},
+			updateEvents: map[string]*v1types.ConditionUpdateEvent{},
+			wantCreates:  nil,
+			wantUpdates:  nil,
+		},
+		{
+			name: "facility not matched",
+			records: []*store.ConditionRecord{
+				{
+					ID:       cid1,
+					State:    rctypes.Pending,
+					Facility: "mismatch",
+					Conditions: []*rctypes.Condition{
+						{
+							ID:     cid1,
+							Kind:   rctypes.FirmwareInstall,
+							State:  rctypes.Pending,
+							Target: sid1,
+							// exceed thresholds
+							CreatedAt: createdTS,
+							UpdatedAt: updatedTS,
+						},
+						{
+							ID:        cid1,
+							Kind:      rctypes.Inventory,
+							State:     rctypes.Pending,
+							Target:    sid1,
+							CreatedAt: createdTS.Add(-rctypes.StaleThreshold + 1),
+							UpdatedAt: time.Time{},
+						},
+					},
+				},
+			},
+			updateEvents: map[string]*v1types.ConditionUpdateEvent{},
+			wantCreates:  nil,
+			wantUpdates:  nil,
+		},
+		{
+			name: "CR is in complete state",
+			records: []*store.ConditionRecord{
+				{
+					ID:       cid1,
+					State:    rctypes.Succeeded,
+					Facility: facility,
+					Conditions: []*rctypes.Condition{
+						{
+							ID:     cid1,
+							Kind:   rctypes.FirmwareInstall,
+							State:  rctypes.Pending,
+							Target: sid1,
+							// exceed thresholds
+							CreatedAt: createdTS,
+							UpdatedAt: updatedTS,
+						},
+						{
+							ID:        cid1,
+							Kind:      rctypes.Inventory,
+							State:     rctypes.Pending,
+							Target:    sid1,
+							CreatedAt: createdTS.Add(-rctypes.StaleThreshold + 1),
+							UpdatedAt: time.Time{},
+						},
+					},
+				},
+			},
+			updateEvents: map[string]*v1types.ConditionUpdateEvent{},
+			wantCreates:  nil,
+			wantUpdates:  nil,
+		},
+		{
+			name: "CR in complete state, status KV record in complete state",
+			records: []*store.ConditionRecord{
+				{
+					ID:       cid1,
+					State:    rctypes.Succeeded,
+					Facility: facility,
+					Conditions: []*rctypes.Condition{
+						{
+							ID:        cid1,
+							Kind:      rctypes.FirmwareInstall,
+							State:     rctypes.Succeeded,
+							Target:    sid1,
+							CreatedAt: createdTS,
+							UpdatedAt: updatedTS,
+						},
+						{
+							ID:        cid1,
+							Kind:      rctypes.Inventory,
+							State:     rctypes.Succeeded,
+							Target:    sid1,
+							CreatedAt: createdTS,
+							UpdatedAt: updatedTS,
+						},
+					},
+				},
+			},
+			updateEvents: map[string]*v1types.ConditionUpdateEvent{
+				sid1.String(): {
+					Kind: rctypes.Inventory,
+					ConditionUpdate: v1types.ConditionUpdate{
+						ConditionID: cid1,
+						ServerID:    sid1,
+						State:       rctypes.Succeeded,
+						Status:      []byte(`{"msg": "all done"}`),
+						UpdatedAt:   updatedTS,
+						CreatedAt:   createdTS,
+					},
+				},
+			},
+			wantCreates: nil,
+			wantUpdates: nil,
+		},
+		{
 			name: "CR in Pending state and Condition is still in queue",
 			records: []*store.ConditionRecord{
 				{
-					ID:    cid1,
-					State: rctypes.Pending,
+					ID:       cid1,
+					State:    rctypes.Pending,
+					Facility: facility,
 					Conditions: []*rctypes.Condition{
 						{
 							ID:        cid1,
@@ -648,8 +718,9 @@ func TestFilterToReconcile(t *testing.T) {
 			name: "CR in Pending state within stale threshold and not listed in status KV",
 			records: []*store.ConditionRecord{
 				{
-					ID:    cid1,
-					State: rctypes.Pending,
+					ID:       cid1,
+					State:    rctypes.Pending,
+					Facility: facility,
 					Conditions: []*rctypes.Condition{
 						{
 							ID:        cid1,
@@ -707,8 +778,9 @@ func TestFilterToReconcile(t *testing.T) {
 			records: []*store.ConditionRecord{
 				// record to be updated
 				{
-					ID:    cid1,
-					State: rctypes.Active,
+					ID:       cid1,
+					State:    rctypes.Active,
+					Facility: facility,
 					Conditions: []*rctypes.Condition{
 						{
 							ID:     cid1,
@@ -763,7 +835,7 @@ func TestFilterToReconcile(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			gotCreates, gotUpdates := filterToReconcile(tc.records, tc.updateEvents)
+			gotCreates, gotUpdates := filterToReconcile(tc.records, tc.updateEvents, facility)
 			if len(tc.wantCreates) == 0 {
 				assert.Len(t, gotCreates, 0)
 			} else {
