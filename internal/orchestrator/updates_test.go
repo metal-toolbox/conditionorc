@@ -753,6 +753,7 @@ func TestFilterToReconcile(t *testing.T) {
 						ServerID:    sid1,
 						State:       rctypes.Failed,
 						Status:      failedByReconciler,
+						CreatedAt:   createdTS.Add(-rctypes.StaleThreshold - 2*time.Minute),
 					},
 					Kind: rctypes.FirmwareInstall,
 				},

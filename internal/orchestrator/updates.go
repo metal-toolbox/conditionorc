@@ -286,6 +286,7 @@ func parseEventUpdateFromKV(ctx context.Context, kve nats.KeyValueEntry, kind rc
 			State:       convState,
 			Status:      cs.Status,
 			UpdatedAt:   cs.UpdatedAt,
+			CreatedAt:   cs.CreatedAt,
 		},
 		Kind:         kind,
 		ControllerID: controllerID,
@@ -303,6 +304,7 @@ func failedUpdateEventFromCondition(cond *rctypes.Condition) *v1types.ConditionU
 			State:       rctypes.Failed,
 			Status:      failedByReconciler,
 			UpdatedAt:   time.Now(),
+			CreatedAt:   cond.CreatedAt,
 		},
 		Kind: cond.Kind,
 	}
