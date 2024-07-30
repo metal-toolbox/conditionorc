@@ -8,6 +8,7 @@ import (
 	"github.com/google/uuid"
 	rctypes "github.com/metal-toolbox/rivets/condition"
 	"github.com/metal-toolbox/rivets/events"
+	"github.com/metal-toolbox/rivets/events/pkg/kv"
 	"github.com/nats-io/nats.go"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -49,21 +50,19 @@ type taskKVImpl struct {
 }
 
 func initTaskKVImpl(facilityCode string, l *logrus.Logger, stream events.Stream) (taskKV, error) {
-	// Note: No CreateOrBindCall is made to the bucket here,
-	// since we expect that the Orchestrator or other controllers will create this bucket
-	// before any http based controller shows up.
-	//
-	// If this trips over nats.ErrBucketNotFound, then lets add the CreateOrBind method
-	njs := stream.(*events.NatsJetstream)
+	njs, ok := stream.(*events.NatsJetstream)
+	if !ok {
+		panic("bad stream implementation")
+	}
 
-	handle, err := events.AsNatsJetStreamContext(njs).KeyValue(rctypes.TaskKVRepositoryBucket)
+	bucket, err := kv.CreateOrBindKVBucket(njs, rctypes.TaskKVRepositoryBucket, kv.WithTTL(10*24*time.Hour))
 	if err != nil {
 		return nil, err
 	}
 
 	return &taskKVImpl{
 		logger:       l,
-		kv:           handle,
+		kv:           bucket,
 		facilityCode: facilityCode,
 	}, nil
 }
