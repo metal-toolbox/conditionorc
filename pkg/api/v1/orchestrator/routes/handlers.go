@@ -92,34 +92,28 @@ func (r *Routes) conditionStatusUpdate(c *gin.Context) (int, *v1types.ServerResp
 	}
 
 	// expect condition to be in an incomplete state to accept this update.
-	cr, err := r.repository.Get(ctx, serverID)
+	cond, err := r.repository.GetActiveCondition(ctx, serverID)
 	if err != nil {
+		if errors.Is(err, store.ErrConditionNotFound) {
+			return http.StatusBadRequest, &v1types.ServerResponse{
+				Message: err.Error(),
+			}
+		}
+
 		return http.StatusInternalServerError, &v1types.ServerResponse{
 			Message: "condition lookup: " + err.Error(),
 		}
 	}
 
-	var found bool
-	var updateable bool
-	for _, cond := range cr.Conditions {
-		if cond.Kind == conditionKind {
-			found = true
-
-			if !rctypes.StateIsComplete(cond.State) {
-				updateable = true
-			}
+	if rctypes.StateIsComplete(cond.State) {
+		return http.StatusBadRequest, &v1types.ServerResponse{
+			Message: "update denied, condition in final state: " + string(cond.State),
 		}
 	}
 
-	if !found {
+	if cond.Kind != conditionKind {
 		return http.StatusBadRequest, &v1types.ServerResponse{
 			Message: "no matching condition found in record: " + string(conditionKind),
-		}
-	}
-
-	if !updateable {
-		return http.StatusBadRequest, &v1types.ServerResponse{
-			Message: "update denied, condition in final state",
 		}
 	}
 
