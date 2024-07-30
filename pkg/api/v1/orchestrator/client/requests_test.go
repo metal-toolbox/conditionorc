@@ -1,3 +1,4 @@
+// nolint
 package client
 
 import (
@@ -32,7 +33,7 @@ func TestClientDo(t *testing.T) {
 				}
 			},
 			setupRequest: func() *http.Request {
-				req, _ := http.NewRequest("GET", "https://foo/api", nil)
+				req, _ := http.NewRequest("GET", "https://foo/api", http.NoBody)
 				return req
 			},
 			mockResponse: &http.Response{
@@ -57,7 +58,7 @@ func TestClientDo(t *testing.T) {
 				}
 			},
 			setupRequest: func() *http.Request {
-				req, _ := http.NewRequest("GET", "https://foo/api", nil)
+				req, _ := http.NewRequest("GET", "https://foo/api", http.NoBody)
 				return req
 			},
 			mockError:          errors.New("network timeout"),
@@ -72,7 +73,7 @@ func TestClientDo(t *testing.T) {
 				}
 			},
 			setupRequest: func() *http.Request {
-				req, _ := http.NewRequest("GET", "https://foo/api", nil)
+				req, _ := http.NewRequest("GET", "https://foo/api", http.NoBody)
 				return req
 			},
 			mockResponse: &http.Response{
@@ -90,7 +91,7 @@ func TestClientDo(t *testing.T) {
 				}
 			},
 			setupRequest: func() *http.Request {
-				req, _ := http.NewRequest("GET", "https://foo/api", nil)
+				req, _ := http.NewRequest("GET", "https://foo/api", http.NoBody)
 				return req
 			},
 			mockResponse: &http.Response{

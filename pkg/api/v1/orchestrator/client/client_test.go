@@ -1,3 +1,4 @@
+// nolint
 package client
 
 import (
@@ -13,7 +14,6 @@ import (
 	"github.com/metal-toolbox/conditionorc/internal/store"
 	"github.com/metal-toolbox/conditionorc/pkg/api/v1/orchestrator/routes"
 
-	"github.com/metal-toolbox/rivets/events/registry"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -30,13 +30,11 @@ const (
 
 // tester holds all the mocks for easier passing around
 type tester struct {
-	mockStore              *store.MockRepository
-	mockFleetDB            *fleetdb.MockFleetDB
-	mockStream             *eventsm.MockStream
-	mockStatusValueKV      *routes.MockstatusValueKV
-	mockLivenessKV         *routes.MocklivenessKV
-	mocktaskKV             *routes.MocktaskKV
-	mockConditionJetstream *routes.MockconditionJetstream
+	mockStore         *store.MockRepository
+	mockFleetDB       *fleetdb.MockFleetDB
+	mockStream        *eventsm.MockStream
+	mockStatusValueKV *routes.MockstatusValueKV
+	mocktaskKV        *routes.MocktaskKV
 }
 
 func mockrouter(t *testing.T, mtester *tester) (*gin.Engine, error) {
@@ -51,9 +49,7 @@ func mockrouter(t *testing.T, mtester *tester) (*gin.Engine, error) {
 		routes.WithStore(mtester.mockStore),
 		routes.WithFleetDBClient(mtester.mockFleetDB),
 		routes.WithStatusKVPublisher(mtester.mockStatusValueKV),
-		routes.WithLivenessKV(mtester.mockLivenessKV),
 		routes.WithTaskKV(mtester.mocktaskKV),
-		routes.WithConditionJetstream(mtester.mockConditionJetstream),
 		routes.WithConditionDefinitions(
 			[]*rctypes.Definition{
 				{Kind: rctypes.FirmwareInstall},
@@ -82,13 +78,11 @@ func mockrouter(t *testing.T, mtester *tester) (*gin.Engine, error) {
 
 func setupMockRouter(t *testing.T) (*tester, *gin.Engine, error) {
 	mtester := &tester{
-		mockStore:              store.NewMockRepository(t),
-		mockFleetDB:            fleetdb.NewMockFleetDB(t),
-		mockStream:             eventsm.NewMockStream(t),
-		mockStatusValueKV:      routes.NewMockstatusValueKV(t),
-		mockLivenessKV:         routes.NewMocklivenessKV(t),
-		mocktaskKV:             routes.NewMocktaskKV(t),
-		mockConditionJetstream: routes.NewMockconditionJetstream(t),
+		mockStore:         store.NewMockRepository(t),
+		mockFleetDB:       fleetdb.NewMockFleetDB(t),
+		mockStream:        eventsm.NewMockStream(t),
+		mockStatusValueKV: routes.NewMockstatusValueKV(t),
+		mocktaskKV:        routes.NewMocktaskKV(t),
 	}
 
 	r, err := mockrouter(t, mtester)
@@ -98,7 +92,6 @@ func setupMockRouter(t *testing.T) (*tester, *gin.Engine, error) {
 func TestConditionStatusUpdate(t *testing.T) {
 	serverID := uuid.New()
 	conditionID := uuid.New()
-	controllerID := registry.GetID("test-controller")
 	cond := &rctypes.Condition{
 		ID:   conditionID,
 		Kind: rctypes.FirmwareInstall,
@@ -125,12 +118,14 @@ func TestConditionStatusUpdate(t *testing.T) {
 			},
 			onlyUpdateTimestamp: false,
 			mockStore: func(r *store.MockRepository) {
-				r.On("GetActiveCondition", mock.Anything, serverID).
-					Return(cond, nil).
+				r.On("Get", mock.Anything, serverID).
+					Return(&store.ConditionRecord{
+						Conditions: []*rctypes.Condition{cond},
+					}, nil).
 					Once()
 			},
 			mockKVPublisher: func(p *routes.MockstatusValueKV) {
-				p.On("publish", facility, cond.ID, controllerID, cond.Kind, mock.Anything, false, false).
+				p.On("publish", facility, cond.ID, serverID, cond.Kind, mock.Anything, false, false).
 					Return(nil).
 					Once()
 			},
@@ -146,12 +141,14 @@ func TestConditionStatusUpdate(t *testing.T) {
 			statusValue:         nil,
 			onlyUpdateTimestamp: true,
 			mockStore: func(r *store.MockRepository) {
-				r.On("GetActiveCondition", mock.Anything, serverID).
-					Return(cond, nil).
+				r.On("Get", mock.Anything, serverID).
+					Return(&store.ConditionRecord{
+						Conditions: []*rctypes.Condition{cond},
+					}, nil).
 					Once()
 			},
 			mockKVPublisher: func(p *routes.MockstatusValueKV) {
-				p.On("publish", facility, cond.ID, controllerID, cond.Kind, mock.Anything, false, true).
+				p.On("publish", facility, cond.ID, serverID, cond.Kind, mock.Anything, false, true).
 					Return(nil).
 					Once()
 			},
@@ -167,14 +164,14 @@ func TestConditionStatusUpdate(t *testing.T) {
 			statusValue:         nil,
 			onlyUpdateTimestamp: false,
 			mockStore: func(r *store.MockRepository) {
-				r.On("GetActiveCondition", mock.Anything, serverID).
-					Return(nil, nil).
+				r.On("Get", mock.Anything, serverID).
+					Return(nil, store.ErrConditionNotFound).
 					Once()
 			},
 			mockKVPublisher: nil,
 			expectResponse: func() *v1types.ServerResponse {
 				return &v1types.ServerResponse{
-					Message:    "no active condition found for server",
+					Message:    "condition lookup: condition not found",
 					StatusCode: http.StatusBadRequest,
 				}
 			},
@@ -203,7 +200,6 @@ func TestConditionStatusUpdate(t *testing.T) {
 				cond.Kind,
 				serverID,
 				conditionID,
-				controllerID,
 				tc.statusValue,
 				tc.onlyUpdateTimestamp,
 			)
@@ -212,149 +208,6 @@ func TestConditionStatusUpdate(t *testing.T) {
 			if tc.expectResponse != nil {
 				assert.Equal(t, tc.expectResponse(), got)
 			}
-		})
-	}
-}
-
-func TestConditionQueuePop(t *testing.T) {
-	serverID := uuid.New()
-	conditionID := uuid.New()
-	conditionKind := rctypes.FirmwareInstall
-	cond := &rctypes.Condition{
-		ID:   conditionID,
-		Kind: conditionKind,
-	}
-
-	mtester, server, err := setupMockRouter(t)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	testcases := []struct {
-		name                   string
-		mockStore              func(r *store.MockRepository)
-		mockConditionJetstream func(cj *routes.MockconditionJetstream)
-		mockLivenessKV         func(l *routes.MocklivenessKV)
-		mockStatusKVPublisher  func(p *routes.MockstatusValueKV)
-		mockTaskKV             func(tk *routes.MocktaskKV)
-		expectResponse         func() *v1types.ServerResponse
-	}{
-		{
-			name: "successful pop",
-			mockStore: func(r *store.MockRepository) {
-				r.On("Get", mock.Anything, serverID).
-					Return(&store.ConditionRecord{
-						Conditions: []*rctypes.Condition{cond},
-					}, nil).
-					Once()
-			},
-			mockConditionJetstream: func(cj *routes.MockconditionJetstream) {
-				cj.On("pop", mock.Anything, conditionKind, serverID).
-					Return(cond, nil).
-					Once()
-			},
-			mockLivenessKV: func(l *routes.MocklivenessKV) {
-				l.On("register", serverID.String()).
-					Return(registry.GetID("test-controller"), nil).
-					Once()
-			},
-			mockStatusKVPublisher: func(p *routes.MockstatusValueKV) {
-				p.On("publish", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, true, false).
-					Return(nil).
-					Once()
-			},
-			mockTaskKV: func(tk *routes.MocktaskKV) {
-				tk.On("publish", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, true, false).
-					Return(nil).
-					Once()
-			},
-			expectResponse: func() *v1types.ServerResponse {
-				return &v1types.ServerResponse{
-					Condition:  cond,
-					StatusCode: http.StatusOK,
-				}
-			},
-		},
-	}
-
-	for _, tc := range testcases {
-		t.Run(tc.name, func(t *testing.T) {
-			tc.mockStore(mtester.mockStore)
-			tc.mockConditionJetstream(mtester.mockConditionJetstream)
-			tc.mockLivenessKV(mtester.mockLivenessKV)
-			tc.mockStatusKVPublisher(mtester.mockStatusValueKV)
-			tc.mockTaskKV(mtester.mocktaskKV)
-
-			testServer := httptest.NewServer(server)
-			defer testServer.Close()
-
-			client := &Client{
-				serverAddress: testServer.URL,
-				client:        http.DefaultClient,
-			}
-
-			got, err := client.ConditionQueuePop(context.TODO(), conditionKind, serverID)
-
-			require.NoError(t, err)
-			assert.Equal(t, tc.expectResponse(), got)
-		})
-	}
-}
-
-func TestControllerCheckin(t *testing.T) {
-	serverID := uuid.New()
-	conditionID := uuid.New()
-	controllerID := registry.GetID("test-controller")
-
-	mtester, server, err := setupMockRouter(t)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	testcases := []struct {
-		name           string
-		mockStore      func(r *store.MockRepository)
-		mockLivenessKV func(l *routes.MocklivenessKV)
-		expectResponse func() *v1types.ServerResponse
-	}{
-		{
-			name: "successful checkin",
-			mockStore: func(r *store.MockRepository) {
-				r.On("GetActiveCondition", mock.Anything, serverID).
-					Return(&rctypes.Condition{ID: conditionID}, nil).
-					Once()
-			},
-			mockLivenessKV: func(l *routes.MocklivenessKV) {
-				l.On("checkin", controllerID).
-					Return(nil).
-					Once()
-			},
-			expectResponse: func() *v1types.ServerResponse {
-				return &v1types.ServerResponse{
-					Message:    "check-in successful",
-					StatusCode: http.StatusOK,
-				}
-			},
-		},
-	}
-
-	for _, tc := range testcases {
-		t.Run(tc.name, func(t *testing.T) {
-			tc.mockStore(mtester.mockStore)
-			tc.mockLivenessKV(mtester.mockLivenessKV)
-
-			testServer := httptest.NewServer(server)
-			defer testServer.Close()
-
-			client := &Client{
-				serverAddress: testServer.URL,
-				client:        http.DefaultClient,
-			}
-
-			got, err := client.ControllerCheckin(context.TODO(), serverID, conditionID, controllerID)
-
-			require.NoError(t, err)
-			assert.Equal(t, tc.expectResponse(), got)
 		})
 	}
 }
