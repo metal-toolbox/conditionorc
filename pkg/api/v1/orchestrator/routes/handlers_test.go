@@ -168,12 +168,11 @@ func TestConditionStatusUpdate(t *testing.T) {
 		{
 			name: "no matching condition found",
 			mockRepository: func(r *store.MockRepository) {
-				r.On("Get", mock.Anything, serverID).
-					Return(&store.ConditionRecord{
-						Conditions: []*rctypes.Condition{
-							{Kind: rctypes.Kind("other_kind"), State: rctypes.Active},
-						},
-					}, nil).
+				r.On("GetActiveCondition", mock.Anything, serverID).
+					Return(
+						&rctypes.Condition{ID: conditionID, Kind: rctypes.Kind("other_kind"), State: rctypes.Active},
+						nil,
+					).
 					Once()
 			},
 			request: func(t *testing.T) *http.Request {
@@ -193,12 +192,11 @@ func TestConditionStatusUpdate(t *testing.T) {
 		{
 			name: "condition in final state",
 			mockRepository: func(r *store.MockRepository) {
-				r.On("Get", mock.Anything, serverID).
-					Return(&store.ConditionRecord{
-						Conditions: []*rctypes.Condition{
-							{Kind: conditionKind, State: rctypes.Succeeded},
-						},
-					}, nil).
+				r.On("GetActiveCondition", mock.Anything, serverID).
+					Return(
+						&rctypes.Condition{ID: conditionID, Kind: rctypes.FirmwareInstall, State: rctypes.Succeeded},
+						nil,
+					).
 					Once()
 			},
 			request: func(t *testing.T) *http.Request {
@@ -218,12 +216,11 @@ func TestConditionStatusUpdate(t *testing.T) {
 		{
 			name: "successful update",
 			mockRepository: func(r *store.MockRepository) {
-				r.On("Get", mock.Anything, serverID).
-					Return(&store.ConditionRecord{
-						Conditions: []*rctypes.Condition{
-							{Kind: conditionKind, State: rctypes.Active},
-						},
-					}, nil).
+				r.On("GetActiveCondition", mock.Anything, serverID).
+					Return(
+						&rctypes.Condition{ID: conditionID, Kind: rctypes.FirmwareInstall, State: rctypes.Active},
+						nil,
+					).
 					Once()
 			},
 			mockKVPublisher: func(p *MockstatusValueKV) {
@@ -248,12 +245,11 @@ func TestConditionStatusUpdate(t *testing.T) {
 		{
 			name: "timestamp update only",
 			mockRepository: func(r *store.MockRepository) {
-				r.On("Get", mock.Anything, serverID).
-					Return(&store.ConditionRecord{
-						Conditions: []*rctypes.Condition{
-							{Kind: conditionKind, State: rctypes.Active},
-						},
-					}, nil).
+				r.On("GetActiveCondition", mock.Anything, serverID).
+					Return(
+						&rctypes.Condition{ID: conditionID, Kind: rctypes.FirmwareInstall, State: rctypes.Active},
+						nil,
+					).
 					Once()
 			},
 			mockKVPublisher: func(p *MockstatusValueKV) {
