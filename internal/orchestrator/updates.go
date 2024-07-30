@@ -323,30 +323,13 @@ func conditionFromUpdateEvent(evt *v1types.ConditionUpdateEvent) *rctypes.Condit
 	}
 }
 
-func filterIncompleteRecords(records []*store.ConditionRecord, facility string) []*store.ConditionRecord {
-	foundRecords := []*store.ConditionRecord{}
-
-	for _, cr := range records {
-		if len(cr.Conditions) == 0 {
-			continue
-		}
-
-		if cr.Facility != facility {
-			continue
-		}
-
-		if !rctypes.StateIsComplete(cr.State) {
-			foundRecords = append(foundRecords, cr)
-		}
-	}
-
-	return foundRecords
-}
-
 // Method returns a slice of Conditions along with a slice of ConditionUpdateEvents which
 // are to be applied to the active-condition KV.
-func filterToReconcile(records []*store.ConditionRecord, updateEvts map[string]*v1types.ConditionUpdateEvent) ([]*rctypes.Condition, []*v1types.ConditionUpdateEvent) {
-	currentCRs := map[string]struct{}{}
+func filterToReconcile(records []*store.ConditionRecord, updateEvts map[string]*v1types.ConditionUpdateEvent, facility string) ([]*rctypes.Condition, []*v1types.ConditionUpdateEvent) {
+	// active/pending CR lookup map
+	activeCRs := map[string]struct{}{}
+	// finalized CR lookup map
+	completedCRs := map[string]struct{}{}
 
 	// missing conditions in active-conditions KV to be created
 	creates := []*rctypes.Condition{}
@@ -355,7 +338,7 @@ func filterToReconcile(records []*store.ConditionRecord, updateEvts map[string]*
 	updates := []*v1types.ConditionUpdateEvent{}
 
 	stale := func(createdAt, updatedAt time.Time) bool {
-		//	// condition in queue
+		// condition in queue
 		if updatedAt.IsZero() {
 			return time.Since(createdAt) >= msgMaxAgeThreshold
 		}
@@ -369,8 +352,22 @@ func filterToReconcile(records []*store.ConditionRecord, updateEvts map[string]*
 	// - The status KV entry does not exist for the condition listed in active-condition condition
 	// - The first incomplete Condition has exceeded the stale threshold
 	for _, cr := range records {
+		if cr.Facility != facility {
+			continue
+		}
+
+		if len(cr.Conditions) == 0 {
+			continue
+		}
+
 		firstCond := cr.Conditions[0]
-		currentCRs[firstCond.Target.String()] = struct{}{}
+
+		if rctypes.StateIsComplete(cr.State) {
+			completedCRs[firstCond.Target.String()] = struct{}{}
+			continue
+		}
+
+		activeCRs[firstCond.Target.String()] = struct{}{}
 
 		_, exists := updateEvts[firstCond.Target.String()]
 		if !exists && stale(firstCond.CreatedAt, firstCond.UpdatedAt) {
@@ -381,8 +378,10 @@ func filterToReconcile(records []*store.ConditionRecord, updateEvts map[string]*
 	//  creates
 	// - The Condition Status entry has no corresponding Active Condition Record.
 	for serverID, updateEvt := range updateEvts {
-		_, exists := currentCRs[serverID]
-		if !exists {
+		_, existsActive := activeCRs[serverID]
+		_, existsComplete := completedCRs[serverID]
+
+		if !existsActive && !existsComplete {
 			creates = append(creates, conditionFromUpdateEvent(updateEvt))
 		}
 	}
@@ -391,17 +390,6 @@ func filterToReconcile(records []*store.ConditionRecord, updateEvts map[string]*
 }
 
 func (o *Orchestrator) activeConditionsToReconcile(ctx context.Context) ([]*rctypes.Condition, []*v1types.ConditionUpdateEvent) {
-	// list condition records from the active-conditions KV
-	records, err := o.repository.List(ctx)
-	if err != nil {
-		o.logger.WithError(err).Error("condition record lookup error")
-
-		return nil, nil
-	}
-
-	// filter condition Kinds and records to be reconciled
-	filteredRecords := filterIncompleteRecords(records, o.facility)
-
 	// map of serverIDs to condition updates from the status KV
 	updateEvts := map[string]*v1types.ConditionUpdateEvent{}
 
@@ -436,7 +424,15 @@ func (o *Orchestrator) activeConditionsToReconcile(ctx context.Context) ([]*rcty
 		}
 	}
 
-	return filterToReconcile(filteredRecords, updateEvts)
+	// list condition records from the active-conditions KV
+	records, err := o.repository.List(ctx)
+	if err != nil {
+		o.logger.WithError(err).Error("condition record lookup error")
+
+		return nil, nil
+	}
+
+	return filterToReconcile(records, updateEvts, o.facility)
 }
 
 func (o *Orchestrator) getEventsToReconcile(ctx context.Context) (evts []*v1types.ConditionUpdateEvent) {
