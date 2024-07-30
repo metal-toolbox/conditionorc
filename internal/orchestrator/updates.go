@@ -806,6 +806,7 @@ func (o *Orchestrator) reconcileActiveConditionRecords(ctx context.Context) {
 			if rctypes.StateIsComplete(cond.State) {
 				if histErr := o.db.WriteEventHistory(ctx, cond); histErr != nil {
 					le.WithError(histErr).Warn("writing event history for unlinked condition")
+					metrics.DependencyError("fleetdb", "update event history")
 				}
 			}
 			if delErr := status.DeleteCondition(cond.Kind, o.facility, cond.ID.String()); delErr != nil {
