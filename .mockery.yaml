@@ -1,6 +1,5 @@
 testonly: False
-with-expecter: True
-unroll-variadic: False
+unroll-variadic: True
 packages:
   github.com/metal-toolbox/conditionorc/internal/store:
     config:

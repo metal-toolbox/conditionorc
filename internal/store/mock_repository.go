@@ -27,13 +27,14 @@ func (_m *MockRepository) EXPECT() *MockRepository_Expecter {
 
 // CreateMultiple provides a mock function with given fields: ctx, serverID, facilityCode, conditions
 func (_m *MockRepository) CreateMultiple(ctx context.Context, serverID uuid.UUID, facilityCode string, conditions ...*condition.Condition) error {
-	var tmpRet mock.Arguments
-	if len(conditions) > 0 {
-		tmpRet = _m.Called(ctx, serverID, facilityCode, conditions)
-	} else {
-		tmpRet = _m.Called(ctx, serverID, facilityCode)
+	_va := make([]interface{}, len(conditions))
+	for _i := range conditions {
+		_va[_i] = conditions[_i]
 	}
-	ret := tmpRet
+	var _ca []interface{}
+	_ca = append(_ca, ctx, serverID, facilityCode)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
 
 	if len(ret) == 0 {
 		panic("no return value specified for CreateMultiple")
