@@ -296,7 +296,7 @@ func (r *Routes) taskPublish(c *gin.Context) (int, *v1types.ServerResponse) {
 	activeCond, err := r.repository.GetActiveCondition(ctx, serverID)
 	if err != nil {
 		if errors.Is(err, store.ErrConditionNotFound) {
-			return http.StatusBadRequest, &v1types.ServerResponse{
+			return http.StatusNotFound, &v1types.ServerResponse{
 				Message: err.Error(),
 			}
 		}
