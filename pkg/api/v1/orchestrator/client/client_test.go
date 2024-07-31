@@ -118,10 +118,11 @@ func TestConditionStatusUpdate(t *testing.T) {
 			},
 			onlyUpdateTimestamp: false,
 			mockStore: func(r *store.MockRepository) {
-				r.On("Get", mock.Anything, serverID).
-					Return(&store.ConditionRecord{
-						Conditions: []*rctypes.Condition{cond},
-					}, nil).
+				r.On("GetActiveCondition", mock.Anything, serverID).
+					Return(
+						&rctypes.Condition{ID: conditionID, Kind: rctypes.FirmwareInstall, State: rctypes.Active},
+						nil,
+					).
 					Once()
 			},
 			mockKVPublisher: func(p *routes.MockstatusValueKV) {
@@ -141,10 +142,11 @@ func TestConditionStatusUpdate(t *testing.T) {
 			statusValue:         nil,
 			onlyUpdateTimestamp: true,
 			mockStore: func(r *store.MockRepository) {
-				r.On("Get", mock.Anything, serverID).
-					Return(&store.ConditionRecord{
-						Conditions: []*rctypes.Condition{cond},
-					}, nil).
+				r.On("GetActiveCondition", mock.Anything, serverID).
+					Return(
+						&rctypes.Condition{ID: conditionID, Kind: rctypes.FirmwareInstall, State: rctypes.Active},
+						nil,
+					).
 					Once()
 			},
 			mockKVPublisher: func(p *routes.MockstatusValueKV) {
@@ -164,14 +166,17 @@ func TestConditionStatusUpdate(t *testing.T) {
 			statusValue:         nil,
 			onlyUpdateTimestamp: false,
 			mockStore: func(r *store.MockRepository) {
-				r.On("Get", mock.Anything, serverID).
-					Return(nil, store.ErrConditionNotFound).
+				r.On("GetActiveCondition", mock.Anything, serverID).
+					Return(
+						&rctypes.Condition{ID: conditionID, Kind: rctypes.Kind("other_kind"), State: rctypes.Active},
+						nil,
+					).
 					Once()
 			},
 			mockKVPublisher: nil,
 			expectResponse: func() *v1types.ServerResponse {
 				return &v1types.ServerResponse{
-					Message:    "condition lookup: condition not found",
+					Message:    "no matching condition found in record: firmwareInstall",
 					StatusCode: http.StatusBadRequest,
 				}
 			},
