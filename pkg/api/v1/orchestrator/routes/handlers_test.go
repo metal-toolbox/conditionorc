@@ -190,6 +190,50 @@ func TestConditionStatusUpdate(t *testing.T) {
 			},
 		},
 		{
+			name: "condition not found",
+			mockRepository: func(r *store.MockRepository) {
+				r.On("GetActiveCondition", mock.Anything, serverID).
+					Return(nil, store.ErrConditionNotFound).Once()
+			},
+			request: func(t *testing.T) *http.Request {
+				payload := `{"status": "in_progress", "message": "Updating firmware"}`
+				request, err := http.NewRequestWithContext(context.TODO(), http.MethodPut, surl, bytes.NewBufferString(payload))
+				if err != nil {
+					t.Fatal(err)
+				}
+				request.Header.Set("Content-Type", "application/json")
+				return request
+			},
+			assertResponse: func(t *testing.T, r *httptest.ResponseRecorder) {
+				assert.Equal(t, http.StatusNotFound, r.Code)
+				assert.Contains(t, string(asBytes(t, r.Body)), store.ErrConditionNotFound.Error())
+			},
+		},
+		{
+			name: "conditionID does not match",
+			mockRepository: func(r *store.MockRepository) {
+				r.On("GetActiveCondition", mock.Anything, serverID).
+					Return(
+						&rctypes.Condition{ID: uuid.New(), Kind: rctypes.FirmwareInstall, State: rctypes.Active},
+						nil,
+					).
+					Once()
+			},
+			request: func(t *testing.T) *http.Request {
+				payload := `{"status": "in_progress", "message": "Updating firmware"}`
+				request, err := http.NewRequestWithContext(context.TODO(), http.MethodPut, surl, bytes.NewBufferString(payload))
+				if err != nil {
+					t.Fatal(err)
+				}
+				request.Header.Set("Content-Type", "application/json")
+				return request
+			},
+			assertResponse: func(t *testing.T, r *httptest.ResponseRecorder) {
+				assert.Equal(t, http.StatusBadRequest, r.Code)
+				assert.Contains(t, string(asBytes(t, r.Body)), "update denied, condition ID does not match")
+			},
+		},
+		{
 			name: "condition in final state",
 			mockRepository: func(r *store.MockRepository) {
 				r.On("GetActiveCondition", mock.Anything, serverID).

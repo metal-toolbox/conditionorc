@@ -95,13 +95,24 @@ func (r *Routes) conditionStatusUpdate(c *gin.Context) (int, *v1types.ServerResp
 	cond, err := r.repository.GetActiveCondition(ctx, serverID)
 	if err != nil {
 		if errors.Is(err, store.ErrConditionNotFound) {
-			return http.StatusBadRequest, &v1types.ServerResponse{
+			return http.StatusNotFound, &v1types.ServerResponse{
 				Message: err.Error(),
 			}
 		}
 
 		return http.StatusInternalServerError, &v1types.ServerResponse{
 			Message: "condition lookup: " + err.Error(),
+		}
+	}
+
+	if cond.ID != conditionID {
+		err := errors.New("update denied, condition ID does not match")
+		r.logger.WithError(err).WithFields(
+			logrus.Fields{"current conditionID": cond.ID, "request conditionID": conditionID},
+		).Warn("incorrect condition update request")
+
+		return http.StatusBadRequest, &v1types.ServerResponse{
+			Message: err.Error(),
 		}
 	}
 
