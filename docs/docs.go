@@ -38,7 +38,27 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/types.ServerResponse"
+                            "$ref": "#/definitions/github_com_metal-toolbox_conditionorc_pkg_api_v1_conditions_types.ServerResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/serverProvision": {
+            "post": {
+                "description": "an API to perform the server provision.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "summary": "Server Provision",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_metal-toolbox_conditionorc_pkg_api_v1_conditions_types.ServerResponse"
                         }
                     }
                 }
@@ -61,7 +81,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/types.ServerResponse"
+                            "$ref": "#/definitions/github_com_metal-toolbox_conditionorc_pkg_api_v1_conditions_types.ServerResponse"
                         }
                     }
                 }
@@ -97,7 +117,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/types.ServerResponse"
+                            "$ref": "#/definitions/github_com_metal-toolbox_conditionorc_pkg_api_v1_conditions_types.ServerResponse"
                         }
                     }
                 }
@@ -135,7 +155,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/types.ServerResponse"
+                            "$ref": "#/definitions/github_com_metal-toolbox_conditionorc_pkg_api_v1_conditions_types.ServerResponse"
                         }
                     }
                 }
@@ -165,7 +185,38 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/types.ServerResponse"
+                            "$ref": "#/definitions/github_com_metal-toolbox_conditionorc_pkg_api_v1_conditions_types.ServerResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/validateFirmware": {
+            "post": {
+                "description": "Initiates a firmware install, an inventory, and a firmware validation in a single workflow.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "summary": "Validate Firmware",
+                "parameters": [
+                    {
+                        "description": "firmware validation options: server id and firmware set id",
+                        "name": "data",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/routes.FirmwareValidationRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_metal-toolbox_conditionorc_pkg_api_v1_conditions_types.ServerResponse"
                         }
                     }
                 }
@@ -183,10 +234,6 @@ const docTemplate = `{
                 "createdAt": {
                     "description": "CreatedAt is when this object was created.",
                     "type": "string"
-                },
-                "exclusive": {
-                    "description": "Exclusive indicates this condition holds exclusive access to the device\nand other conditions have to wait until this is in a finalized state.",
-                    "type": "boolean"
                 },
                 "failOnCheckpointError": {
                     "description": "Should the worker executing this condition fail if its unable to checkpoint\nthe status of work on this condition.",
@@ -233,6 +280,10 @@ const docTemplate = `{
                     "items": {
                         "type": "integer"
                     }
+                },
+                "target": {
+                    "description": "Target is the identifier for the target server this Condition is applicable for.",
+                    "type": "string"
                 },
                 "updatedAt": {
                     "description": "UpdatedAt is when this object was last updated.",
@@ -332,14 +383,26 @@ const docTemplate = `{
         "condition.Kind": {
             "type": "string",
             "enum": [
-                "inventory",
+                "broker",
+                "broker.acquireServer",
+                "broker.releaseServer",
                 "virtualMediaMount",
-                "firmwareInstall"
+                "firmwareInstall",
+                "firmwareInstallInband",
+                "inventory",
+                "serverControl",
+                "biosControl"
             ],
             "x-enum-varnames": [
-                "Inventory",
+                "Broker",
+                "BrokerAcquireServer",
+                "BrokerReleaseServer",
                 "VirtualMediaMount",
-                "FirmwareInstall"
+                "FirmwareInstall",
+                "FirmwareInstallInband",
+                "Inventory",
+                "ServerControl",
+                "BiosControl"
             ]
         },
         "condition.State": {
@@ -357,6 +420,35 @@ const docTemplate = `{
                 "Succeeded"
             ]
         },
+        "github_com_metal-toolbox_conditionorc_pkg_api_v1_conditions_types.ServerResponse": {
+            "type": "object",
+            "properties": {
+                "message": {
+                    "type": "string"
+                },
+                "records": {
+                    "$ref": "#/definitions/types.ConditionsResponse"
+                },
+                "statusCode": {
+                    "type": "integer"
+                }
+            }
+        },
+        "routes.FirmwareValidationRequest": {
+            "type": "object",
+            "required": [
+                "firmware_set_id",
+                "server_id"
+            ],
+            "properties": {
+                "firmware_set_id": {
+                    "type": "string"
+                },
+                "server_id": {
+                    "type": "string"
+                }
+            }
+        },
         "types.ConditionsResponse": {
             "type": "object",
             "properties": {
@@ -371,20 +463,6 @@ const docTemplate = `{
                 },
                 "state": {
                     "$ref": "#/definitions/condition.State"
-                }
-            }
-        },
-        "types.ServerResponse": {
-            "type": "object",
-            "properties": {
-                "message": {
-                    "type": "string"
-                },
-                "records": {
-                    "$ref": "#/definitions/types.ConditionsResponse"
-                },
-                "statusCode": {
-                    "type": "integer"
                 }
             }
         }
