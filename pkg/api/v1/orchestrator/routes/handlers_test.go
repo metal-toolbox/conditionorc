@@ -578,7 +578,7 @@ func TestTaskPublish(t *testing.T) {
 				return request
 			},
 			assertResponse: func(t *testing.T, r *httptest.ResponseRecorder) {
-				assert.Equal(t, http.StatusBadRequest, r.Code)
+				assert.Equal(t, http.StatusNotFound, r.Code)
 				assert.Contains(t, string(asBytes(t, r.Body)), "expected an active condition: condition not found")
 			},
 		},
