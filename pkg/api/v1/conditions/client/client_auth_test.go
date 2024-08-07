@@ -24,8 +24,8 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"go.hollow.sh/toolbox/ginjwt"
-	"gopkg.in/square/go-jose.v2"
-	"gopkg.in/square/go-jose.v2/jwt"
+	"gopkg.in/go-jose/go-jose.v2"
+	"gopkg.in/go-jose/go-jose.v2/jwt"
 
 	v1types "github.com/metal-toolbox/conditionorc/pkg/api/v1/conditions/types"
 	rctypes "github.com/metal-toolbox/rivets/condition"
