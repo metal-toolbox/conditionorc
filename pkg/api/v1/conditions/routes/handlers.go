@@ -398,6 +398,18 @@ func (r *Routes) firmwareInstallComposite(serverID uuid.UUID, fwtp rctypes.Firmw
 				State:      rctypes.Pending,
 				CreatedAt:  createTime,
 			},
+			{
+				Kind:       rctypes.BrokerAcquireServer,
+				Version:    rctypes.ConditionStructVersion,
+				Parameters: rctypes.NewBrokerTaskParameters(
+					serverID,
+					rctypes.AcquireServer,
+					rctypes.PurposeFirmwareInstall,
+					"Marked for firmware install",
+				).MustMarshal(),
+				State:      rctypes.Pending,
+				CreatedAt:  createTime,
+			},
 		},
 	}
 }
