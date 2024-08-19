@@ -958,26 +958,27 @@ func TestConditionListenersExit(t *testing.T) {
 }
 
 func TestQueueFollowingCondition(t *testing.T) {
+	serverID := uuid.New()
 	t.Run("no following work", func(t *testing.T) {
 		condID := uuid.New()
 		repo := store.NewMockRepository(t)
-		repo.On("GetActiveCondition", mock.Anything, condID).Return(nil, store.ErrConditionNotFound).Once()
+		repo.On("GetActiveCondition", mock.Anything, serverID).Return(nil, store.ErrConditionNotFound).Once()
 		o := &Orchestrator{
 			logger:     logger,
 			repository: repo,
 		}
-		condArg := &rctypes.Condition{ID: condID}
+		condArg := &rctypes.Condition{ID: condID, Target: serverID}
 		require.NoError(t, o.queueFollowingCondition(context.TODO(), condArg))
 	})
 	t.Run("lookup error", func(t *testing.T) {
 		condID := uuid.New()
 		repo := store.NewMockRepository(t)
-		repo.On("GetActiveCondition", mock.Anything, condID).Return(nil, errors.New("pound sand")).Once()
+		repo.On("GetActiveCondition", mock.Anything, serverID).Return(nil, errors.New("pound sand")).Once()
 		o := &Orchestrator{
 			logger:     logger,
 			repository: repo,
 		}
-		condArg := &rctypes.Condition{ID: condID}
+		condArg := &rctypes.Condition{ID: condID, Target: serverID}
 		err := o.queueFollowingCondition(context.TODO(), condArg)
 		require.Error(t, err)
 		require.ErrorIs(t, err, errCompleteEvent)
@@ -988,11 +989,11 @@ func TestQueueFollowingCondition(t *testing.T) {
 		next := &rctypes.Condition{
 			ID:     condID,
 			Kind:   rctypes.Kind("following-kind"),
-			Target: uuid.New(),
+			Target: serverID,
 			State:  rctypes.Pending,
 		}
-		condArg := &rctypes.Condition{ID: condID}
-		repo.On("GetActiveCondition", mock.Anything, condID).Return(next, nil).Once()
+		condArg := &rctypes.Condition{ID: condID, Target: serverID}
+		repo.On("GetActiveCondition", mock.Anything, serverID).Return(next, nil).Once()
 		stream := eventsm.NewMockStream(t)
 		subject := "fc-13.servers.following-kind"
 		stream.On("Publish", mock.Anything, subject, mock.Anything).Return(errors.New("pound sand")).Once()
@@ -1012,11 +1013,11 @@ func TestQueueFollowingCondition(t *testing.T) {
 		next := &rctypes.Condition{
 			ID:     condID,
 			Kind:   rctypes.Kind("following-kind"),
-			Target: uuid.New(),
+			Target: serverID,
 			State:  rctypes.Active,
 		}
-		condArg := &rctypes.Condition{ID: condID}
-		repo.On("GetActiveCondition", mock.Anything, condID).Return(next, nil).Once()
+		condArg := &rctypes.Condition{ID: condID, Target: serverID}
+		repo.On("GetActiveCondition", mock.Anything, serverID).Return(next, nil).Once()
 		o := &Orchestrator{
 			logger:     logger,
 			repository: repo,
@@ -1030,11 +1031,11 @@ func TestQueueFollowingCondition(t *testing.T) {
 		next := &rctypes.Condition{
 			ID:     condID,
 			Kind:   rctypes.Kind("following-kind"),
-			Target: uuid.New(),
+			Target: serverID,
 			State:  rctypes.Pending,
 		}
-		condArg := &rctypes.Condition{ID: condID}
-		repo.On("GetActiveCondition", mock.Anything, condID).Return(next, nil).Once()
+		condArg := &rctypes.Condition{ID: condID, Target: serverID}
+		repo.On("GetActiveCondition", mock.Anything, serverID).Return(next, nil).Once()
 		stream := eventsm.NewMockStream(t)
 		subject := "fc-13.servers.following-kind"
 		stream.On("Publish", mock.Anything, subject, mock.Anything).Return(nil).Once()
