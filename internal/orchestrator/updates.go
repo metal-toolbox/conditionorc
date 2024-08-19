@@ -606,7 +606,7 @@ func (o *Orchestrator) finalizeCondition(ctx context.Context, cond *rctypes.Cond
 
 // Queue up follow on conditions
 func (o *Orchestrator) queueFollowingCondition(ctx context.Context, cond *rctypes.Condition) error {
-	active, err := o.repository.GetActiveCondition(ctx, cond.ID)
+	active, err := o.repository.GetActiveCondition(ctx, cond.Target)
 	if err != nil && errors.Is(err, store.ErrConditionNotFound) {
 		// nothing more to do
 		return nil
