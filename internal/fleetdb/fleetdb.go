@@ -39,14 +39,15 @@ type serverCreateStatus struct {
 
 var (
 	// connectionTimeout is the maximum amount of time spent on each http connection to FleetDBClient.
-	connectionTimeout = 30 * time.Second
-	pkgName           = "internal/fleetdb"
-	errServerLookup   = errors.New("unable to retrieve server")
-	ErrServerNotFound = errors.New("server not found")
-	errIncomplete     = errors.New("condition is still active")
+	connectionTimeout      = 30 * time.Second
+	pkgName                = "internal/fleetdb"
+	errServerLookup        = errors.New("unable to retrieve server")
+	ErrServerNotFound      = errors.New("server not found")
+	ErrFirmwareSetNotFound = errors.New("firmware set not found")
+	errIncomplete          = errors.New("condition is still active")
 )
 
-func serverServiceError(operation string) {
+func fleetdbAPIError(operation string) {
 	metrics.DependencyError("serverservice", operation)
 }
 
@@ -136,7 +137,7 @@ func (s *fleetDBImpl) GetServer(ctx context.Context, serverID uuid.UUID) (*model
 			"method":   "GetServer",
 		}).Warn("error reaching fleetDB")
 
-		serverServiceError("get-server")
+		fleetdbAPIError("get-server")
 
 		return nil, errors.Wrap(errServerLookup, err.Error())
 	}
@@ -207,4 +208,30 @@ func (i *fleetDBImpl) WriteEventHistory(ctx context.Context, cond *rctypes.Condi
 		le.WithError(err).Warn("updating event history")
 	}
 	return err
+}
+
+// Retrieve a firmware set by its identifier
+func (s *fleetDBImpl) FirmwareSetByID(ctx context.Context, id uuid.UUID) (*fleetdbapi.ComponentFirmwareSet, error) {
+	otelCtx, span := otel.Tracer(pkgName).Start(ctx, "FleetDB.FirmwareSetByID")
+	defer span.End()
+
+	errFirmwareSetIDLookup := errors.New("error in firmware set ID lookup")
+	obj, _, err := s.client.GetServerComponentFirmwareSet(otelCtx, id)
+	if err != nil {
+		if strings.Contains(err.Error(), "404") {
+			return nil, ErrFirmwareSetNotFound
+		}
+
+		s.logger.WithFields(logrus.Fields{
+			"setID":  id.String(),
+			"error":  err,
+			"method": "FirmwareSetByID",
+		}).Warn("FleetDB API query error")
+
+		fleetdbAPIError("get-firmware-set-id")
+
+		return nil, errors.Wrap(errFirmwareSetIDLookup, err.Error())
+	}
+
+	return obj, nil
 }

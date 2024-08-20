@@ -323,6 +323,14 @@ func (n *natsStore) Update(ctx context.Context, serverID uuid.UUID, updated *rct
 	// XXX: is there a better way to OR 3 mostly independent conditions
 	switch {
 	case cr.State == rctypes.Pending, updated.State == rctypes.Failed, lastCondition:
+		le.WithFields(
+			logrus.Fields{
+				"current.State": cr.State,
+				"updated.State": updated.State,
+				"lastCondition": lastCondition,
+			},
+		).Trace("Condition record state update")
+
 		cr.State = updated.State
 	default:
 	}

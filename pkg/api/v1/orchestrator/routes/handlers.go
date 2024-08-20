@@ -17,9 +17,8 @@ import (
 )
 
 var (
-	errPublishStatus    = errors.New("error in condition status publish")
-	errUnmarshalKey     = errors.New("error unmarshal key, value for update")
-	errServerIDMismatch = errors.New("condition serverID mismatch error")
+	errPublishStatus = errors.New("error in condition status publish")
+	errUnmarshalKey  = errors.New("error unmarshal key, value for update")
 )
 
 func (r *Routes) conditionKindValid(kind rctypes.Kind) bool {
@@ -132,10 +131,8 @@ func (r *Routes) conditionStatusUpdate(c *gin.Context) (int, *v1types.ServerResp
 	if err := r.statusValueKV.publish(
 		r.facilityCode,
 		conditionID,
-		serverID,
 		conditionKind,
 		&statusValue,
-		false,
 		onlyTimestampUpdate,
 	); err != nil {
 		return http.StatusInternalServerError, &v1types.ServerResponse{
@@ -319,7 +316,6 @@ func (r *Routes) taskPublish(c *gin.Context) (int, *v1types.ServerResponse) {
 		conditionID.String(),
 		conditionKind,
 		&task,
-		false,
 		onlyTimestampUpdate,
 	); err != nil {
 		return http.StatusInternalServerError, &v1types.ServerResponse{

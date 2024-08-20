@@ -72,7 +72,7 @@ func TestTaskKV(t *testing.T) {
 		}
 
 		// Publish task
-		err := taskKV.publish(ctx, serverID.String(), conditionID.String(), conditionKind, task, true, false)
+		err := taskKV.publish(ctx, serverID.String(), conditionID.String(), conditionKind, task, true)
 		require.NoError(t, err)
 
 		// Get task
@@ -92,7 +92,7 @@ func TestTaskKV(t *testing.T) {
 			State: rctypes.Pending,
 		}
 
-		err := taskKV.publish(ctx, serverID.String(), conditionID.String(), conditionKind, updatedTask, false, false)
+		err := taskKV.publish(ctx, serverID.String(), conditionID.String(), conditionKind, updatedTask, false)
 		require.NoError(t, err)
 
 		retrievedTask, err := taskKV.get(ctx, conditionKind, conditionID, serverID)
@@ -104,7 +104,7 @@ func TestTaskKV(t *testing.T) {
 
 	t.Run("Update Timestamp Only", func(t *testing.T) {
 		time.Sleep(time.Millisecond) // some buffer before we publish the ts update
-		err := taskKV.publish(ctx, serverID.String(), conditionID.String(), conditionKind, nil, false, true)
+		err := taskKV.publish(ctx, serverID.String(), conditionID.String(), conditionKind, nil, true)
 		require.NoError(t, err)
 
 		retrievedTask, err := taskKV.get(ctx, conditionKind, conditionID, serverID)

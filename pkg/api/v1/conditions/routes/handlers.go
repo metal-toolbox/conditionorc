@@ -20,6 +20,7 @@ import (
 	"github.com/metal-toolbox/conditionorc/internal/metrics"
 	"github.com/metal-toolbox/conditionorc/internal/store"
 	v1types "github.com/metal-toolbox/conditionorc/pkg/api/v1/conditions/types"
+	fleetdbapi "github.com/metal-toolbox/fleetdb/pkg/api/v1"
 	rctypes "github.com/metal-toolbox/rivets/condition"
 )
 
@@ -324,8 +325,8 @@ func (r *Routes) firmwareInstall(c *gin.Context) (int, *v1types.ServerResponse) 
 		}
 	}
 
-	var fw rctypes.FirmwareInstallTaskParameters
-	if err = c.ShouldBindJSON(&fw); err != nil {
+	var fwtp rctypes.FirmwareInstallTaskParameters
+	if err = c.ShouldBindJSON(&fwtp); err != nil {
 		r.logger.WithError(err).Warn("unmarshal firmwareInstall payload")
 
 		return http.StatusBadRequest, &v1types.ServerResponse{
@@ -333,7 +334,25 @@ func (r *Routes) firmwareInstall(c *gin.Context) (int, *v1types.ServerResponse) 
 		}
 	}
 
-	serverConditions := r.firmwareInstallComposite(serverID, fw)
+	if fwtp.FirmwareSetID == uuid.Nil {
+		msg := "invalid firmware-set ID"
+		r.logger.Warn(msg)
+
+		return http.StatusBadRequest, &v1types.ServerResponse{
+			Message: msg,
+		}
+	}
+
+	fwset, err := r.fleetDBClient.FirmwareSetByID(otelCtx, fwtp.FirmwareSetID)
+	if err != nil {
+		msg := "firmware set query: " + err.Error()
+		r.logger.Warn(msg)
+		return http.StatusInternalServerError, &v1types.ServerResponse{
+			Message: msg,
+		}
+	}
+
+	serverConditions := r.firmwareInstallComposite(otelCtx, serverID, fwtp, fwset)
 	if err = r.repository.CreateMultiple(otelCtx, serverID, facilityCode, serverConditions.Conditions...); err != nil {
 		if errors.Is(err, store.ErrActiveCondition) {
 			return http.StatusConflict, &v1types.ServerResponse{
@@ -379,27 +398,59 @@ func (r *Routes) firmwareInstall(c *gin.Context) (int, *v1types.ServerResponse) 
 	}
 }
 
-func (r *Routes) firmwareInstallComposite(serverID uuid.UUID, fwtp rctypes.FirmwareInstallTaskParameters) *rctypes.ServerConditions {
+func (r *Routes) firmwareInstallComposite(
+	ctx context.Context,
+	serverID uuid.UUID,
+	fwtp rctypes.FirmwareInstallTaskParameters,
+	fwset *fleetdbapi.ComponentFirmwareSet,
+) *rctypes.ServerConditions {
 	createTime := time.Now()
-	return &rctypes.ServerConditions{
-		ServerID: serverID,
-		Conditions: []*rctypes.Condition{
-			{
-				Kind:       rctypes.FirmwareInstall,
-				Version:    rctypes.ConditionStructVersion,
-				Parameters: fwtp.MustJSON(),
-				State:      rctypes.Pending,
-				CreatedAt:  createTime,
-			},
-			{
-				Kind:       rctypes.Inventory,
-				Version:    rctypes.ConditionStructVersion,
-				Parameters: rctypes.MustDefaultInventoryJSON(serverID),
-				State:      rctypes.Pending,
-				CreatedAt:  createTime,
-			},
-		},
+
+	// conditions
+	inband := &rctypes.Condition{
+		Kind:       rctypes.FirmwareInstallInband,
+		Version:    rctypes.ConditionStructVersion,
+		Parameters: fwtp.MustJSON(),
+		State:      rctypes.Pending,
+		CreatedAt:  createTime,
 	}
+
+	//	oob := &rctypes.Condition{
+	//		Kind:       rctypes.FirmwareInstall,
+	//		Version:    rctypes.ConditionStructVersion,
+	//		Parameters: fwtp.MustJSON(),
+	//		State:      rctypes.Pending,
+	//		CreatedAt:  createTime,
+	//	}
+
+	inv := &rctypes.Condition{
+		Kind:       rctypes.Inventory,
+		Version:    rctypes.ConditionStructVersion,
+		Parameters: rctypes.MustDefaultInventoryJSON(serverID),
+		State:      rctypes.Pending,
+		CreatedAt:  createTime,
+	}
+
+	// returned obj
+	sc := &rctypes.ServerConditions{
+		ServerID:   serverID,
+		Conditions: []*rctypes.Condition{},
+	}
+
+	var requireInband bool
+	for _, fw := range fwset.ComponentFirmware {
+		if fw.InstallInband != nil && *fw.InstallInband {
+			requireInband = true
+		}
+	}
+
+	if requireInband {
+		sc.Conditions = append(sc.Conditions, inband, inv)
+	}
+
+	//sc.Conditions = append(sc.Conditions, oob, inv)
+
+	return sc
 }
 
 func (r *Routes) conditionCreate(otelCtx context.Context, newCondition *rctypes.Condition, serverID uuid.UUID, facilityCode string) (int, *v1types.ServerResponse) {

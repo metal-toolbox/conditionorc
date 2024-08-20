@@ -37,7 +37,6 @@ type taskKV interface {
 		conditionID string,
 		conditionKind rctypes.Kind,
 		task *rctypes.Task[any, any],
-		create,
 		onlyTimestamp bool,
 	) error
 }
@@ -128,7 +127,6 @@ func (t *taskKVImpl) publish(
 	conditionID string,
 	conditionKind rctypes.Kind,
 	task *rctypes.Task[any, any],
-	create,
 	onlyTimestamp bool,
 ) error {
 	_, span := otel.Tracer(pkgName).Start(
@@ -160,7 +158,7 @@ func (t *taskKVImpl) publish(
 	}
 
 	// create
-	if create {
+	create := func() error {
 		task.CreatedAt = time.Now()
 		taskJSON, errMarshal := task.Marshal()
 		if errMarshal != nil {
@@ -179,15 +177,17 @@ func (t *taskKVImpl) publish(
 			"taskID":       conditionID,
 			"rev":          rev,
 			"key":          key,
-			"create":       create,
-		}).Trace("Task create published")
+		}).Trace("Task record created")
 
 		return nil
 	}
 
-	// update
 	curr, err := t.kv.Get(key)
-	if err != nil && !errors.Is(err, nats.ErrKeyNotFound) {
+	if err != nil {
+		if errors.Is(err, nats.ErrKeyNotFound) {
+			return create()
+		}
+
 		return failed(err)
 	}
 
@@ -199,6 +199,15 @@ func (t *taskKVImpl) publish(
 	if onlyTimestamp {
 		currTask.UpdatedAt = time.Now()
 	} else {
+		// clear old task entry
+		if rctypes.StateIsComplete(currTask.State) || time.Since(currTask.UpdatedAt) > rctypes.StaleThreshold {
+			if err := t.kv.Delete(key); err != nil {
+				return errors.Wrap(errPublishTask, err.Error())
+			}
+
+			return create()
+		}
+
 		if errUpdate := currTask.Update(task); errUpdate != nil {
 			return failed(errUpdate)
 		}
@@ -220,7 +229,7 @@ func (t *taskKVImpl) publish(
 		"rev":          curr.Revision(),
 		"key":          key,
 		"create":       create,
-	}).Trace("Task update published")
+	}).Trace("Task record updated")
 
 	return nil
 }
