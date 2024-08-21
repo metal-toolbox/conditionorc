@@ -7,6 +7,8 @@ import (
 
 	condition "github.com/metal-toolbox/rivets/condition"
 
+	fleetdbapi "github.com/metal-toolbox/fleetdb/pkg/api/v1"
+
 	mock "github.com/stretchr/testify/mock"
 
 	model "github.com/metal-toolbox/conditionorc/internal/model"
@@ -133,6 +135,65 @@ func (_c *MockFleetDB_DeleteServer_Call) Return(_a0 error) *MockFleetDB_DeleteSe
 }
 
 func (_c *MockFleetDB_DeleteServer_Call) RunAndReturn(run func(context.Context, uuid.UUID) error) *MockFleetDB_DeleteServer_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// FirmwareSetByID provides a mock function with given fields: ctx, setID
+func (_m *MockFleetDB) FirmwareSetByID(ctx context.Context, setID uuid.UUID) (*fleetdbapi.ComponentFirmwareSet, error) {
+	ret := _m.Called(ctx, setID)
+
+	if len(ret) == 0 {
+		panic("no return value specified for FirmwareSetByID")
+	}
+
+	var r0 *fleetdbapi.ComponentFirmwareSet
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, uuid.UUID) (*fleetdbapi.ComponentFirmwareSet, error)); ok {
+		return rf(ctx, setID)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, uuid.UUID) *fleetdbapi.ComponentFirmwareSet); ok {
+		r0 = rf(ctx, setID)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*fleetdbapi.ComponentFirmwareSet)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, uuid.UUID) error); ok {
+		r1 = rf(ctx, setID)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockFleetDB_FirmwareSetByID_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'FirmwareSetByID'
+type MockFleetDB_FirmwareSetByID_Call struct {
+	*mock.Call
+}
+
+// FirmwareSetByID is a helper method to define mock.On call
+//   - ctx context.Context
+//   - setID uuid.UUID
+func (_e *MockFleetDB_Expecter) FirmwareSetByID(ctx interface{}, setID interface{}) *MockFleetDB_FirmwareSetByID_Call {
+	return &MockFleetDB_FirmwareSetByID_Call{Call: _e.mock.On("FirmwareSetByID", ctx, setID)}
+}
+
+func (_c *MockFleetDB_FirmwareSetByID_Call) Run(run func(ctx context.Context, setID uuid.UUID)) *MockFleetDB_FirmwareSetByID_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(uuid.UUID))
+	})
+	return _c
+}
+
+func (_c *MockFleetDB_FirmwareSetByID_Call) Return(_a0 *fleetdbapi.ComponentFirmwareSet, _a1 error) *MockFleetDB_FirmwareSetByID_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockFleetDB_FirmwareSetByID_Call) RunAndReturn(run func(context.Context, uuid.UUID) (*fleetdbapi.ComponentFirmwareSet, error)) *MockFleetDB_FirmwareSetByID_Call {
 	_c.Call.Return(run)
 	return _c
 }
