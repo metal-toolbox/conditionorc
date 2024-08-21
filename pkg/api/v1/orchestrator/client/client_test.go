@@ -249,7 +249,7 @@ func TestConditionTaskPublish(t *testing.T) {
 					Once()
 			},
 			mockTaskKV: func(tk *routes.MocktaskKV) {
-				tk.On("publish", mock.Anything, serverID.String(), conditionID.String(), conditionKind, mock.IsType(&rctypes.Task[any, any]{}), false, false).
+				tk.On("publish", mock.Anything, serverID.String(), conditionID.String(), conditionKind, mock.IsType(&rctypes.Task[any, any]{}), false).
 					Return(nil).
 					Once()
 			},
@@ -270,7 +270,7 @@ func TestConditionTaskPublish(t *testing.T) {
 					Once()
 			},
 			mockTaskKV: func(tk *routes.MocktaskKV) {
-				tk.On("publish", mock.Anything, serverID.String(), conditionID.String(), conditionKind, mock.IsType(&rctypes.Task[any, any]{}), false, true).
+				tk.On("publish", mock.Anything, serverID.String(), conditionID.String(), conditionKind, mock.IsType(&rctypes.Task[any, any]{}), true).
 					Return(nil).
 					Once()
 			},
