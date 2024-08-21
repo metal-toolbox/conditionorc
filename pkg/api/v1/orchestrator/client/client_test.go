@@ -126,7 +126,7 @@ func TestConditionStatusUpdate(t *testing.T) {
 					Once()
 			},
 			mockKVPublisher: func(p *routes.MockstatusValueKV) {
-				p.On("publish", facility, cond.ID, serverID, cond.Kind, mock.Anything, false, false).
+				p.On("publish", facility, cond.ID, cond.Kind, mock.Anything, false).
 					Return(nil).
 					Once()
 			},
@@ -150,7 +150,7 @@ func TestConditionStatusUpdate(t *testing.T) {
 					Once()
 			},
 			mockKVPublisher: func(p *routes.MockstatusValueKV) {
-				p.On("publish", facility, cond.ID, serverID, cond.Kind, mock.Anything, false, true).
+				p.On("publish", facility, cond.ID, cond.Kind, mock.Anything, true).
 					Return(nil).
 					Once()
 			},
