@@ -15,11 +15,9 @@ import (
 type statusValueKV interface {
 	publish(
 		facilityCode string,
-		conditionID,
-		serverID uuid.UUID,
+		conditionID uuid.UUID,
 		conditionKind rctypes.Kind,
 		newSV *rctypes.StatusValue,
-		create,
 		onlyTimestamp bool,
 	) error
 }
@@ -33,11 +31,9 @@ func initStatusValueKV() statusValueKV {
 
 func (s *statusValue) publish(
 	facilityCode string,
-	conditionID,
-	serverID uuid.UUID,
+	conditionID uuid.UUID,
 	conditionKind rctypes.Kind,
 	newSV *rctypes.StatusValue,
-	create,
 	onlyTimestamp bool,
 ) error {
 	statusKV, err := status.GetConditionKV(conditionKind)
@@ -46,8 +42,9 @@ func (s *statusValue) publish(
 	}
 
 	key := rctypes.StatusValueKVKey(facilityCode, conditionID.String())
-	// create
-	if create {
+	currEntry, err := statusKV.Get(key)
+
+	create := func() error {
 		newSV.CreatedAt = time.Now()
 		if _, errCreate := statusKV.Create(key, newSV.MustBytes()); errCreate != nil {
 			return errors.Wrap(errPublishStatus, errCreate.Error())
@@ -56,9 +53,11 @@ func (s *statusValue) publish(
 		return nil
 	}
 
-	// update
-	currEntry, err := statusKV.Get(key)
-	if err != nil && !errors.Is(err, nats.ErrKeyNotFound) {
+	if err != nil {
+		if errors.Is(err, nats.ErrKeyNotFound) {
+			return create()
+		}
+
 		return errors.Wrap(errPublishStatus, err.Error())
 	}
 
@@ -68,10 +67,6 @@ func (s *statusValue) publish(
 		curSV := &rctypes.StatusValue{}
 		if errJSON := json.Unmarshal(currEntry.Value(), &curSV); errJSON != nil {
 			return errors.Wrap(errUnmarshalKey, errJSON.Error())
-		}
-
-		if curSV.WorkerID != serverID.String() {
-			return errors.Wrap(errServerIDMismatch, curSV.WorkerID)
 		}
 
 		publishSV = curSV
