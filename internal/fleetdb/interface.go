@@ -30,6 +30,8 @@ type FleetDB interface {
 	DeleteServer(ctx context.Context, serverID uuid.UUID) error
 	// WriteEventHistory commits the final state of this Condition to FleetDB
 	WriteEventHistory(ctx context.Context, cond *rctypes.Condition) error
+	// FirmwareSetByID returns the firmware set matched by its identifier
+	FirmwareSetByID(ctx context.Context, setID uuid.UUID) (*fleetdbapi.ComponentFirmwareSet, error)
 }
 
 func NewFleetDBClient(ctx context.Context, config *app.Configuration, conditionDefs rctypes.Definitions,
