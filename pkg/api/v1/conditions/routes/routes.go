@@ -115,15 +115,18 @@ func NewRoutes(options ...Option) (*Routes, error) {
 		opt(routes)
 	}
 
-	supported := []string{}
-
 	if routes.repository == nil {
 		return nil, errors.Wrap(ErrStore, "no store repository defined")
 	}
 
+	supported := []string{}
+	for _, def := range routes.conditionDefinitions {
+		supported = append(supported, string(def.Kind))
+	}
+
 	routes.logger.Debug(
 		"routes initialized with support for conditions: ",
-		strings.Join(supported, ","),
+		strings.Join(supported, ", "),
 	)
 
 	return routes, nil
