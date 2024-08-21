@@ -15,6 +15,7 @@ import (
 	"github.com/metal-toolbox/conditionorc/internal/fleetdb"
 	"github.com/metal-toolbox/conditionorc/internal/model"
 	"github.com/metal-toolbox/conditionorc/internal/server"
+	fleetdbapi "github.com/metal-toolbox/fleetdb/pkg/api/v1"
 
 	"github.com/metal-toolbox/conditionorc/internal/store"
 	"github.com/sirupsen/logrus"
@@ -322,22 +323,50 @@ func TestConditionCreate(t *testing.T) {
 func TestFirmwareInstall(t *testing.T) {
 	serverID := uuid.New()
 
+	inband := true
+	inbandfw := fleetdbapi.ComponentFirmwareVersion{
+		Vendor:        "foobar",
+		Model:         []string{"bar"},
+		Version:       "0.0",
+		InstallInband: &inband,
+	}
+
+	oobfw := fleetdbapi.ComponentFirmwareVersion{
+		Vendor:  "foo",
+		Model:   []string{"bar"},
+		Version: "0.0",
+	}
+
+	fwset := &fleetdbapi.ComponentFirmwareSet{
+		UUID:              uuid.New(),
+		ComponentFirmware: []fleetdbapi.ComponentFirmwareVersion{},
+	}
+
 	testcases := []struct {
 		name                string
 		payload             *rctypes.FirmwareInstallTaskParameters
 		mockStore           func(r *store.MockRepository)
+		mockFleetDB         func(r *fleetdb.MockFleetDB)
 		expectResponse      func() *v1types.ServerResponse
 		expectErrorContains string
 		expectPublish       bool
+		inbandInstall       bool
 	}{
 		{
 			name: "success case",
 			payload: &rctypes.FirmwareInstallTaskParameters{
-				AssetID: serverID,
+				AssetID:       serverID,
+				FirmwareSetID: fwset.UUID,
 			},
 			mockStore: func(r *store.MockRepository) {
 				r.On("CreateMultiple", mock.Anything, serverID, "facility", mock.Anything, mock.Anything).
 					Return(nil).Once()
+
+			},
+			mockFleetDB: func(r *fleetdb.MockFleetDB) {
+				fwset.ComponentFirmware = append(fwset.ComponentFirmware, oobfw)
+				r.On("FirmwareSetByID", mock.Anything, mock.Anything).
+					Return(fwset, nil).Once()
 			},
 			expectResponse: func() *v1types.ServerResponse {
 				return &v1types.ServerResponse{
@@ -349,9 +378,39 @@ func TestFirmwareInstall(t *testing.T) {
 			expectPublish:       true,
 		},
 		{
-			name: "400 response",
+			name: "success case - inband install",
 			payload: &rctypes.FirmwareInstallTaskParameters{
-				AssetID: serverID,
+				AssetID:       serverID,
+				FirmwareSetID: fwset.UUID,
+			},
+			mockStore: func(r *store.MockRepository) {
+				r.On("CreateMultiple", mock.Anything, serverID, "facility", mock.Anything, mock.Anything).
+					Return(nil).Once()
+			},
+			mockFleetDB: func(r *fleetdb.MockFleetDB) {
+				fwset.ComponentFirmware = append(fwset.ComponentFirmware, inbandfw, oobfw)
+				r.On("FirmwareSetByID", mock.Anything, mock.Anything).
+					Return(fwset, nil).Once()
+			},
+			expectResponse: func() *v1types.ServerResponse {
+				return &v1types.ServerResponse{
+					StatusCode: 200,
+					Message:    "firmware install scheduled",
+				}
+			},
+			expectErrorContains: "",
+			expectPublish:       true,
+		},
+		{
+			name: "409 response",
+			payload: &rctypes.FirmwareInstallTaskParameters{
+				AssetID:       serverID,
+				FirmwareSetID: fwset.UUID,
+			},
+			mockFleetDB: func(r *fleetdb.MockFleetDB) {
+				fwset.ComponentFirmware = append(fwset.ComponentFirmware, oobfw)
+				r.On("FirmwareSetByID", mock.Anything, mock.Anything).
+					Return(fwset, nil).Once()
 			},
 			mockStore: func(r *store.MockRepository) {
 				r.On("CreateMultiple", mock.Anything, serverID, "facility", mock.Anything, mock.Anything).
@@ -374,6 +433,10 @@ func TestFirmwareInstall(t *testing.T) {
 
 			if tc.mockStore != nil {
 				tc.mockStore(tester.repository)
+			}
+
+			if tc.mockFleetDB != nil {
+				tc.mockFleetDB(tester.fleetDB)
 			}
 
 			tester.fleetDB.On("GetServer", mock.Anything, mock.Anything).Return(&model.Server{FacilityCode: "facility"}, nil).Times(1)
