@@ -72,7 +72,7 @@ func TestTaskKV(t *testing.T) {
 		}
 
 		// Publish task
-		err := taskKV.publish(ctx, serverID.String(), conditionID.String(), conditionKind, task, true, false)
+		err := taskKV.publish(ctx, serverID.String(), conditionID.String(), conditionKind, task, true)
 		require.NoError(t, err)
 
 		// Get task
@@ -87,12 +87,13 @@ func TestTaskKV(t *testing.T) {
 
 	t.Run("Update Existing Task", func(t *testing.T) {
 		updatedTask := &rctypes.Task[any, any]{
-			ID:    conditionID,
-			Kind:  conditionKind,
-			State: rctypes.Pending,
+			ID:        conditionID,
+			Kind:      conditionKind,
+			State:     rctypes.Pending,
+			UpdatedAt: time.Now(),
 		}
 
-		err := taskKV.publish(ctx, serverID.String(), conditionID.String(), conditionKind, updatedTask, false, false)
+		err := taskKV.publish(ctx, serverID.String(), conditionID.String(), conditionKind, updatedTask, false)
 		require.NoError(t, err)
 
 		retrievedTask, err := taskKV.get(ctx, conditionKind, conditionID, serverID)
@@ -104,7 +105,7 @@ func TestTaskKV(t *testing.T) {
 
 	t.Run("Update Timestamp Only", func(t *testing.T) {
 		time.Sleep(time.Millisecond) // some buffer before we publish the ts update
-		err := taskKV.publish(ctx, serverID.String(), conditionID.String(), conditionKind, nil, false, true)
+		err := taskKV.publish(ctx, serverID.String(), conditionID.String(), conditionKind, nil, true)
 		require.NoError(t, err)
 
 		retrievedTask, err := taskKV.get(ctx, conditionKind, conditionID, serverID)
@@ -112,6 +113,42 @@ func TestTaskKV(t *testing.T) {
 
 		assert.Equal(t, rctypes.Pending, retrievedTask.State)
 		assert.True(t, retrievedTask.UpdatedAt.After(retrievedTask.CreatedAt))
+	})
+
+	t.Run("Update Existing Task - purge finalized", func(t *testing.T) {
+		updatedTask := &rctypes.Task[any, any]{
+			ID:        conditionID,
+			Kind:      conditionKind,
+			State:     rctypes.Succeeded,
+			UpdatedAt: time.Now(),
+		}
+
+		err := taskKV.publish(ctx, serverID.String(), conditionID.String(), conditionKind, updatedTask, false)
+		require.NoError(t, err)
+
+		retrievedTask, err := taskKV.get(ctx, conditionKind, conditionID, serverID)
+		require.NoError(t, err)
+
+		assert.Equal(t, updatedTask.State, retrievedTask.State)
+		assert.True(t, retrievedTask.UpdatedAt.After(retrievedTask.CreatedAt))
+	})
+
+	t.Run("Update Existing Task - purge stale", func(t *testing.T) {
+		updatedTask := &rctypes.Task[any, any]{
+			ID:        conditionID,
+			Kind:      conditionKind,
+			State:     rctypes.Succeeded,
+			UpdatedAt: time.Now().Add(-rctypes.StaleThreshold + 1),
+		}
+
+		err := taskKV.publish(ctx, serverID.String(), conditionID.String(), conditionKind, updatedTask, false)
+		require.NoError(t, err)
+
+		retrievedTask, err := taskKV.get(ctx, conditionKind, conditionID, serverID)
+		require.NoError(t, err)
+
+		assert.Equal(t, updatedTask.State, retrievedTask.State)
+		assert.False(t, retrievedTask.CreatedAt.IsZero())
 	})
 
 	t.Run("Get Non-existent Task", func(t *testing.T) {

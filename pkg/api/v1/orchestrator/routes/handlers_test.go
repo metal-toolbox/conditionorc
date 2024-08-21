@@ -612,7 +612,7 @@ func TestTaskPublish(t *testing.T) {
 					Once()
 			},
 			mockTaskKV: func(tk *MocktaskKV) {
-				tk.On("publish", mock.Anything, serverID.String(), conditionID.String(), conditionKind, mock.IsType(&rctypes.Task[any, any]{}), false, false).
+				tk.On("publish", mock.Anything, serverID.String(), conditionID.String(), conditionKind, mock.IsType(&rctypes.Task[any, any]{}), false).
 					Return(nil).
 					Once()
 			},
@@ -639,7 +639,7 @@ func TestTaskPublish(t *testing.T) {
 					Once()
 			},
 			mockTaskKV: func(tk *MocktaskKV) {
-				tk.On("publish", mock.Anything, serverID.String(), conditionID.String(), conditionKind, mock.IsType(&rctypes.Task[any, any]{ID: conditionID}), false, true).
+				tk.On("publish", mock.Anything, serverID.String(), conditionID.String(), conditionKind, mock.IsType(&rctypes.Task[any, any]{ID: conditionID}), true).
 					Return(nil).
 					Once()
 			},
@@ -664,7 +664,7 @@ func TestTaskPublish(t *testing.T) {
 					Once()
 			},
 			mockTaskKV: func(tk *MocktaskKV) {
-				tk.On("publish", mock.Anything, serverID.String(), conditionID.String(), conditionKind, mock.IsType(&rctypes.Task[any, any]{}), false, false).
+				tk.On("publish", mock.Anything, serverID.String(), conditionID.String(), conditionKind, mock.IsType(&rctypes.Task[any, any]{}), false).
 					Return(fmt.Errorf("task KV publish error")).
 					Once()
 			},

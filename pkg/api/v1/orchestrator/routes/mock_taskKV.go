@@ -86,17 +86,17 @@ func (_c *MocktaskKV_get_Call) RunAndReturn(run func(context.Context, condition.
 	return _c
 }
 
-// publish provides a mock function with given fields: ctx, serverID, conditionID, conditionKind, task, create, onlyTimestamp
-func (_m *MocktaskKV) publish(ctx context.Context, serverID string, conditionID string, conditionKind condition.Kind, task *condition.Task[interface{}, interface{}], create bool, onlyTimestamp bool) error {
-	ret := _m.Called(ctx, serverID, conditionID, conditionKind, task, create, onlyTimestamp)
+// publish provides a mock function with given fields: ctx, serverID, conditionID, conditionKind, task, onlyTimestamp
+func (_m *MocktaskKV) publish(ctx context.Context, serverID string, conditionID string, conditionKind condition.Kind, task *condition.Task[interface{}, interface{}], onlyTimestamp bool) error {
+	ret := _m.Called(ctx, serverID, conditionID, conditionKind, task, onlyTimestamp)
 
 	if len(ret) == 0 {
 		panic("no return value specified for publish")
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, string, condition.Kind, *condition.Task[interface{}, interface{}], bool, bool) error); ok {
-		r0 = rf(ctx, serverID, conditionID, conditionKind, task, create, onlyTimestamp)
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, condition.Kind, *condition.Task[interface{}, interface{}], bool) error); ok {
+		r0 = rf(ctx, serverID, conditionID, conditionKind, task, onlyTimestamp)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -115,15 +115,14 @@ type MocktaskKV_publish_Call struct {
 //   - conditionID string
 //   - conditionKind condition.Kind
 //   - task *condition.Task[interface{},interface{}]
-//   - create bool
 //   - onlyTimestamp bool
-func (_e *MocktaskKV_Expecter) publish(ctx interface{}, serverID interface{}, conditionID interface{}, conditionKind interface{}, task interface{}, create interface{}, onlyTimestamp interface{}) *MocktaskKV_publish_Call {
-	return &MocktaskKV_publish_Call{Call: _e.mock.On("publish", ctx, serverID, conditionID, conditionKind, task, create, onlyTimestamp)}
+func (_e *MocktaskKV_Expecter) publish(ctx interface{}, serverID interface{}, conditionID interface{}, conditionKind interface{}, task interface{}, onlyTimestamp interface{}) *MocktaskKV_publish_Call {
+	return &MocktaskKV_publish_Call{Call: _e.mock.On("publish", ctx, serverID, conditionID, conditionKind, task, onlyTimestamp)}
 }
 
-func (_c *MocktaskKV_publish_Call) Run(run func(ctx context.Context, serverID string, conditionID string, conditionKind condition.Kind, task *condition.Task[interface{}, interface{}], create bool, onlyTimestamp bool)) *MocktaskKV_publish_Call {
+func (_c *MocktaskKV_publish_Call) Run(run func(ctx context.Context, serverID string, conditionID string, conditionKind condition.Kind, task *condition.Task[interface{}, interface{}], onlyTimestamp bool)) *MocktaskKV_publish_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string), args[2].(string), args[3].(condition.Kind), args[4].(*condition.Task[interface{}, interface{}]), args[5].(bool), args[6].(bool))
+		run(args[0].(context.Context), args[1].(string), args[2].(string), args[3].(condition.Kind), args[4].(*condition.Task[interface{}, interface{}]), args[5].(bool))
 	})
 	return _c
 }
@@ -133,7 +132,7 @@ func (_c *MocktaskKV_publish_Call) Return(_a0 error) *MocktaskKV_publish_Call {
 	return _c
 }
 
-func (_c *MocktaskKV_publish_Call) RunAndReturn(run func(context.Context, string, string, condition.Kind, *condition.Task[interface{}, interface{}], bool, bool) error) *MocktaskKV_publish_Call {
+func (_c *MocktaskKV_publish_Call) RunAndReturn(run func(context.Context, string, string, condition.Kind, *condition.Task[interface{}, interface{}], bool) error) *MocktaskKV_publish_Call {
 	_c.Call.Return(run)
 	return _c
 }
