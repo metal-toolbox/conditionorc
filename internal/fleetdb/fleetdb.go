@@ -48,7 +48,7 @@ var (
 )
 
 func fleetdbAPIError(operation string) {
-	metrics.DependencyError("serverservice", operation)
+	metrics.DependencyError("fleetdbapi", operation)
 }
 
 // AddServer creates a server record in FleetDB
@@ -218,7 +218,8 @@ func (s *fleetDBImpl) FirmwareSetByID(ctx context.Context, id uuid.UUID) (*fleet
 	errFirmwareSetIDLookup := errors.New("error in firmware set ID lookup")
 	obj, _, err := s.client.GetServerComponentFirmwareSet(otelCtx, id)
 	if err != nil {
-		if strings.Contains(err.Error(), "404") {
+		se := &fleetdbapi.ServerError{}
+		if errors.As(err, se) && se.StatusCode == 404 {
 			return nil, ErrFirmwareSetNotFound
 		}
 
