@@ -406,6 +406,32 @@ func (r *Routes) firmwareInstallComposite(
 ) *rctypes.ServerConditions {
 	createTime := time.Now()
 
+	booleanIsTrue := func(b *bool) bool {
+		return b != nil && *b
+	}
+
+	// Firmwares from the set are copied into the firmwares slice
+	// which saves the controller from having to query it from fleetdb API.
+	//
+	// nolint:gocritic // because this is easier to read as is
+	for _, fw := range fwset.ComponentFirmware {
+		fwtp.Firmwares = append(
+			fwtp.Firmwares,
+			rctypes.Firmware{
+				ID:            fw.UUID.String(),
+				Vendor:        fw.Vendor,
+				FileName:      fw.Filename,
+				Version:       fw.Version,
+				URL:           fw.RepositoryURL,
+				Component:     fw.Component,
+				Checksum:      fw.Checksum,
+				Models:        fw.Model,
+				InstallInband: booleanIsTrue(fw.InstallInband),
+				Oem:           booleanIsTrue(fw.OEM),
+			},
+		)
+	}
+
 	// install inband
 	inband := &rctypes.Condition{
 		Kind:       rctypes.FirmwareInstallInband,
@@ -452,10 +478,6 @@ func (r *Routes) firmwareInstallComposite(
 	sc := &rctypes.ServerConditions{
 		ServerID:   serverID,
 		Conditions: []*rctypes.Condition{},
-	}
-
-	booleanIsTrue := func(b *bool) bool {
-		return b != nil && *b
 	}
 
 	// under feature flag until this is confirmed to be working as expected
