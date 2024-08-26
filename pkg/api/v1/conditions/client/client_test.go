@@ -229,7 +229,7 @@ func TestConditionCreate(t *testing.T) {
 				).Once()
 
 				r.On(
-					"CreateMultiple",
+					"Create",
 					mock.Anything,
 					serverID,
 					mock.Anything,
@@ -359,7 +359,7 @@ func TestFirmwareInstall(t *testing.T) {
 				FirmwareSetID: fwset.UUID,
 			},
 			mockStore: func(r *store.MockRepository) {
-				r.On("CreateMultiple", mock.Anything, serverID, "facility", mock.Anything, mock.Anything).
+				r.On("Create", mock.Anything, serverID, "facility", mock.Anything, mock.Anything).
 					Return(nil).Once()
 
 			},
@@ -384,7 +384,7 @@ func TestFirmwareInstall(t *testing.T) {
 				FirmwareSetID: fwset.UUID,
 			},
 			mockStore: func(r *store.MockRepository) {
-				r.On("CreateMultiple", mock.Anything, serverID, "facility", mock.Anything, mock.Anything).
+				r.On("Create", mock.Anything, serverID, "facility", mock.Anything, mock.Anything).
 					Return(nil).Once()
 			},
 			mockFleetDB: func(r *fleetdb.MockFleetDB) {
@@ -413,7 +413,7 @@ func TestFirmwareInstall(t *testing.T) {
 					Return(fwset, nil).Once()
 			},
 			mockStore: func(r *store.MockRepository) {
-				r.On("CreateMultiple", mock.Anything, serverID, "facility", mock.Anything, mock.Anything).
+				r.On("Create", mock.Anything, serverID, "facility", mock.Anything, mock.Anything).
 					Return(fmt.Errorf("%w:%s", store.ErrActiveCondition, "pound sand")).Once()
 			},
 			expectResponse: func() *v1types.ServerResponse {
@@ -520,7 +520,7 @@ func TestServerEnroll(t *testing.T) {
 			},
 			mockStore: func(r *store.MockRepository) {
 				// expect valid payload
-				r.On("CreateMultiple",
+				r.On("Create",
 					mock.Anything,
 					serverID,
 					mock.Anything,
@@ -664,7 +664,7 @@ func TestServerEnrollEmptyUUID(t *testing.T) {
 		Return(rollback, nil).
 		Once()
 
-	tester.repository.On("CreateMultiple",
+	tester.repository.On("Create",
 		mock.Anything,
 		mock.Anything,
 		mock.Anything,

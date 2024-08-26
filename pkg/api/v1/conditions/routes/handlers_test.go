@@ -134,7 +134,7 @@ func TestAddServer(t *testing.T) {
 			// mock repository
 			mockStore: func(r *store.MockRepository) {
 				// create condition query
-				r.On("CreateMultiple", mock.Anything, mockServerID, mockFacilityCode, mock.Anything).
+				r.On("Create", mock.Anything, mockServerID, mockFacilityCode, mock.Anything).
 					Return(nil).
 					Run(func(args mock.Arguments) {
 						c := args.Get(3).(*rctypes.Condition)
@@ -270,7 +270,7 @@ func TestAddServer(t *testing.T) {
 			// mock repository
 			mockStore: func(r *store.MockRepository) {
 				// create condition query
-				r.On("CreateMultiple", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+				r.On("Create", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 					Return(nil).
 					Run(func(args mock.Arguments) {
 						id := args.Get(1).(uuid.UUID)
@@ -603,7 +603,7 @@ func TestAddServerRollback(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			rollbackCallCounter = 0
 			if tc.mockStoreCreateErr.calledTime > 0 {
-				repository.On("CreateMultiple", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+				repository.On("Create", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 					Return(tc.mockStoreCreateErr.err).
 					Times(tc.mockStoreCreateErr.calledTime)
 			}
@@ -746,7 +746,7 @@ func TestServerConditionCreate(t *testing.T) {
 				r.On("GetActiveCondition", mock.Anything, serverID).
 					Return(nil, nil).
 					Once()
-				r.On("CreateMultiple", mock.Anything, serverID, facilityCode, mock.IsType(&rctypes.Condition{})).
+				r.On("Create", mock.Anything, serverID, facilityCode, mock.IsType(&rctypes.Condition{})).
 					Run(func(args mock.Arguments) {
 						c := args.Get(3).(*rctypes.Condition)
 						assert.Equal(t, rctypes.ConditionStructVersion, c.Version, "condition version mismatch")
@@ -798,7 +798,7 @@ func TestServerConditionCreate(t *testing.T) {
 					Return(nil, nil).
 					Once()
 
-				create := r.On("CreateMultiple", mock.Anything, serverID, facilityCode, mock.IsType(&rctypes.Condition{})).
+				create := r.On("Create", mock.Anything, serverID, facilityCode, mock.IsType(&rctypes.Condition{})).
 					Run(func(args mock.Arguments) {
 						c := args.Get(3).(*rctypes.Condition)
 						expect := &rctypes.Fault{Panic: true, DelayDuration: "10s", FailAt: "foobar"}
@@ -881,7 +881,7 @@ func TestServerConditionCreate(t *testing.T) {
 				r.On("GetActiveCondition", mock.Anything, serverID).
 					Return(nil, nil).
 					Once()
-				r.On("CreateMultiple", mock.Anything, serverID, facilityCode, mock.IsType(&rctypes.Condition{})).
+				r.On("Create", mock.Anything, serverID, facilityCode, mock.IsType(&rctypes.Condition{})).
 					Run(func(args mock.Arguments) {
 						c := args.Get(3).(*rctypes.Condition)
 						assert.Equal(t, rctypes.ConditionStructVersion, c.Version, "condition version mismatch")

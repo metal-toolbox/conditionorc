@@ -110,7 +110,7 @@ func TestCreateReadUpdate(t *testing.T) {
 	require.Nil(t, active)
 
 	// add a condition
-	err = store.CreateMultiple(context.TODO(), serverID, "fc-13", condition)
+	err = store.Create(context.TODO(), serverID, "fc-13", condition)
 	require.NoError(t, err)
 
 	active, err = store.GetActiveCondition(context.TODO(), serverID)
@@ -147,7 +147,7 @@ func TestCreateReadUpdate(t *testing.T) {
 }
 
 // Given a conditionRecord with multiple conditions, walk through some common
-// scenarios around CreateMultiple/Update/Get/GetActive
+// scenarios around Create/Update/Get/GetActive
 func TestMultipleConditionUpdate(t *testing.T) {
 	t.Parallel()
 
@@ -161,20 +161,20 @@ func TestMultipleConditionUpdate(t *testing.T) {
 	t.Run("create multiple sanity checks", func(t *testing.T) {
 		serverID := uuid.New()
 
-		err := store.CreateMultiple(context.TODO(), serverID, facility)
+		err := store.Create(context.TODO(), serverID, facility)
 		require.NoError(t, err, "created multiple with nil work")
 
 		work := []*rctypes.Condition{
-			&rctypes.Condition{
+			{
 				Kind:  rctypes.Kind("first"),
 				State: rctypes.Pending,
 			},
 		}
 
-		err = store.CreateMultiple(context.TODO(), serverID, facility, work...)
+		err = store.Create(context.TODO(), serverID, facility, work...)
 		require.NoError(t, err, "created multiple on idle server with work")
 
-		err = store.CreateMultiple(context.TODO(), serverID, facility, work...)
+		err = store.Create(context.TODO(), serverID, facility, work...)
 		require.ErrorIs(t, err, ErrActiveCondition, "created multiple on busy server with work")
 
 	})
@@ -193,8 +193,8 @@ func TestMultipleConditionUpdate(t *testing.T) {
 			second,
 		}
 
-		err := store.CreateMultiple(context.TODO(), serverID, facility, work...)
-		require.NoError(t, err, "CreateMultiple")
+		err := store.Create(context.TODO(), serverID, facility, work...)
+		require.NoError(t, err, "Create")
 
 		active, err := store.GetActiveCondition(context.TODO(), serverID)
 		require.NoError(t, err, "GetActiveCondition I")
@@ -243,8 +243,8 @@ func TestMultipleConditionUpdate(t *testing.T) {
 			second,
 		}
 
-		err := store.CreateMultiple(context.TODO(), serverID, facility, work...)
-		require.NoError(t, err, "CreateMultiple")
+		err := store.Create(context.TODO(), serverID, facility, work...)
+		require.NoError(t, err, "Create")
 
 		active, err := store.GetActiveCondition(context.TODO(), serverID)
 		require.NoError(t, err, "GetActiveCondition I")

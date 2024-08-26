@@ -50,10 +50,10 @@ type Repository interface {
 	// @serverID: required
 	GetActiveCondition(ctx context.Context, serverID uuid.UUID) (*rctypes.Condition, error)
 
-	// Create a condition record that encapsulates a unit of work encompassing multiple conditions
+	// Create a condition record that encapsulates a unit of work, which can encompass one or many conditions.
 	// If you create a condition record with 0 conditions, you don't actually create anything, but
 	// no error is returned.
-	CreateMultiple(ctx context.Context, serverID uuid.UUID, facilityCode string, conditions ...*rctypes.Condition) error
+	Create(ctx context.Context, serverID uuid.UUID, facilityCode string, conditions ...*rctypes.Condition) error
 
 	// Update a condition on a server
 	// @serverID: required

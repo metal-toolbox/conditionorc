@@ -99,8 +99,8 @@ func (r *Routes) validateFirmware(c *gin.Context) (int, *v1types.ServerResponse)
 
 	conds := firmwareValidationConditions(fvr)
 	// XXX: This is lifted from the firmwareInstall api code. Consider abstracting a utility method for
-	// CreateMultiple and publishCondition.
-	if err = r.repository.CreateMultiple(otelCtx, fvr.ServerID, facilityCode, conds.Conditions...); err != nil {
+	// Create and publishCondition.
+	if err = r.repository.Create(otelCtx, fvr.ServerID, facilityCode, conds.Conditions...); err != nil {
 		if errors.Is(err, store.ErrActiveCondition) {
 			return http.StatusConflict, &v1types.ServerResponse{
 				Message: err.Error(),

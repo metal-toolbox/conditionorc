@@ -325,7 +325,7 @@ func TestActiveConditionsToReconcile_Creates(t *testing.T) {
 
 			ctx := context.Background()
 			for _, cond := range tc.conditions {
-				err := o.repository.CreateMultiple(ctx, cond.Target, o.facility, cond)
+				err := o.repository.Create(ctx, cond.Target, o.facility, cond)
 				require.NoError(t, err)
 			}
 
@@ -379,7 +379,7 @@ func TestActiveConditionsToReconcile_Updates(t *testing.T) {
 	// active-conditions handle
 	acKV := newCleanActiveConditionsKV(t)
 
-	if err := o.repository.CreateMultiple(ctx, sid, o.facility, fwcond, invcond); err != nil {
+	if err := o.repository.Create(ctx, sid, o.facility, fwcond, invcond); err != nil {
 		t.Fatal(err)
 	}
 
