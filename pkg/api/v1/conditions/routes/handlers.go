@@ -354,7 +354,7 @@ func (r *Routes) firmwareInstall(c *gin.Context) (int, *v1types.ServerResponse) 
 	}
 
 	serverConditions := r.firmwareInstallComposite(serverID, fwtp, fwset)
-	if err = r.repository.CreateMultiple(otelCtx, serverID, facilityCode, serverConditions.Conditions...); err != nil {
+	if err = r.repository.Create(otelCtx, serverID, facilityCode, serverConditions.Conditions...); err != nil {
 		if errors.Is(err, store.ErrActiveCondition) {
 			return http.StatusConflict, &v1types.ServerResponse{
 				Message: err.Error(),
@@ -501,7 +501,7 @@ func (r *Routes) firmwareInstallComposite(
 
 func (r *Routes) conditionCreate(otelCtx context.Context, newCondition *rctypes.Condition, serverID uuid.UUID, facilityCode string) (int, *v1types.ServerResponse) {
 	// Create the new condition
-	err := r.repository.CreateMultiple(otelCtx, serverID, facilityCode, newCondition)
+	err := r.repository.Create(otelCtx, serverID, facilityCode, newCondition)
 	if err != nil {
 		r.logger.WithError(err).Info("condition create failed")
 

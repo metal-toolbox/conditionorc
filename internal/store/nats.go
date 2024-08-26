@@ -182,49 +182,14 @@ func (n *natsStore) GetActiveCondition(ctx context.Context, serverID uuid.UUID) 
 	return active, nil
 }
 
-// Create a condition on a server.
-// @id: required
-// @condition: required
-//
-// Note: it is up to the caller to validate the condition payload and to check
-// any existing condition before creating.
-func (n *natsStore) Create(ctx context.Context, serverID uuid.UUID, condition *rctypes.Condition) error {
-	_, span := otel.Tracer(pkgName).Start(ctx, "NatsStore.Create")
-	defer span.End()
-
-	le := n.log.WithFields(logrus.Fields{
-		"serverID":      serverID.String(),
-		"conditionKind": condition.Kind,
-		"conditionID":   condition.ID.String(),
-	})
-
-	state := rctypes.Pending
-	if condition.State != state {
-		state = condition.State
-	}
-
-	cr := ConditionRecord{
-		ID:    condition.ID,
-		State: state,
-		Conditions: []*rctypes.Condition{
-			condition,
-		},
-	}
-
-	_, err := n.bucket.Put(serverID.String(), cr.MustJSON())
-	if err != nil {
-		natsError("create")
-		span.RecordError(err)
-		le.WithError(err).Warn("writing condition to storage")
-	}
-	return err
-}
-
-// CreateMultiple crafts a condition-record that is comprised of multiple individual conditions. Unlike Create
+// Create one or more conditions on a server to define a unit of work to be done on a server.
 // it checks for an existing, active ConditionRecord prior to queuing the new one, and will return an error if
 // it finds one.
-func (n *natsStore) CreateMultiple(ctx context.Context, serverID uuid.UUID, facilityCode string, work ...*rctypes.Condition) error {
-	otelCtx, span := otel.Tracer(pkgName).Start(ctx, "NatsStore.CreateMultiple")
+// @serverID: required
+// @facilityCode: required
+// @work: optional
+func (n *natsStore) Create(ctx context.Context, serverID uuid.UUID, facilityCode string, work ...*rctypes.Condition) error {
+	otelCtx, span := otel.Tracer(pkgName).Start(ctx, "NatsStore.Create")
 	defer span.End()
 
 	le := n.log.WithFields(logrus.Fields{
