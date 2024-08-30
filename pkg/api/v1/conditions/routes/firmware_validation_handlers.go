@@ -41,6 +41,7 @@ func firmwareValidationConditions(fvr FirmwareValidationRequest) *rctypes.Server
 		AssetID:                 fvr.ServerID,
 		Action:                  rctypes.ValidateFirmware,
 		ValidateFirmwareTimeout: 30 * time.Minute,
+		ValidateFirmwareID:      fvr.FirmwareSetID,
 	}
 
 	return &rctypes.ServerConditions{
