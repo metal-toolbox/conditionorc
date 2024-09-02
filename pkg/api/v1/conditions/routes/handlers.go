@@ -14,6 +14,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/sirupsen/logrus"
+	"go.hollow.sh/toolbox/ginjwt"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
@@ -353,7 +354,7 @@ func (r *Routes) firmwareInstall(c *gin.Context) (int, *v1types.ServerResponse) 
 		}
 	}
 
-	serverConditions := r.firmwareInstallComposite(serverID, fwtp, fwset)
+	serverConditions := r.firmwareInstallComposite(otelCtx, serverID, ginjwt.GetUser(c), fwtp, fwset)
 	if err = r.repository.Create(otelCtx, serverID, facilityCode, serverConditions.Conditions...); err != nil {
 		if errors.Is(err, store.ErrActiveCondition) {
 			return http.StatusConflict, &v1types.ServerResponse{
@@ -400,7 +401,9 @@ func (r *Routes) firmwareInstall(c *gin.Context) (int, *v1types.ServerResponse) 
 }
 
 func (r *Routes) firmwareInstallComposite(
+	ctx context.Context,
 	serverID uuid.UUID,
+	clientID string,
 	fwtp rctypes.FirmwareInstallTaskParameters,
 	fwset *fleetdbapi.ComponentFirmwareSet,
 ) *rctypes.ServerConditions {
@@ -409,6 +412,9 @@ func (r *Routes) firmwareInstallComposite(
 	booleanIsTrue := func(b *bool) bool {
 		return b != nil && *b
 	}
+
+	traceID := trace.SpanFromContext(ctx).SpanContext().TraceID().String()
+	spanID := trace.SpanFromContext(ctx).SpanContext().SpanID().String()
 
 	// Firmwares from the set are copied into the firmwares slice
 	// which saves the controller from having to query it from fleetdb API.
@@ -439,6 +445,9 @@ func (r *Routes) firmwareInstallComposite(
 		Parameters: fwtp.MustJSON(),
 		State:      rctypes.Pending,
 		CreatedAt:  createTime,
+		TraceID:    traceID,
+		SpanID:     spanID,
+		Client:     clientID,
 	}
 
 	// pxeboot
@@ -454,6 +463,9 @@ func (r *Routes) firmwareInstallComposite(
 		).MustJSON(),
 		State:     rctypes.Pending,
 		CreatedAt: createTime,
+		TraceID:   traceID,
+		SpanID:    spanID,
+		Client:    clientID,
 	}
 
 	// oob install
@@ -463,6 +475,9 @@ func (r *Routes) firmwareInstallComposite(
 		Parameters: fwtp.MustJSON(),
 		State:      rctypes.Pending,
 		CreatedAt:  createTime,
+		TraceID:    traceID,
+		SpanID:     spanID,
+		Client:     clientID,
 	}
 
 	// oob inventory
@@ -472,6 +487,9 @@ func (r *Routes) firmwareInstallComposite(
 		Parameters: rctypes.MustDefaultInventoryJSON(serverID),
 		State:      rctypes.Pending,
 		CreatedAt:  createTime,
+		TraceID:    traceID,
+		SpanID:     spanID,
+		Client:     clientID,
 	}
 
 	// returned obj
