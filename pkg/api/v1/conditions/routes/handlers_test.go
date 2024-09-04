@@ -9,6 +9,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"testing"
 
 	"github.com/gin-gonic/gin"
@@ -18,6 +19,7 @@ import (
 	"github.com/metal-toolbox/conditionorc/internal/store"
 	"github.com/metal-toolbox/conditionorc/pkg/api/v1/conditions/types"
 	v1types "github.com/metal-toolbox/conditionorc/pkg/api/v1/conditions/types"
+	fleetdbapi "github.com/metal-toolbox/fleetdb/pkg/api/v1"
 	rctypes "github.com/metal-toolbox/rivets/condition"
 	"github.com/metal-toolbox/rivets/events"
 	eventsm "github.com/metal-toolbox/rivets/events"
@@ -25,6 +27,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 )
 
 func mockserver(t *testing.T, logger *logrus.Logger, fleetDBClient fleetdb.FleetDB, repository store.Repository, stream events.Stream) (*gin.Engine, error) {
@@ -1111,6 +1114,122 @@ func TestConditionStatus(t *testing.T) {
 			server.ServeHTTP(recorder, tc.request(t))
 
 			tc.assertResponse(t, recorder)
+		})
+	}
+}
+
+func TestFirmwareInstallComposite(t *testing.T) {
+	serverID := uuid.New()
+	r := &Routes{}
+	fwtp := rctypes.FirmwareInstallTaskParameters{
+		AssetID:      serverID,
+		ForceInstall: true,
+	}
+
+	boolPtr := func(b bool) *bool {
+		return &b
+	}
+	testcases := []struct {
+		name             string
+		fwset            *fleetdbapi.ComponentFirmwareSet
+		expectFirmwares  int
+		expectConditions int
+		expectInband     bool
+	}{
+		{
+			"oob fw set",
+			&fleetdbapi.ComponentFirmwareSet{
+				Name: "foo",
+				ComponentFirmware: []fleetdbapi.ComponentFirmwareVersion{
+					{
+						Vendor:        "bar",
+						Filename:      "abc.bin",
+						Version:       "1.1",
+						RepositoryURL: "http://foo/abc.bin",
+						Component:     "bmc",
+						Checksum:      "foo",
+						Model:         []string{"baz", "baz"},
+					},
+					{
+						Vendor:        "foo",
+						Filename:      "def.bin",
+						Version:       "0.1",
+						RepositoryURL: "http://bar/def.bin",
+						Component:     "bios",
+						Checksum:      "123",
+						Model:         []string{"as", "ds"},
+					},
+				},
+			},
+			2,
+			2,
+			false,
+		},
+		{
+			"inband fw set",
+			&fleetdbapi.ComponentFirmwareSet{
+				Name: "foo",
+				ComponentFirmware: []fleetdbapi.ComponentFirmwareVersion{
+					{
+						Vendor:        "bar",
+						Filename:      "abc.bin",
+						Version:       "1.1",
+						RepositoryURL: "http://foo/abc.bin",
+						Component:     "bmc",
+						Checksum:      "foo",
+						Model:         []string{"baz", "baz"},
+						InstallInband: boolPtr(true),
+					},
+					{
+						Vendor:        "foo",
+						Filename:      "def.bin",
+						Version:       "0.1",
+						RepositoryURL: "http://bar/def.bin",
+						Component:     "bios",
+						Checksum:      "123",
+						Model:         []string{"as", "ds"},
+					},
+				},
+			},
+			2,
+			4,
+			true,
+		},
+	}
+
+	for _, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+			if tc.expectInband {
+				os.Setenv("CONDITION_API_FEATURE_INBAND_FIRMWARE", "true")
+			}
+
+			got := r.firmwareInstallComposite(serverID, fwtp, tc.fwset)
+			assert.Equal(t, tc.expectConditions, len(got.Conditions))
+			for _, cond := range got.Conditions {
+				assert.NotEmpty(t, cond.Kind)
+				assert.Equal(t, rctypes.Pending, cond.State)
+				assert.Equal(t, rctypes.ConditionStructVersion, cond.Version)
+				assert.NotZero(t, cond.CreatedAt)
+
+				switch cond.Kind {
+				case rctypes.FirmwareInstall, rctypes.FirmwareInstallInband:
+					params := &rctypes.FirmwareInstallTaskParameters{}
+					require.NoError(t, params.Unmarshal(cond.Parameters))
+					assert.Equal(t, tc.expectFirmwares, len(params.Firmwares))
+					assert.Equal(t, fwtp.ForceInstall, params.ForceInstall)
+					assert.Equal(t, fwtp.AssetID, params.AssetID)
+				case rctypes.Inventory:
+					params := &rctypes.InventoryTaskParameters{}
+					require.NoError(t, json.Unmarshal(cond.Parameters, &params))
+					assert.Equal(t, fwtp.AssetID, params.AssetID)
+				case rctypes.ServerControl:
+					params := &rctypes.ServerControlTaskParameters{}
+					require.NoError(t, json.Unmarshal(cond.Parameters, &params))
+					assert.Equal(t, rctypes.PxeBootPersistent, params.Action)
+					assert.True(t, params.SetNextBootDevicePersistent)
+					assert.True(t, params.SetNextBootDeviceEFI)
+				}
+			}
 		})
 	}
 }

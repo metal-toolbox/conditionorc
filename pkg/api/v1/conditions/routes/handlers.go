@@ -481,20 +481,17 @@ func (r *Routes) firmwareInstallComposite(
 	}
 
 	// under feature flag until this is confirmed to be working as expected
+	// - if set - include require inband - if firmwares shares that requirement
 	if os.Getenv("CONDITION_API_FEATURE_INBAND_FIRMWARE") != "" {
-		var requireInband bool
 		for idx := range fwset.ComponentFirmware {
 			if booleanIsTrue(fwset.ComponentFirmware[idx].InstallInband) {
-				requireInband = true
+				sc.Conditions = append(sc.Conditions, pxeBoot, inband, oob, inv)
+				return sc
 			}
 		}
-
-		if requireInband {
-			sc.Conditions = append(sc.Conditions, pxeBoot, inband, oob, inv)
-		}
-	} else {
-		sc.Conditions = append(sc.Conditions, oob, inv)
 	}
+
+	sc.Conditions = append(sc.Conditions, oob, inv)
 
 	return sc
 }
