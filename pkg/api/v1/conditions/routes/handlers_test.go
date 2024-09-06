@@ -1203,7 +1203,7 @@ func TestFirmwareInstallComposite(t *testing.T) {
 				os.Setenv("CONDITION_API_FEATURE_INBAND_FIRMWARE", "true")
 			}
 
-			got := r.firmwareInstallComposite(serverID, fwtp, tc.fwset)
+			got := r.firmwareInstallComposite(context.Background(), serverID, "foobar", fwtp, tc.fwset)
 			assert.Equal(t, tc.expectConditions, len(got.Conditions))
 			for _, cond := range got.Conditions {
 				assert.NotEmpty(t, cond.Kind)
