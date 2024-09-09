@@ -37,6 +37,13 @@ func firmwareValidationConditions(fvr FirmwareValidationRequest) *rctypes.Server
 		ResetBMCBeforeInstall: true,
 	}
 
+	validationParams := &rctypes.ServerControlTaskParameters{
+		AssetID:                 fvr.ServerID,
+		Action:                  rctypes.ValidateFirmware,
+		ValidateFirmwareTimeout: 30 * time.Minute,
+		ValidateFirmwareID:      fvr.FirmwareSetID,
+	}
+
 	return &rctypes.ServerConditions{
 		ServerID: fvr.ServerID,
 		Conditions: []*rctypes.Condition{
@@ -54,7 +61,13 @@ func firmwareValidationConditions(fvr FirmwareValidationRequest) *rctypes.Server
 				State:      rctypes.Pending,
 				CreatedAt:  createTime,
 			},
-			// TODO: Need a firmware validation task, but first things first!
+			{
+				Kind:       rctypes.ServerControl,
+				Version:    rctypes.ConditionStructVersion,
+				Parameters: validationParams.MustJSON(),
+				State:      rctypes.Pending,
+				CreatedAt:  createTime,
+			},
 		},
 	}
 }
@@ -129,7 +142,7 @@ func (r *Routes) validateFirmware(c *gin.Context) (int, *v1types.ServerResponse)
 
 	metrics.ConditionQueued.With(
 		// XXX: define a Kind for firmwareValidation
-		prometheus.Labels{"conditionKind": string(rctypes.FirmwareInstall)},
+		prometheus.Labels{"conditionKind": string(rctypes.ValidateFirmware)},
 	).Inc()
 
 	return http.StatusOK, &v1types.ServerResponse{

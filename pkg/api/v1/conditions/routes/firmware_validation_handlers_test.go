@@ -72,9 +72,9 @@ func TestValidateFirmware(t *testing.T) {
 		require.NoError(t, err, "creating validation request")
 
 		fleetdb.On("GetServer", mock.Anything, mock.Anything).Return(srv, nil).Twice()
-		repo.On("Create", mock.Anything, mock.Anything, "fc13", mock.Anything, mock.Anything).
+		repo.On("Create", mock.Anything, mock.Anything, "fc13", mock.Anything, mock.Anything, mock.Anything).
 			Return(store.ErrActiveCondition).Once()
-		repo.On("Create", mock.Anything, mock.Anything, "fc13", mock.Anything, mock.Anything).
+		repo.On("Create", mock.Anything, mock.Anything, "fc13", mock.Anything, mock.Anything, mock.Anything).
 			Return(errors.New("pound sand")).Once()
 
 		req, err := http.NewRequestWithContext(context.TODO(), http.MethodPost, fwValidationUrl, bytes.NewReader(fvr))
@@ -109,7 +109,7 @@ func TestValidateFirmware(t *testing.T) {
 
 		fleetdb.On("GetServer", mock.Anything, mock.Anything).Return(srv, nil).Once()
 
-		repo.On("Create", mock.Anything, mock.Anything, "fc13", mock.Anything, mock.Anything).
+		repo.On("Create", mock.Anything, mock.Anything, "fc13", mock.Anything, mock.Anything, mock.Anything).
 			Return(nil).Once()
 		repo.On("Update", mock.Anything, srv.ID, mock.Anything).Return(nil).Once()
 
@@ -141,7 +141,7 @@ func TestValidateFirmware(t *testing.T) {
 
 		fleetdb.On("GetServer", mock.Anything, mock.Anything).Return(srv, nil).Once()
 
-		repo.On("Create", mock.Anything, mock.Anything, "fc13", mock.Anything, mock.Anything).
+		repo.On("Create", mock.Anything, mock.Anything, "fc13", mock.Anything, mock.Anything, mock.Anything).
 			Return(nil).Once()
 
 		stream.On("Publish", mock.Anything, "fc13.servers.firmwareInstall", mock.Anything).Return(nil).Once()
