@@ -9,8 +9,8 @@ import (
 	"github.com/metal-toolbox/conditionorc/internal/model"
 	"github.com/metal-toolbox/conditionorc/internal/orchestrator/notify"
 	"github.com/metal-toolbox/rivets/events"
+	"github.com/metal-toolbox/rivets/ginjwt"
 	"github.com/pkg/errors"
-	"go.hollow.sh/toolbox/ginjwt"
 
 	rctypes "github.com/metal-toolbox/rivets/condition"
 )

@@ -12,7 +12,7 @@ import (
 	"github.com/metal-toolbox/rivets/events"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
-	"go.hollow.sh/toolbox/ginauth"
+	"github.com/metal-toolbox/rivets/ginauth"
 
 	v1types "github.com/metal-toolbox/conditionorc/pkg/api/v1/orchestrator/types"
 	rctypes "github.com/metal-toolbox/rivets/condition"

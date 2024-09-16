@@ -20,9 +20,9 @@ import (
 	"os"
 
 	"github.com/metal-toolbox/conditionorc/internal/version"
+	"github.com/metal-toolbox/rivets/ginjwt"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-	"go.hollow.sh/toolbox/ginjwt"
 )
 
 var (

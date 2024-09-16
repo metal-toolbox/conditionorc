@@ -14,10 +14,10 @@ import (
 	condRoutes "github.com/metal-toolbox/conditionorc/pkg/api/v1/conditions/routes"
 	orcRoutes "github.com/metal-toolbox/conditionorc/pkg/api/v1/orchestrator/routes"
 	"github.com/metal-toolbox/rivets/events"
+	"github.com/metal-toolbox/rivets/ginauth"
+	"github.com/metal-toolbox/rivets/ginjwt"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
-	"go.hollow.sh/toolbox/ginauth"
-	"go.hollow.sh/toolbox/ginjwt"
 
 	rctypes "github.com/metal-toolbox/rivets/condition"
 )
