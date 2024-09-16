@@ -21,9 +21,9 @@ import (
 	"github.com/google/uuid"
 	"github.com/metal-toolbox/conditionorc/internal/server"
 	"github.com/metal-toolbox/conditionorc/internal/store"
+	"github.com/metal-toolbox/rivets/ginjwt"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
-	"go.hollow.sh/toolbox/ginjwt"
 	"gopkg.in/go-jose/go-jose.v2"
 	"gopkg.in/go-jose/go-jose.v2/jwt"
 

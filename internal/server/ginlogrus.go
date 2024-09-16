@@ -32,8 +32,8 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/metal-toolbox/rivets/ginjwt"
 	"github.com/sirupsen/logrus"
-	"go.hollow.sh/toolbox/ginjwt"
 )
 
 // 2016-09-27 09:38:21.541541811 +0200 CEST
