@@ -33,7 +33,7 @@ var (
 	errInvalidState    = errors.New("invalid condition state")
 	errCompleteEvent   = errors.New("unable to complete event")
 	failedByReconciler = []byte(`{ "msg": "controller failed to process this condition in time" }`)
-	reconcilerCadence  = 1 * time.Minute
+	reconcilerCadence  = 10 * time.Minute
 	errRetryThis       = errors.New("retry this operation")
 	// Ideally set this to the JS MaxAge value.
 	// The Discard Policy should be set to Old.
