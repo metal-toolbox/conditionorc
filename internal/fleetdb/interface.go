@@ -34,18 +34,16 @@ type FleetDB interface {
 	FirmwareSetByID(ctx context.Context, setID uuid.UUID) (*fleetdbapi.ComponentFirmwareSet, error)
 }
 
-func NewFleetDBClient(ctx context.Context, config *app.Configuration, conditionDefs rctypes.Definitions,
-	logger *logrus.Logger) (FleetDB, error) {
+func NewFleetDBClient(ctx context.Context, config *app.Configuration, logger *logrus.Logger) (FleetDB, error) {
 	ssOpts := &config.FleetDBAPIOptions
 	client, err := getFleetDBAPIClient(ctx, ssOpts, logger)
 	if err != nil {
 		return nil, err
 	}
 	return &fleetDBImpl{
-		config:               ssOpts,
-		conditionDefinitions: conditionDefs,
-		logger:               logger,
-		client:               client,
+		config: ssOpts,
+		logger: logger,
+		client: client,
 	}, nil
 }
 

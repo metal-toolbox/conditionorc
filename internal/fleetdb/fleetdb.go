@@ -25,10 +25,9 @@ const (
 )
 
 type fleetDBImpl struct {
-	config               *app.FleetDBAPIOptions
-	conditionDefinitions rctypes.Definitions
-	client               *fleetdbapi.Client
-	logger               *logrus.Logger
+	config *app.FleetDBAPIOptions
+	client *fleetdbapi.Client
+	logger *logrus.Logger
 }
 
 type serverCreateStatus struct {
