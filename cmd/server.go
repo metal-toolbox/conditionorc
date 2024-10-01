@@ -49,7 +49,7 @@ var cmdServer = &cobra.Command{
 			app.Logger.Fatal(err)
 		}
 
-		fleetDBClient, err := fleetdb.NewFleetDBClient(ctx, app.Config, app.Config.ConditionDefinitions, app.Logger)
+		fleetDBClient, err := fleetdb.NewFleetDBClient(ctx, app.Config, app.Logger)
 		if err != nil {
 			app.Logger.Fatal(err)
 		}
