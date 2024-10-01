@@ -85,6 +85,13 @@ func (c *Client) ServerFirmwareInstall(ctx context.Context,
 	return c.post(ctx, path, params)
 }
 
+func (c *Client) ServerBiosControl(ctx context.Context,
+	params *rctypes.BiosControlTaskParameters) (*v1types.ServerResponse, error) {
+	path := fmt.Sprintf("servers/%s/biosControl", params.AssetID.String())
+
+	return c.post(ctx, path, params)
+}
+
 func (c *Client) ServerConditionCreate(ctx context.Context, serverID uuid.UUID, conditionKind rctypes.Kind, conditionCreate v1types.ConditionCreate) (*v1types.ServerResponse, error) {
 	path := fmt.Sprintf("servers/%s/condition/%s", serverID.String(), conditionKind)
 

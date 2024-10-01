@@ -157,6 +157,10 @@ func (r *Routes) Routes(g *gin.RouterGroup) {
 		servers.POST("/firmwareInstall", r.composeAuthHandler(createScopes("condition")),
 			wrapAPICall(r.firmwareInstall))
 
+		// BIOS
+		servers.POST("/biosControl", r.composeAuthHandler(createScopes("condition")),
+			wrapAPICall(r.biosControl))
+
 		// Generalized API for any condition status (for cases where some server work
 		// has multiple conditions involved and the caller doesn't know what they might be)
 		servers.GET("/status", r.composeAuthHandler(readScopes("condition")),

@@ -516,6 +516,66 @@ func (r *Routes) firmwareInstallComposite(
 	return sc
 }
 
+// @Summary Bios Control
+// @Tag Conditions
+// @Description Controls the BIOS of the server
+// @Param uuid path string true "Server ID"
+// @Param data body rctypes.BiosControlTaskParameters true "bios control options"
+// @Accept json
+// @Produce json
+// @Success 200 {object} v1types.ServerResponse
+// Failure 400 {object} v1types.ServerResponse
+// Failure 500 {object} v1types.ServerResponse
+// Failure 503 {object} v1types.ServerResponse
+// @Router /servers/{uuid}/biosControl [post]
+func (r *Routes) biosControl(c *gin.Context) (int, *v1types.ServerResponse) {
+	id := c.Param("uuid")
+	otelCtx, span := otel.Tracer(pkgName).Start(c.Request.Context(), "Routes.biosControl")
+	span.SetAttributes(attribute.KeyValue{Key: "serverId", Value: attribute.StringValue(id)})
+	defer span.End()
+
+	serverID, err := uuid.Parse(id)
+	if err != nil {
+		r.logger.WithError(err).WithField("serverID", id).Warn("bad serverID")
+
+		return http.StatusBadRequest, &v1types.ServerResponse{
+			Message: "server id: " + err.Error(),
+		}
+	}
+
+	facilityCode, err := r.serverFacilityCode(otelCtx, serverID)
+	if err != nil {
+		return http.StatusInternalServerError, &v1types.ServerResponse{
+			Message: "server facility: " + err.Error(),
+		}
+	}
+
+	var bctp rctypes.BiosControlTaskParameters
+	if err = c.ShouldBindJSON(&bctp); err != nil {
+		r.logger.WithError(err).Warn("unmarshal biosCotnrol payload")
+
+		return http.StatusBadRequest, &v1types.ServerResponse{
+			Message: "invalid biosCotnrol payload: " + err.Error(),
+		}
+	}
+
+	createTime := time.Now()
+	traceID := trace.SpanFromContext(otelCtx).SpanContext().TraceID().String()
+	spanID := trace.SpanFromContext(otelCtx).SpanContext().SpanID().String()
+
+	biosControlCondition := &rctypes.Condition{
+		Kind:       rctypes.BiosControl,
+		Parameters: bctp.MustJSON(),
+		State:      rctypes.Pending,
+		CreatedAt:  createTime,
+		TraceID:    traceID,
+		SpanID:     spanID,
+		Client:     ginjwt.GetUser(c),
+	}
+
+	return r.conditionCreate(otelCtx, biosControlCondition, serverID, facilityCode)
+}
+
 func (r *Routes) conditionCreate(otelCtx context.Context, newCondition *rctypes.Condition, serverID uuid.UUID, facilityCode string) (int, *v1types.ServerResponse) {
 	// Create the new condition
 	err := r.repository.Create(otelCtx, serverID, facilityCode, newCondition)
