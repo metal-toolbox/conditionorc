@@ -361,7 +361,6 @@ func TestFirmwareInstall(t *testing.T) {
 			mockStore: func(r *store.MockRepository) {
 				r.On("Create", mock.Anything, serverID, "facility", mock.Anything, mock.Anything).
 					Return(nil).Once()
-
 			},
 			mockFleetDB: func(r *fleetdb.MockFleetDB) {
 				fwset.ComponentFirmware = append(fwset.ComponentFirmware, oobfw)
@@ -842,6 +841,121 @@ func TestServerDeleteInvalidUUID(t *testing.T) {
 			}
 			require.Equal(t, tc.expectResponse().StatusCode, got.StatusCode, "bad status code")
 			require.Equal(t, tc.expectResponse().Message, got.Message, "bad message")
+		})
+	}
+}
+
+func TestServerBiosControl(t *testing.T) {
+	serverID := uuid.New()
+
+	validParams := rctypes.BiosControlTaskParameters{
+		AssetID: serverID,
+		Action:  rctypes.ResetConfig,
+	}
+
+	testcases := []struct {
+		name                string
+		payload             *rctypes.BiosControlTaskParameters
+		mockStore           func(r *store.MockRepository)
+		mockFleetDB         func(r *fleetdb.MockFleetDB)
+		expectResponse      func() *v1types.ServerResponse
+		expectErrorContains string
+		expectPublish       bool
+	}{
+		{
+			name:    "success case",
+			payload: &validParams,
+			mockStore: func(r *store.MockRepository) {
+				r.On("Create", mock.Anything, serverID, "facility", mock.Anything, mock.Anything).
+					Return(nil).Once()
+			},
+			mockFleetDB: func(r *fleetdb.MockFleetDB) {
+				r.On("GetServer", mock.Anything, mock.Anything).
+					Return(&model.Server{FacilityCode: "facility"}, nil).Once()
+			},
+			expectResponse: func() *v1types.ServerResponse {
+				return &v1types.ServerResponse{
+					StatusCode: 200,
+					Message:    "condition set",
+				}
+			},
+			expectErrorContains: "",
+			expectPublish:       true,
+		},
+		{
+			name:    "no server",
+			payload: &validParams,
+			mockFleetDB: func(r *fleetdb.MockFleetDB) {
+				r.On("GetServer", mock.Anything, mock.Anything).
+					Return(nil, fmt.Errorf("no server")).Once()
+			},
+			expectResponse: func() *v1types.ServerResponse {
+				return &v1types.ServerResponse{
+					StatusCode: 500,
+					Message:    "server facility: no server",
+				}
+			},
+			expectErrorContains: "",
+			expectPublish:       false,
+		},
+		{
+			name:    "active condition error",
+			payload: &validParams,
+			mockStore: func(r *store.MockRepository) {
+				r.On("Create", mock.Anything, serverID, "facility", mock.Anything, mock.Anything).
+					Return(fmt.Errorf("%w:%s", store.ErrActiveCondition, "pound sand")).Once()
+			},
+			mockFleetDB: func(r *fleetdb.MockFleetDB) {
+				r.On("GetServer", mock.Anything, mock.Anything).
+					Return(&model.Server{FacilityCode: "facility"}, nil).Once()
+			},
+			expectResponse: func() *v1types.ServerResponse {
+				return &v1types.ServerResponse{
+					StatusCode: 500,
+					Message:    "server has an active condition",
+				}
+			},
+			expectErrorContains: "",
+			expectPublish:       false,
+		},
+	}
+
+	for _, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+			tester := newTester(t)
+
+			if tc.mockStore != nil {
+				tc.mockStore(tester.repository)
+			}
+
+			if tc.mockFleetDB != nil {
+				tc.mockFleetDB(tester.fleetDB)
+			}
+
+			if tc.expectPublish {
+				tester.stream.On(
+					"Publish",
+					mock.Anything,
+					mock.Anything,
+					mock.Anything,
+				).Return(nil).Times(1)
+			}
+
+			got, err := tester.client.ServerBiosControl(context.TODO(), tc.payload)
+			if err != nil {
+				t.Error(err)
+			}
+
+			if err != nil {
+				require.Contains(t, err.Error(), tc.expectErrorContains)
+			}
+
+			if tc.expectErrorContains != "" && err == nil {
+				t.Error("expected error, got nil")
+			}
+
+			require.Equal(t, tc.expectResponse().StatusCode, got.StatusCode, "bad status code")
+			require.Contains(t, got.Message, tc.expectResponse().Message, "bad message")
 		})
 	}
 }
