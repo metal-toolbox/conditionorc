@@ -184,3 +184,12 @@ type ServerProvisionRequest struct {
 	NetworkConfiguration string    `json:"NetworkConfiguration,omitempty"`
 	Tags                 []string  `json:"Tags,omitempty"`
 }
+
+type FirmwareValidationRequest struct {
+	ServerID      uuid.UUID `json:"server_id" binding:"required,uuid4_rfc4122"`
+	FirmwareSetID uuid.UUID `json:"firmware_set_id" binding:"required,uuid4_rfc4122"`
+}
+
+func (fvr FirmwareValidationRequest) AsJSON() (json.RawMessage, error) {
+	return json.Marshal(fvr)
+}

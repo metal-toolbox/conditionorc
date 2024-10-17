@@ -1,12 +1,10 @@
 package routes
 
 import (
-	"encoding/json"
 	"net/http"
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/google/uuid"
 	rctypes "github.com/metal-toolbox/rivets/condition"
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
@@ -18,17 +16,8 @@ import (
 	v1types "github.com/metal-toolbox/conditionorc/pkg/api/v1/conditions/types"
 )
 
-type FirmwareValidationRequest struct {
-	ServerID      uuid.UUID `json:"server_id" binding:"required,uuid4_rfc4122"`
-	FirmwareSetID uuid.UUID `json:"firmware_set_id" binding:"required,uuid4_rfc4122"`
-}
-
-func (fvr FirmwareValidationRequest) AsJSON() (json.RawMessage, error) {
-	return json.Marshal(fvr)
-}
-
 // this is where we compose all conditions to be executed during the firmware validation task
-func firmwareValidationConditions(fvr FirmwareValidationRequest) *rctypes.ServerConditions {
+func firmwareValidationConditions(fvr *v1types.FirmwareValidationRequest) *rctypes.ServerConditions {
 	createTime := time.Now()
 
 	fwParams := &rctypes.FirmwareInstallTaskParameters{
@@ -88,7 +77,7 @@ func (r *Routes) validateFirmware(c *gin.Context) (int, *v1types.ServerResponse)
 	otelCtx, span := otel.Tracer(pkgName).Start(c.Request.Context(), "Routes.validateFirmware")
 	defer span.End()
 
-	var fvr FirmwareValidationRequest
+	fvr := &v1types.FirmwareValidationRequest{}
 	if err := c.ShouldBindJSON(&fvr); err != nil {
 		r.logger.WithError(err).Warn("unmarshal firmware validation payload")
 

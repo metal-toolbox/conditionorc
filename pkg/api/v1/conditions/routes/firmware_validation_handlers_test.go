@@ -10,6 +10,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/metal-toolbox/conditionorc/internal/model"
 	"github.com/metal-toolbox/conditionorc/internal/store"
+	v1types "github.com/metal-toolbox/conditionorc/pkg/api/v1/conditions/types"
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -40,7 +41,7 @@ func TestValidateFirmware(t *testing.T) {
 		_, fleetdb, _, server, err := setupTestServer(t)
 		require.NoError(t, err, "prerequisite setup")
 
-		fvr, err := FirmwareValidationRequest{
+		fvr, err := v1types.FirmwareValidationRequest{
 			ServerID:      uuid.New(),
 			FirmwareSetID: uuid.New(),
 		}.AsJSON()
@@ -65,7 +66,7 @@ func TestValidateFirmware(t *testing.T) {
 			FacilityCode: "fc13",
 		}
 
-		fvr, err := FirmwareValidationRequest{
+		fvr, err := v1types.FirmwareValidationRequest{
 			ServerID:      srv.ID,
 			FirmwareSetID: uuid.New(),
 		}.AsJSON()
@@ -101,7 +102,7 @@ func TestValidateFirmware(t *testing.T) {
 			FacilityCode: "fc13",
 		}
 
-		fvr, err := FirmwareValidationRequest{
+		fvr, err := v1types.FirmwareValidationRequest{
 			ServerID:      srv.ID,
 			FirmwareSetID: uuid.New(),
 		}.AsJSON()
@@ -133,7 +134,7 @@ func TestValidateFirmware(t *testing.T) {
 			FacilityCode: "fc13",
 		}
 
-		fvr, err := FirmwareValidationRequest{
+		fvr, err := v1types.FirmwareValidationRequest{
 			ServerID:      srv.ID,
 			FirmwareSetID: uuid.New(),
 		}.AsJSON()
