@@ -12,7 +12,7 @@ require (
 	github.com/metal-toolbox/fleetdb v1.19.5
 	github.com/metal-toolbox/rivets v1.3.10
 	github.com/nats-io/nats-server/v2 v2.10.12
-	github.com/nats-io/nats.go v1.36.0
+	github.com/nats-io/nats.go v1.37.0
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.20.1
 	github.com/sirupsen/logrus v1.9.3
