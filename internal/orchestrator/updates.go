@@ -410,6 +410,10 @@ func (o *Orchestrator) eventUpdate(ctx context.Context, evt *v1types.ConditionUp
 			"serverID":    updatedCondition.Target.String(),
 			"conditionID": updatedCondition.ID.String(),
 		}).Info("condition update failed")
+		if errors.Is(err, store.ErrConditionComplete) {
+			// we *should* not be here because the mergeUpdate function should have failed before
+			return err
+		}
 		return errors.Wrap(errRetryThis, err.Error())
 	}
 
