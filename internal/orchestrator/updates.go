@@ -477,14 +477,21 @@ func (o *Orchestrator) queueFollowingCondition(ctx context.Context, cond *rctype
 
 		metrics.DependencyError("nats", "retrieve active condition")
 
-		return errors.Wrap(errCompleteEvent, err.Error())
+		return fmt.Errorf("%w:retrieving active condition:%w", errCompleteEvent, err)
 	}
-
-	// Publish the next event if that event is in the pending state
-	//
 	// Conditions for controllers that run inband are not published to the JS,
 	// they are retrieved by the inband controllers themselves through the Orchestrator API.
-	if active != nil && active.State == rctypes.Pending && active.StreamPublishRequired() {
+	if !active.StreamPublishRequired() {
+		o.logger.WithFields(logrus.Fields{
+			"condition.id":   active.ID,
+			"server.id":      active.Target.String(),
+			"condition.kind": active.Kind,
+		}).Debug("not publishing inband condition")
+		return nil
+	}
+
+	// If we're here we have to publish the next event, if that event is in the pending state
+	if active != nil && active.State == rctypes.Pending {
 		byt := active.MustBytes()
 		subject := fmt.Sprintf("%s.servers.%s", o.facility, active.Kind)
 		err := o.streamBroker.Publish(ctx, subject, byt)
@@ -496,8 +503,9 @@ func (o *Orchestrator) queueFollowingCondition(ctx context.Context, cond *rctype
 			}).Warn("publishing next active condition")
 
 			metrics.DependencyError("nats", "publish-condition")
+			metrics.PublishErrors.WithLabelValues(string(active.Kind)).Inc()
 
-			return errors.Wrap(errCompleteEvent, err.Error())
+			return fmt.Errorf("%w:publishing next event:%w", errCompleteEvent, err)
 		}
 
 		metrics.ConditionQueued.With(
