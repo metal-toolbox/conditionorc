@@ -22,10 +22,7 @@ var (
 	ConditionQueued         *prometheus.CounterVec
 	ConditionCompleted      *prometheus.CounterVec
 	PublishErrors           *prometheus.CounterVec
-	ConditionInKV           *prometheus.CounterVec
 	ConditionReconcileStale *prometheus.CounterVec
-
-	NatsKVUpdateEvent *prometheus.CounterVec
 )
 
 func init() {
@@ -79,28 +76,12 @@ func init() {
 		[]string{"conditionKind"},
 	)
 
-	ConditionInKV = promauto.NewCounterVec(
-		prometheus.CounterOpts{
-			Name: "conditionorc_condition_in_kv",
-			Help: "A count of all conditions listed in the KV.",
-		},
-		[]string{"conditionKind", "state"},
-	)
-
 	ConditionReconcileStale = promauto.NewCounterVec(
 		prometheus.CounterOpts{
 			Name: "conditionorc_condition_active_stale",
 			Help: "A count of active conditions identified to be stale.",
 		},
 		[]string{"conditionKind"},
-	)
-
-	NatsKVUpdateEvent = promauto.NewCounterVec(
-		prometheus.CounterOpts{
-			Name: "conditionorc_nats_kv_update_event",
-			Help: "A count of NATS KV Condition update events.",
-		},
-		[]string{"conditionKind", "valid"},
 	)
 }
 

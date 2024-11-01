@@ -144,6 +144,12 @@ func TestCreateReadUpdate(t *testing.T) {
 	cr, err = store.Get(context.TODO(), serverID)
 	require.NoError(t, err)
 	require.Equal(t, rctypes.Succeeded, cr.State)
+
+	// updating a condition already in a final state is not allowed
+	condition.State = rctypes.Failed
+	err = store.Update(context.TODO(), serverID, condition)
+	require.Error(t, err)
+	require.ErrorIs(t, ErrConditionComplete, err)
 }
 
 // Given a conditionRecord with multiple conditions, walk through some common

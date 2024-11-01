@@ -28,7 +28,6 @@ var (
 		kv.WithTTL(10 * 24 * time.Hour), // XXX: we could keep more history here, but might need more storage
 	}
 	errBadData = errors.New("bad condition data")
-	ErrList    = errors.New("list query returned error")
 )
 
 type natsStore struct {
@@ -255,6 +254,10 @@ func (n *natsStore) Update(ctx context.Context, serverID uuid.UUID, updated *rct
 		span.RecordError(err)
 		le.WithError(err).Warn("condition lookup failure on update")
 		return err
+	}
+
+	if rctypes.StateIsComplete(cr.State) {
+		return ErrConditionComplete
 	}
 
 	// stupid games, stupid prizes sanity check

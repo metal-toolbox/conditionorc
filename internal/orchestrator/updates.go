@@ -35,9 +35,6 @@ var (
 	failedByReconciler = []byte(`{ "msg": "controller failed to process this condition in time" }`)
 	reconcilerCadence  = 10 * time.Minute
 	errRetryThis       = errors.New("retry this operation")
-	// Ideally set this to the JS MaxAge value.
-	// The Discard Policy should be set to Old.
-	msgMaxAgeThreshold = 24 * time.Hour
 )
 
 func (o *Orchestrator) startUpdateMonitor(ctx context.Context) {
@@ -295,146 +292,6 @@ func parseEventUpdateFromKV(ctx context.Context, kve nats.KeyValueEntry, kind rc
 	return updEvent, nil
 }
 
-// statusKVEntries is a map of ServerIDs from the status KV for a condition kind
-func failedUpdateEventFromCondition(cond *rctypes.Condition) *v1types.ConditionUpdateEvent {
-	return &v1types.ConditionUpdateEvent{
-		ConditionUpdate: v1types.ConditionUpdate{
-			ConditionID: cond.ID,
-			ServerID:    cond.Target,
-			State:       rctypes.Failed,
-			Status:      failedByReconciler,
-			UpdatedAt:   time.Now(),
-			CreatedAt:   cond.CreatedAt,
-		},
-		Kind: cond.Kind,
-	}
-}
-
-func conditionFromUpdateEvent(evt *v1types.ConditionUpdateEvent) *rctypes.Condition {
-	return &rctypes.Condition{
-		Version:   rctypes.ConditionStructVersion,
-		ID:        evt.ConditionID,
-		Target:    evt.ServerID,
-		Kind:      evt.Kind,
-		State:     evt.State,
-		Status:    evt.Status,
-		CreatedAt: evt.CreatedAt,
-		UpdatedAt: evt.UpdatedAt,
-	}
-}
-
-// Method returns a slice of Conditions along with a slice of ConditionUpdateEvents which
-// are to be applied to the active-condition KV.
-func filterToReconcile(records []*store.ConditionRecord, updateEvts map[string]*v1types.ConditionUpdateEvent, facility string) ([]*rctypes.Condition, []*v1types.ConditionUpdateEvent) {
-	// active/pending CR lookup map
-	activeCRs := map[string]struct{}{}
-	// finalized CR lookup map
-	completedCRs := map[string]struct{}{}
-
-	// missing conditions in active-conditions KV to be created
-	creates := []*rctypes.Condition{}
-
-	// in-complete status KV updates to be applied
-	updates := []*v1types.ConditionUpdateEvent{}
-
-	stale := func(createdAt, updatedAt time.Time) bool {
-		// condition in queue
-		if updatedAt.IsZero() {
-			return time.Since(createdAt) >= msgMaxAgeThreshold
-		}
-
-		// condition active with stale updatedAt
-		return time.Since(createdAt) >= rctypes.StaleThreshold &&
-			time.Since(updatedAt) >= rctypes.StatusStaleThreshold
-	}
-
-	// updates
-	// - The status KV entry does not exist for the condition listed in active-condition condition
-	// - The first incomplete Condition has exceeded the stale threshold
-	for _, cr := range records {
-		if cr.Facility != facility {
-			continue
-		}
-
-		if len(cr.Conditions) == 0 {
-			continue
-		}
-
-		firstCond := cr.Conditions[0]
-
-		if rctypes.StateIsComplete(cr.State) {
-			completedCRs[firstCond.Target.String()] = struct{}{}
-			continue
-		}
-
-		activeCRs[firstCond.Target.String()] = struct{}{}
-
-		_, exists := updateEvts[firstCond.Target.String()]
-		if !exists && stale(firstCond.CreatedAt, firstCond.UpdatedAt) {
-			updates = append(updates, failedUpdateEventFromCondition(firstCond))
-		}
-	}
-
-	//  creates
-	// - The Condition Status entry has no corresponding Active Condition Record.
-	for serverID, updateEvt := range updateEvts {
-		_, existsActive := activeCRs[serverID]
-		_, existsComplete := completedCRs[serverID]
-
-		if !existsActive && !existsComplete {
-			creates = append(creates, conditionFromUpdateEvent(updateEvt))
-		}
-	}
-
-	return creates, updates
-}
-
-func (o *Orchestrator) activeConditionsToReconcile(ctx context.Context) ([]*rctypes.Condition, []*v1types.ConditionUpdateEvent) {
-	// map of serverIDs to condition updates from the status KV
-	updateEvts := map[string]*v1types.ConditionUpdateEvent{}
-
-	// List Conditions in the Status KV and prepare an update payload for those to be reconciled.
-	for _, def := range o.conditionDefs {
-		kind := def.Kind
-
-		// fetch all conditions statuses for kind
-		statusEntries, err := status.GetAllConditions(kind, o.facility)
-		if err != nil {
-			o.logger.WithError(err).WithField("rctypes.kind", string(kind)).
-				Warn("reconciler error in condition status lookup")
-			continue
-		}
-
-		// parse status entries
-		for _, kve := range statusEntries {
-			evt, err := parseEventUpdateFromKV(ctx, kve, kind)
-			if err != nil {
-				o.logger.WithError(err).WithFields(logrus.Fields{
-					"rctypes.kind": string(kind),
-					"kv.key":       kve.Key(),
-				}).Warn("reconciler skipping malformed update")
-				// TODO:
-				// we want to handle cases where the Controller has posted a malformed update
-				// although recreating a active-condition record using just ConditionID from the
-				// status entry key is impossible - since we have no idea what the Target/ServerID is.
-				continue
-			}
-
-			updateEvts[evt.ServerID.String()] = evt
-		}
-	}
-
-	// list condition records from the active-conditions KV
-	records, err := o.repository.List(ctx)
-	if err != nil {
-		o.logger.WithError(err).Error("condition record lookup error")
-
-		return nil, nil
-	}
-
-	return filterToReconcile(records, updateEvts, o.facility)
-}
-
 func (o *Orchestrator) getEventsToReconcile(ctx context.Context) (evts []*v1types.ConditionUpdateEvent) {
 	// collect all events across multiple condition definitions
 	for _, def := range o.conditionDefs {
@@ -553,6 +410,10 @@ func (o *Orchestrator) eventUpdate(ctx context.Context, evt *v1types.ConditionUp
 			"serverID":    updatedCondition.Target.String(),
 			"conditionID": updatedCondition.ID.String(),
 		}).Info("condition update failed")
+		if errors.Is(err, store.ErrConditionComplete) {
+			// we *should* not be here because the mergeUpdate function should have failed before
+			return err
+		}
 		return errors.Wrap(errRetryThis, err.Error())
 	}
 
@@ -620,14 +481,21 @@ func (o *Orchestrator) queueFollowingCondition(ctx context.Context, cond *rctype
 
 		metrics.DependencyError("nats", "retrieve active condition")
 
-		return errors.Wrap(errCompleteEvent, err.Error())
+		return fmt.Errorf("%w:retrieving active condition:%w", errCompleteEvent, err)
 	}
-
-	// Publish the next event if that event is in the pending state
-	//
 	// Conditions for controllers that run inband are not published to the JS,
 	// they are retrieved by the inband controllers themselves through the Orchestrator API.
-	if active != nil && active.State == rctypes.Pending && active.StreamPublishRequired() {
+	if !active.StreamPublishRequired() {
+		o.logger.WithFields(logrus.Fields{
+			"condition.id":   active.ID,
+			"server.id":      active.Target.String(),
+			"condition.kind": active.Kind,
+		}).Debug("not publishing inband condition")
+		return nil
+	}
+
+	// If we're here we have to publish the next event, if that event is in the pending state
+	if active != nil && active.State == rctypes.Pending {
 		byt := active.MustBytes()
 		subject := fmt.Sprintf("%s.servers.%s", o.facility, active.Kind)
 		err := o.streamBroker.Publish(ctx, subject, byt)
@@ -639,8 +507,9 @@ func (o *Orchestrator) queueFollowingCondition(ctx context.Context, cond *rctype
 			}).Warn("publishing next active condition")
 
 			metrics.DependencyError("nats", "publish-condition")
+			metrics.PublishErrors.WithLabelValues(string(active.Kind)).Inc()
 
-			return errors.Wrap(errCompleteEvent, err.Error())
+			return fmt.Errorf("%w:publishing next event:%w", errCompleteEvent, err)
 		}
 
 		metrics.ConditionQueued.With(
@@ -720,7 +589,6 @@ func (o *Orchestrator) startReconciler(ctx context.Context, wg *sync.WaitGroup) 
 
 			case <-ticker.C:
 				o.reconcileStatusKVEntries(ctx)
-				o.reconcileActiveConditionRecords(ctx)
 			}
 		}
 	}()
@@ -754,74 +622,5 @@ func (o *Orchestrator) reconcileStatusKVEntries(ctx context.Context) {
 		if err := o.notifier.Send(evt); err != nil {
 			le.WithError(err).Warn("reconciler event notification")
 		}
-	}
-}
-
-// reconcile active-condition KV entries for missing status KV entries and missing active-condition entries
-func (o *Orchestrator) reconcileActiveConditionRecords(ctx context.Context) {
-	creates, updates := o.activeConditionsToReconcile(ctx)
-	for _, evt := range updates {
-		le := o.logger.WithFields(logrus.Fields{
-			"conditionID":    evt.ConditionUpdate.ConditionID.String(),
-			"conditionState": string(evt.ConditionUpdate.State),
-			"kind":           string(evt.Kind),
-		})
-
-		if err := o.eventUpdate(ctx, evt); err != nil {
-			le.WithError(err).Warn("reconciler event update")
-			continue
-		}
-
-		le.Info("status KV condition reconciled")
-
-		if err := o.notifier.Send(evt); err != nil {
-			le.WithError(err).Warn("reconciler event notification")
-		}
-	}
-
-	for _, cond := range creates {
-		le := o.logger.WithFields(logrus.Fields{
-			"conditionID":    cond.ID.String(),
-			"conditionState": string(cond.State),
-			"kind":           string(cond.Kind),
-		})
-
-		lastCR, err := o.repository.Get(ctx, cond.Target)
-		if err != nil {
-			// create record if it doesn't exist
-			if errors.Is(err, store.ErrConditionNotFound) {
-				if errCreate := o.repository.Create(ctx, cond.Target, o.facility, cond); errCreate != nil {
-					le.WithError(errCreate).Warn("reconciler condition record create")
-				}
-
-				le.Info("active-condition KV condition record reconciled - created new record")
-				continue
-			}
-
-			le.WithError(err).Warn("reconciler condition record get")
-			continue
-		}
-
-		if lastCR.ID != cond.ID {
-			// a newer condition was queued after the failure that caused this one to need reconciliation
-			// don't do anything more here, it will only confuse things
-			le.WithField("current.ID", lastCR.ID.String()).Info("more recent condition found")
-			if rctypes.StateIsComplete(cond.State) {
-				if histErr := o.db.WriteEventHistory(ctx, cond); histErr != nil {
-					le.WithError(histErr).Warn("writing event history for unlinked condition")
-					metrics.DependencyError("fleetdb", "update event history")
-				}
-			}
-			if delErr := status.DeleteCondition(cond.Kind, o.facility, cond.ID.String()); delErr != nil {
-				le.WithError(delErr).Warn("deleting unlinked condition")
-			}
-			continue
-		}
-
-		// update record if it exists
-		if errUpdate := o.repository.Update(ctx, cond.Target, cond); errUpdate != nil {
-			le.WithError(errUpdate).Warn("reconciler condition record update")
-		}
-		le.Info("active-condition KV condition record reconciled - updated existing record")
 	}
 }
