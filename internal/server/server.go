@@ -13,13 +13,12 @@ import (
 	"github.com/metal-toolbox/conditionorc/internal/store"
 	condRoutes "github.com/metal-toolbox/conditionorc/pkg/api/v1/conditions/routes"
 	orcRoutes "github.com/metal-toolbox/conditionorc/pkg/api/v1/orchestrator/routes"
-	"github.com/metal-toolbox/rivets/events"
-	"github.com/metal-toolbox/rivets/ginauth"
-	"github.com/metal-toolbox/rivets/ginjwt"
+	rctypes "github.com/metal-toolbox/rivets/v2/condition"
+	"github.com/metal-toolbox/rivets/v2/events"
+	"github.com/metal-toolbox/rivets/v2/ginauth"
+	"github.com/metal-toolbox/rivets/v2/ginjwt"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
-
-	rctypes "github.com/metal-toolbox/rivets/condition"
 )
 
 var (

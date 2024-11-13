@@ -8,12 +8,13 @@ import (
 	"testing"
 
 	"github.com/google/uuid"
-	"github.com/metal-toolbox/conditionorc/internal/model"
-	"github.com/metal-toolbox/conditionorc/internal/store"
-	v1types "github.com/metal-toolbox/conditionorc/pkg/api/v1/conditions/types"
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+
+	"github.com/metal-toolbox/conditionorc/internal/model"
+	"github.com/metal-toolbox/conditionorc/internal/store"
+	v1types "github.com/metal-toolbox/conditionorc/pkg/api/v1/conditions/types"
 )
 
 var (

@@ -5,7 +5,7 @@ package fleetdb
 import (
 	context "context"
 
-	condition "github.com/metal-toolbox/rivets/condition"
+	condition "github.com/metal-toolbox/rivets/v2/condition"
 
 	fleetdbapi "github.com/metal-toolbox/fleetdb/pkg/api/v1"
 

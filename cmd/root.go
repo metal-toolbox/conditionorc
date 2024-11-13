@@ -20,7 +20,7 @@ import (
 	"os"
 
 	"github.com/metal-toolbox/conditionorc/internal/version"
-	"github.com/metal-toolbox/rivets/ginjwt"
+	"github.com/metal-toolbox/rivets/v2/ginjwt"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )

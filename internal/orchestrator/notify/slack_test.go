@@ -13,7 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	v1types "github.com/metal-toolbox/conditionorc/pkg/api/v1/conditions/types"
-	rctypes "github.com/metal-toolbox/rivets/condition"
+	rctypes "github.com/metal-toolbox/rivets/v2/condition"
 )
 
 // cribbed this test infra from the slack API open source code

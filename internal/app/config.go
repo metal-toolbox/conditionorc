@@ -6,13 +6,13 @@ import (
 	"strings"
 	"time"
 
-	"github.com/metal-toolbox/conditionorc/internal/model"
-	"github.com/metal-toolbox/conditionorc/internal/orchestrator/notify"
-	"github.com/metal-toolbox/rivets/events"
-	"github.com/metal-toolbox/rivets/ginjwt"
+	rctypes "github.com/metal-toolbox/rivets/v2/condition"
+	"github.com/metal-toolbox/rivets/v2/events"
+	"github.com/metal-toolbox/rivets/v2/ginjwt"
 	"github.com/pkg/errors"
 
-	rctypes "github.com/metal-toolbox/rivets/condition"
+	"github.com/metal-toolbox/conditionorc/internal/model"
+	"github.com/metal-toolbox/conditionorc/internal/orchestrator/notify"
 )
 
 var ErrConfig = errors.New("configuration error")

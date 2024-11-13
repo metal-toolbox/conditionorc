@@ -15,7 +15,7 @@ import (
 	"golang.org/x/oauth2/clientcredentials"
 
 	fleetdbapi "github.com/metal-toolbox/fleetdb/pkg/api/v1"
-	rctypes "github.com/metal-toolbox/rivets/condition"
+	rctypes "github.com/metal-toolbox/rivets/v2/condition"
 )
 
 // FleetDB handles traffics between conditionorc and fleet db.

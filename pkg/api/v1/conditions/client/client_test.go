@@ -12,21 +12,19 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
-	"github.com/metal-toolbox/conditionorc/internal/fleetdb"
-	"github.com/metal-toolbox/conditionorc/internal/model"
-	"github.com/metal-toolbox/conditionorc/internal/server"
 	fleetdbapi "github.com/metal-toolbox/fleetdb/pkg/api/v1"
-
-	"github.com/metal-toolbox/conditionorc/internal/store"
+	rctypes "github.com/metal-toolbox/rivets/v2/condition"
+	"github.com/metal-toolbox/rivets/v2/events"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	"github.com/metal-toolbox/conditionorc/internal/fleetdb"
+	"github.com/metal-toolbox/conditionorc/internal/model"
+	"github.com/metal-toolbox/conditionorc/internal/server"
+	"github.com/metal-toolbox/conditionorc/internal/store"
 	"github.com/metal-toolbox/conditionorc/pkg/api/v1/conditions/types"
 	v1types "github.com/metal-toolbox/conditionorc/pkg/api/v1/conditions/types"
-	rctypes "github.com/metal-toolbox/rivets/condition"
-
-	eventsm "github.com/metal-toolbox/rivets/events"
 )
 
 type integrationTester struct {
@@ -36,7 +34,7 @@ type integrationTester struct {
 	client          *Client
 	repository      *store.MockRepository
 	fleetDB         *fleetdb.MockFleetDB
-	stream          *eventsm.MockStream
+	stream          *events.MockStream
 }
 
 // Do implements the HTTPRequestDoer interface to swap the response writer
@@ -62,7 +60,7 @@ func newTester(t *testing.T) *integrationTester {
 
 	repository := store.NewMockRepository(t)
 	fleetDBClient := fleetdb.NewMockFleetDB(t)
-	stream := eventsm.NewMockStream(t)
+	stream := events.NewMockStream(t)
 
 	l := logrus.New()
 	l.Level = logrus.Level(logrus.ErrorLevel)

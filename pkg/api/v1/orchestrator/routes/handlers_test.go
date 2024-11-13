@@ -18,8 +18,8 @@ import (
 	v1types "github.com/metal-toolbox/conditionorc/pkg/api/v1/orchestrator/types"
 	"github.com/pkg/errors"
 
-	rctypes "github.com/metal-toolbox/rivets/condition"
-	eventsm "github.com/metal-toolbox/rivets/events"
+	rctypes "github.com/metal-toolbox/rivets/v2/condition"
+	eventsm "github.com/metal-toolbox/rivets/v2/events"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	mock "github.com/stretchr/testify/mock"

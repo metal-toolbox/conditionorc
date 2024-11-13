@@ -8,7 +8,7 @@ import (
 	"github.com/google/uuid"
 
 	v1types "github.com/metal-toolbox/conditionorc/pkg/api/v1/orchestrator/types"
-	rctypes "github.com/metal-toolbox/rivets/condition"
+	rctypes "github.com/metal-toolbox/rivets/v2/condition"
 )
 
 // Doer performs HTTP requests.

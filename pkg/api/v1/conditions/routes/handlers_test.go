@@ -20,9 +20,8 @@ import (
 	"github.com/metal-toolbox/conditionorc/pkg/api/v1/conditions/types"
 	v1types "github.com/metal-toolbox/conditionorc/pkg/api/v1/conditions/types"
 	fleetdbapi "github.com/metal-toolbox/fleetdb/pkg/api/v1"
-	rctypes "github.com/metal-toolbox/rivets/condition"
-	"github.com/metal-toolbox/rivets/events"
-	eventsm "github.com/metal-toolbox/rivets/events"
+	rctypes "github.com/metal-toolbox/rivets/v2/condition"
+	"github.com/metal-toolbox/rivets/v2/events"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
@@ -88,10 +87,10 @@ func asJSONBytes(t *testing.T, s *v1types.ServerResponse) []byte {
 	return b
 }
 
-func setupTestServer(t *testing.T) (*store.MockRepository, *fleetdb.MockFleetDB, *eventsm.MockStream, *gin.Engine, error) {
+func setupTestServer(t *testing.T) (*store.MockRepository, *fleetdb.MockFleetDB, *events.MockStream, *gin.Engine, error) {
 	repository := store.NewMockRepository(t)
 	fleetDBClient := fleetdb.NewMockFleetDB(t)
-	stream := eventsm.NewMockStream(t)
+	stream := events.NewMockStream(t)
 
 	server, err := mockserver(t, logrus.New(), fleetDBClient, repository, stream)
 
@@ -128,7 +127,7 @@ func TestAddServer(t *testing.T) {
 		name              string
 		mockStore         func(r *store.MockRepository)
 		mockFleetDBClient func(f *fleetdb.MockFleetDB)
-		mockStream        func(r *eventsm.MockStream)
+		mockStream        func(r *events.MockStream)
 		request           func(t *testing.T) *http.Request
 		assertResponse    func(t *testing.T, r *httptest.ResponseRecorder)
 	}{
@@ -154,7 +153,7 @@ func TestAddServer(t *testing.T) {
 					Return(nopRollback, nil). // no condition exists
 					Once()
 			},
-			mockStream: func(r *eventsm.MockStream) {
+			mockStream: func(r *events.MockStream) {
 				r.On(
 					"Publish",
 					mock.Anything,
@@ -297,7 +296,7 @@ func TestAddServer(t *testing.T) {
 					}).
 					Once()
 			},
-			mockStream: func(r *eventsm.MockStream) {
+			mockStream: func(r *events.MockStream) {
 				r.On(
 					"Publish",
 					mock.Anything,
@@ -647,7 +646,7 @@ func TestServerConditionCreate(t *testing.T) {
 
 	repository := store.NewMockRepository(t)
 	fleetDBClient := fleetdb.NewMockFleetDB(t)
-	stream := eventsm.NewMockStream(t)
+	stream := events.NewMockStream(t)
 
 	server, err := mockserver(t, logrus.New(), fleetDBClient, repository, stream)
 	if err != nil {
@@ -658,7 +657,7 @@ func TestServerConditionCreate(t *testing.T) {
 		name              string
 		mockStore         func(r *store.MockRepository)
 		mockFleetDBClient func(f *fleetdb.MockFleetDB)
-		mockStream        func(r *eventsm.MockStream)
+		mockStream        func(r *events.MockStream)
 		request           func(t *testing.T) *http.Request
 		assertResponse    func(t *testing.T, r *httptest.ResponseRecorder)
 	}{
@@ -765,7 +764,7 @@ func TestServerConditionCreate(t *testing.T) {
 					Return(&model.Server{ID: serverID, FacilityCode: facilityCode}, nil).
 					Once()
 			},
-			mockStream: func(r *eventsm.MockStream) {
+			mockStream: func(r *events.MockStream) {
 				r.On(
 					"Publish",
 					mock.Anything,
@@ -817,7 +816,7 @@ func TestServerConditionCreate(t *testing.T) {
 					Return(&model.Server{ID: serverID, FacilityCode: facilityCode}, nil).
 					Once()
 			},
-			mockStream: func(r *eventsm.MockStream) {
+			mockStream: func(r *events.MockStream) {
 				r.On(
 					"Publish",
 					mock.Anything,
@@ -907,7 +906,7 @@ func TestServerConditionCreate(t *testing.T) {
 					Return(&model.Server{ID: serverID, FacilityCode: facilityCode}, nil).
 					Once()
 			},
-			mockStream: func(r *eventsm.MockStream) {
+			mockStream: func(r *events.MockStream) {
 				r.On(
 					"Publish",
 					mock.Anything,
