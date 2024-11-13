@@ -12,17 +12,16 @@ import (
 	"github.com/metal-toolbox/conditionorc/internal/metrics"
 	"github.com/metal-toolbox/conditionorc/internal/status"
 	"github.com/metal-toolbox/conditionorc/internal/store"
-	"github.com/metal-toolbox/rivets/events/pkg/kv"
-	"github.com/metal-toolbox/rivets/events/registry"
+	v1types "github.com/metal-toolbox/conditionorc/pkg/api/v1/conditions/types"
+	rctypes "github.com/metal-toolbox/rivets/v2/condition"
+	"github.com/metal-toolbox/rivets/v2/events/pkg/kv"
+	"github.com/metal-toolbox/rivets/v2/events/registry"
 	"github.com/nats-io/nats.go"
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/sirupsen/logrus"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/trace"
-
-	v1types "github.com/metal-toolbox/conditionorc/pkg/api/v1/conditions/types"
-	rctypes "github.com/metal-toolbox/rivets/condition"
 )
 
 var (

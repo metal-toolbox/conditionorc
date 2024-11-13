@@ -16,8 +16,7 @@ import (
 	"go.opentelemetry.io/otel"
 
 	fleetdbapi "github.com/metal-toolbox/fleetdb/pkg/api/v1"
-	rctypes "github.com/metal-toolbox/rivets/condition"
-	rfleetdbapi "github.com/metal-toolbox/rivets/fleetdb"
+	rctypes "github.com/metal-toolbox/rivets/v2/condition"
 )
 
 const (
@@ -72,7 +71,8 @@ func (s *fleetDBImpl) AddServer(ctx context.Context, serverID uuid.UUID, facilit
 		}
 
 		if createStatus.attributesCreated {
-			_, err := s.client.DeleteAttributes(ctx, serverID, rfleetdbapi.ServerAttributeNSBmcAddress)
+			// FIXME: use the constant defined in FleetDB
+			_, err := s.client.DeleteAttributes(ctx, serverID, "sh.hollow.bmc_info")
 			if err != nil {
 				s.logger.WithError(err).Warning("server enroll failed to rollback attributes")
 				return err
@@ -109,7 +109,8 @@ func (s *fleetDBImpl) AddServer(ctx context.Context, serverID uuid.UUID, facilit
 
 	// Add server BMC IP attribute
 	addrAttr := fmt.Sprintf(`{"address": %q}`, addr.String())
-	bmcIPAttr := fleetdbapi.Attributes{Namespace: rfleetdbapi.ServerAttributeNSBmcAddress, Data: []byte(addrAttr)}
+	// FIXME: import constant from FleetDB
+	bmcIPAttr := fleetdbapi.Attributes{Namespace: "sh.hollow.bmc_info", Data: []byte(addrAttr)}
 	_, err = s.client.CreateAttributes(otelCtx, serverID, bmcIPAttr)
 	if err != nil {
 		return cleanup, err

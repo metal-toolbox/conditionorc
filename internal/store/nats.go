@@ -12,9 +12,9 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/metal-toolbox/conditionorc/internal/metrics"
-	rctypes "github.com/metal-toolbox/rivets/condition"
-	"github.com/metal-toolbox/rivets/events"
-	"github.com/metal-toolbox/rivets/events/pkg/kv"
+	rctypes "github.com/metal-toolbox/rivets/v2/condition"
+	"github.com/metal-toolbox/rivets/v2/events"
+	"github.com/metal-toolbox/rivets/v2/events/pkg/kv"
 	"github.com/nats-io/nats.go"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"

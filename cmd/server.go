@@ -16,7 +16,7 @@ import (
 	"github.com/metal-toolbox/conditionorc/internal/server"
 	"github.com/metal-toolbox/conditionorc/internal/store"
 	"github.com/metal-toolbox/conditionorc/internal/version"
-	"github.com/metal-toolbox/rivets/events"
+	"github.com/metal-toolbox/rivets/v2/events"
 	"github.com/spf13/cobra"
 )
 

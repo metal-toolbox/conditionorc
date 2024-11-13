@@ -14,9 +14,11 @@ import (
 	"github.com/google/uuid"
 	"github.com/metal-toolbox/conditionorc/internal/status"
 	"github.com/metal-toolbox/conditionorc/internal/store"
-	"github.com/metal-toolbox/rivets/events"
-	"github.com/metal-toolbox/rivets/events/pkg/kv"
-	"github.com/metal-toolbox/rivets/events/registry"
+	v1types "github.com/metal-toolbox/conditionorc/pkg/api/v1/conditions/types"
+	rctypes "github.com/metal-toolbox/rivets/v2/condition"
+	"github.com/metal-toolbox/rivets/v2/events"
+	"github.com/metal-toolbox/rivets/v2/events/pkg/kv"
+	"github.com/metal-toolbox/rivets/v2/events/registry"
 	"github.com/nats-io/nats-server/v2/server"
 	srvtest "github.com/nats-io/nats-server/v2/test"
 	"github.com/nats-io/nats.go"
@@ -24,10 +26,6 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/goleak"
-
-	v1types "github.com/metal-toolbox/conditionorc/pkg/api/v1/conditions/types"
-	rctypes "github.com/metal-toolbox/rivets/condition"
-	eventsm "github.com/metal-toolbox/rivets/events"
 )
 
 var (
@@ -331,7 +329,7 @@ func TestQueueFollowingCondition(t *testing.T) {
 		}
 		condArg := &rctypes.Condition{ID: condID, Target: serverID}
 		repo.On("GetActiveCondition", mock.Anything, serverID).Return(next, nil).Once()
-		stream := eventsm.NewMockStream(t)
+		stream := events.NewMockStream(t)
 		subject := "fc-13.servers.following-kind"
 		stream.On("Publish", mock.Anything, subject, mock.Anything).Return(errors.New("pound sand")).Once()
 		o := &Orchestrator{
@@ -373,7 +371,7 @@ func TestQueueFollowingCondition(t *testing.T) {
 		}
 		condArg := &rctypes.Condition{ID: condID, Target: serverID}
 		repo.On("GetActiveCondition", mock.Anything, serverID).Return(next, nil).Once()
-		stream := eventsm.NewMockStream(t)
+		stream := events.NewMockStream(t)
 		subject := "fc-13.servers.following-kind"
 		stream.On("Publish", mock.Anything, subject, mock.Anything).Return(nil).Once()
 		o := &Orchestrator{

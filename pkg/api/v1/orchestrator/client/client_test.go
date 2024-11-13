@@ -20,8 +20,8 @@ import (
 	"github.com/stretchr/testify/require"
 
 	v1types "github.com/metal-toolbox/conditionorc/pkg/api/v1/orchestrator/types"
-	rctypes "github.com/metal-toolbox/rivets/condition"
-	eventsm "github.com/metal-toolbox/rivets/events"
+	rctypes "github.com/metal-toolbox/rivets/v2/condition"
+	eventsm "github.com/metal-toolbox/rivets/v2/events"
 )
 
 const (

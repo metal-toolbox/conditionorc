@@ -6,15 +6,14 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	rctypes "github.com/metal-toolbox/rivets/condition"
-	"github.com/metal-toolbox/rivets/events"
+	rctypes "github.com/metal-toolbox/rivets/v2/condition"
+	"github.com/metal-toolbox/rivets/v2/events"
+	"github.com/nats-io/nats-server/v2/server"
+	srvtest "github.com/nats-io/nats-server/v2/test"
 	"github.com/nats-io/nats.go"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
-	"github.com/nats-io/nats-server/v2/server"
-	srvtest "github.com/nats-io/nats-server/v2/test"
 )
 
 func runNATSServer(t *testing.T) *server.Server {

@@ -11,7 +11,9 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
-	"github.com/metal-toolbox/rivets/ginjwt"
+	fleetdbapi "github.com/metal-toolbox/fleetdb/pkg/api/v1"
+	rctypes "github.com/metal-toolbox/rivets/v2/condition"
+	"github.com/metal-toolbox/rivets/v2/ginjwt"
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/sirupsen/logrus"
@@ -22,8 +24,6 @@ import (
 	"github.com/metal-toolbox/conditionorc/internal/metrics"
 	"github.com/metal-toolbox/conditionorc/internal/store"
 	v1types "github.com/metal-toolbox/conditionorc/pkg/api/v1/conditions/types"
-	fleetdbapi "github.com/metal-toolbox/fleetdb/pkg/api/v1"
-	rctypes "github.com/metal-toolbox/rivets/condition"
 )
 
 const (

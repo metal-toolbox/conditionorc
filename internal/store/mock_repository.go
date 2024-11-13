@@ -5,7 +5,7 @@ package store
 import (
 	context "context"
 
-	condition "github.com/metal-toolbox/rivets/condition"
+	condition "github.com/metal-toolbox/rivets/v2/condition"
 
 	mock "github.com/stretchr/testify/mock"
 

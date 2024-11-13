@@ -9,13 +9,13 @@ import (
 	"github.com/metal-toolbox/conditionorc/internal/fleetdb"
 	"github.com/metal-toolbox/conditionorc/internal/metrics"
 	"github.com/metal-toolbox/conditionorc/internal/store"
-	"github.com/metal-toolbox/rivets/events"
-	"github.com/metal-toolbox/rivets/ginauth"
+	rctypes "github.com/metal-toolbox/rivets/v2/condition"
+	"github.com/metal-toolbox/rivets/v2/events"
+	"github.com/metal-toolbox/rivets/v2/ginauth"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 
 	v1types "github.com/metal-toolbox/conditionorc/pkg/api/v1/conditions/types"
-	rctypes "github.com/metal-toolbox/rivets/condition"
 )
 
 const (

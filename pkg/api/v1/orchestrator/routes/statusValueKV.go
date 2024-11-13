@@ -9,7 +9,7 @@ import (
 	"github.com/nats-io/nats.go"
 	"github.com/pkg/errors"
 
-	rctypes "github.com/metal-toolbox/rivets/condition"
+	rctypes "github.com/metal-toolbox/rivets/v2/condition"
 )
 
 type statusValueKV interface {
