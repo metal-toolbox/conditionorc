@@ -2,7 +2,7 @@ module github.com/metal-toolbox/conditionorc
 
 go 1.22.7
 
-toolchain go1.23.1
+toolchain go1.23.4
 
 require (
 	github.com/banzaicloud/logrus-runtime-formatter v0.0.0-20190729070250-5ae5475bae5e
@@ -12,6 +12,7 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/hashicorp/go-retryablehttp v0.7.7
 	github.com/metal-toolbox/fleetdb v1.20.0
+	github.com/metal-toolbox/rivets v1.3.10
 	github.com/metal-toolbox/rivets/v2 v2.0.0
 	github.com/nats-io/nats-server/v2 v2.10.22
 	github.com/nats-io/nats.go v1.37.0
