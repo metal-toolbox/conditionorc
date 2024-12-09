@@ -30,7 +30,7 @@ require (
 	go.opentelemetry.io/otel/trace v1.32.0
 	go.uber.org/goleak v1.3.0
 	golang.org/x/oauth2 v0.24.0
-	gopkg.in/go-jose/go-jose.v2 v2.6.3
+	gopkg.in/go-jose/go-jose.v4 v4.0.4
 )
 
 require (
