@@ -21,6 +21,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/metal-toolbox/conditionorc/internal/server"
 	"github.com/metal-toolbox/conditionorc/internal/store"
+	rctypes "github.com/metal-toolbox/rivets/v2/condition"
 	"github.com/metal-toolbox/rivets/v2/ginjwt"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -28,7 +29,6 @@ import (
 	"gopkg.in/go-jose/go-jose.v2/jwt"
 
 	v1types "github.com/metal-toolbox/conditionorc/pkg/api/v1/conditions/types"
-	rctypes "github.com/metal-toolbox/rivets/condition"
 	"github.com/sirupsen/logrus"
 )
 

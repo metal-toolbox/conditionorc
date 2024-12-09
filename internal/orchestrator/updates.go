@@ -424,9 +424,10 @@ func (o *Orchestrator) eventUpdate(ctx context.Context, evt *v1types.ConditionUp
 }
 
 func (o *Orchestrator) finalizeCondition(ctx context.Context, cond *rctypes.Condition) error {
-	// if we fail to update the event history the reconciler  will catch it later and walk
-	// this code, so return early. It is kosher to replay event history iff the contents of
-	// that history (id, condition kind, target, parameters, state and status) are identical.
+	// if we fail to update the event history or to delete this event from the KV,
+	// the reconciler  will catch it later and walk this code, so return early. It
+	// is kosher to replay event history iff the contents of that history (id,
+	// condition kind, target, parameters, state and status) are identical.
 	if err := o.db.WriteEventHistory(ctx, cond); err != nil {
 		o.logger.WithError(err).WithFields(logrus.Fields{
 			"condition.id":   cond.ID.String(),
@@ -437,6 +438,19 @@ func (o *Orchestrator) finalizeCondition(ctx context.Context, cond *rctypes.Cond
 		metrics.DependencyError("fleetdb", "update event history")
 
 		return errors.Wrap(errCompleteEvent, err.Error())
+	}
+
+	delErr := status.DeleteCondition(cond.Kind, o.facility, cond.ID.String())
+	if delErr != nil {
+		o.logger.WithError(delErr).WithFields(logrus.Fields{
+			"condition.id":   cond.ID.String(),
+			"server.id":      cond.Target.String(),
+			"condition.kind": cond.Kind,
+		}).Warn("removing completed condition data")
+
+		metrics.DependencyError("nats", "remove completed condition condition")
+
+		return errors.Wrap(errCompleteEvent, delErr.Error())
 	}
 
 	metrics.ConditionCompleted.With(
@@ -597,6 +611,10 @@ func (o *Orchestrator) reconcileStatusKVEntries(ctx context.Context) {
 		}
 
 		le.Info("condition reconciled")
+		// don't need this anymore, get rid of it
+		if err := status.DeleteCondition(evt.Kind, o.facility, evt.ConditionID.String()); err != nil {
+			le.WithError(err).Warn("deleting condition on reconciliation")
+		}
 
 		if err := o.notifier.Send(evt); err != nil {
 			le.WithError(err).Warn("reconciler event notification")
