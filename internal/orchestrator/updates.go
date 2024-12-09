@@ -608,15 +608,13 @@ func (o *Orchestrator) reconcileStatusKVEntries(ctx context.Context) {
 				// arguably dependencies are in a weird state, maybe return?
 				continue
 			}
-			// if we're here there has been a terminal error trying to reconcile this
-			// status value. Get rid of it now.
-			if err = status.DeleteCondition(evt.Kind, o.facility, evt.ConditionID.String()); err != nil {
-				le.WithError(err).Warn("deleting condition on reconciliation")
-				continue
-			}
 		}
 
 		le.Info("condition reconciled")
+		// don't need this anymore, get rid of it
+		if err := status.DeleteCondition(evt.Kind, o.facility, evt.ConditionID.String()); err != nil {
+			le.WithError(err).Warn("deleting condition on reconciliation")
+		}
 
 		if err := o.notifier.Send(evt); err != nil {
 			le.WithError(err).Warn("reconciler event notification")
