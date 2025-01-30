@@ -5,7 +5,7 @@ import (
 	"time"
 
 	docs "github.com/metal-toolbox/conditionorc/docs"
-	swaggerfiles "github.com/swaggo/files"
+	swaggerfiles "github.com/swaggo/files/v2"
 	ginSwagger "github.com/swaggo/gin-swagger"
 
 	"github.com/gin-gonic/gin"
