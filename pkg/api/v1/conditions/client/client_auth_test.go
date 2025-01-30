@@ -25,8 +25,8 @@ import (
 	"github.com/metal-toolbox/rivets/v2/ginjwt"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
-	"gopkg.in/go-jose/go-jose.v2"
-	"gopkg.in/go-jose/go-jose.v2/jwt"
+	jose "github.com/go-jose/go-jose/v4"
+	"github.com/go-jose/go-jose/v4/jwt"
 
 	v1types "github.com/metal-toolbox/conditionorc/pkg/api/v1/conditions/types"
 	"github.com/sirupsen/logrus"
