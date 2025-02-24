@@ -9,7 +9,7 @@ require (
 	github.com/coreos/go-oidc/v3 v3.12.0
 	github.com/equinix-labs/otel-init-go v0.0.9
 	github.com/gin-gonic/gin v1.10.0
-	github.com/go-jose/go-jose/v4 v4.0.4
+	github.com/go-jose/go-jose/v4 v4.0.5
 	github.com/google/uuid v1.6.0
 	github.com/hashicorp/go-retryablehttp v0.7.7
 	github.com/metal-toolbox/fleetdb v1.20.1
