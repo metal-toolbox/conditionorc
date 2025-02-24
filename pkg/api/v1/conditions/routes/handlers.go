@@ -553,15 +553,15 @@ func (r *Routes) biosControl(c *gin.Context) (int, *v1types.ServerResponse) {
 
 	var bctp rctypes.BiosControlTaskParameters
 	if err = c.ShouldBindJSON(&bctp); err != nil {
-		r.logger.WithError(err).Warn("unmarshal biosControl payload")
-
 		body, err := io.ReadAll(c.Request.Body)
 		if err != nil {
 			body = []byte("unable to read request body")
 		}
 
+		r.logger.WithError(err).Warn("unmarshal biosControl payload\nbody: " + string(body))
+
 		return http.StatusBadRequest, &v1types.ServerResponse{
-			Message: "invalid biosControl payload: " + err.Error() + "\n body: " + string(body),
+			Message: "invalid biosControl payload: " + err.Error() + "\nbody: " + string(body),
 		}
 	}
 
