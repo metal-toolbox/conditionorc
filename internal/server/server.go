@@ -5,7 +5,6 @@ import (
 	"time"
 
 	docs "github.com/metal-toolbox/conditionorc/docs"
-	swaggerfiles "github.com/swaggo/files"
 	ginSwagger "github.com/swaggo/gin-swagger"
 
 	"github.com/gin-gonic/gin"
@@ -19,6 +18,7 @@ import (
 	"github.com/metal-toolbox/rivets/v2/ginjwt"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
+	"golang.org/x/net/webdav"
 )
 
 var (
@@ -114,6 +114,14 @@ func WithOrchestratorAPI(facilityCode string) Option {
 	}
 }
 
+// Stolen from swaggo/files v1
+func NewHandler() *webdav.Handler {
+	return &webdav.Handler{
+		FileSystem: webdav.NewMemFS(),
+		LockSystem: webdav.NewMemLS(),
+	}
+}
+
 func New(opts ...Option) *http.Server {
 	s := &Server{
 		kind: ConditionsAPI,
@@ -152,7 +160,8 @@ func New(opts ...Option) *http.Server {
 
 	// Swagger Doc API Endpoint. <IP:Port>/api/v1/docs/index.html is the URL you want
 	docs.SwaggerInfo.BasePath = "/api/v1"
-	g.GET("/api/v1/docs/*any", ginSwagger.WrapHandler(swaggerfiles.Handler))
+	handler := NewHandler()
+	g.GET("/api/v1/docs/*any", ginSwagger.WrapHandler(handler))
 
 	return &http.Server{
 		Addr:         s.listenAddress,
